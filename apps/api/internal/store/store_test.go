@@ -61,6 +61,29 @@ func TestMemoryStorePersistsSyncResult(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreDeduplicatesDocumentChunksByServiceAndExternalID(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	chunk := domain.DocumentChunk{
+		ID:         "chunk-1",
+		ExternalID: "notion-page-1",
+		Service:    domain.ServiceNotion,
+		Title:      "Architecture Decision",
+		Source:     "Notion",
+		URL:        "https://notion.so/page-1",
+		Content:    "Decision content",
+		UpdatedAt:  time.Now().UTC(),
+	}
+
+	if err := store.SaveDocumentChunks(context.Background(), ctx, []domain.DocumentChunk{chunk, chunk}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(store.documentChunks) != 1 {
+		t.Fatalf("expected 1 deduplicated chunk, got %d", len(store.documentChunks))
+	}
+}
+
 func TestSealUsesAESGCMWhenKeyIsConfigured(t *testing.T) {
 	t.Setenv("TOKEN_SEALING_KEY", base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012")))
 

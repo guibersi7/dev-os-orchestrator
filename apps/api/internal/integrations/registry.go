@@ -26,7 +26,7 @@ func NewRegistry() *Registry {
 		NewLinearConnector(),
 		NewJiraConnector(),
 		NewTrelloConnector(),
-		newMockConnector(domain.ServiceNotion, "Notion", "oauth", "polling_first", []string{"oauth", "initial_sync", "polling", "semantic_context"}, []string{"pages", "databases", "specs", "decisions", "comments"}),
+		NewNotionConnector(),
 		newMockConnector(domain.ServiceCalendar, "Calendar", "oauth", "polling_first", []string{"oauth", "initial_sync", "polling", "semantic_context"}, []string{"meetings", "attendees", "descriptions", "follow_ups"}),
 	}
 

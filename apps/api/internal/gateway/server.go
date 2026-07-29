@@ -287,14 +287,22 @@ func (s *Server) sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.store.SaveDocumentChunks(r.Context(), ctx, result.DocumentChunks); err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "document_chunk_persist_failed", err.Error(), map[string]any{"service": input.Service})
+		return
+	}
+
 	if err := s.store.SaveSyncResult(r.Context(), ctx, result); err != nil {
 		s.writeError(w, ctx, http.StatusInternalServerError, "sync_state_persist_failed", err.Error(), map[string]any{"service": input.Service})
 		return
 	}
 
+	publicResult := result
+	publicResult.DocumentChunks = nil
+
 	s.write(w, ctx, http.StatusOK, map[string]any{
 		"connector": connector.Info(),
-		"result":    result,
+		"result":    publicResult,
 	})
 }
 

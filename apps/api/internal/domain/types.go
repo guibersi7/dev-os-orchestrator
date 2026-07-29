@@ -72,12 +72,13 @@ type WorkEvent struct {
 }
 
 type SyncResult struct {
-	Service        Service     `json:"service"`
-	Status         string      `json:"status"`
-	RecordsScanned int         `json:"recordsScanned"`
-	EventsCreated  int         `json:"eventsCreated"`
-	NextCursor     *string     `json:"nextCursor"`
-	Events         []WorkEvent `json:"events"`
+	Service        Service         `json:"service"`
+	Status         string          `json:"status"`
+	RecordsScanned int             `json:"recordsScanned"`
+	EventsCreated  int             `json:"eventsCreated"`
+	NextCursor     *string         `json:"nextCursor"`
+	Events         []WorkEvent     `json:"events"`
+	DocumentChunks []DocumentChunk `json:"documentChunks,omitempty"`
 }
 
 type ConnectorInfo struct {
@@ -145,4 +146,16 @@ type ProviderToken struct {
 	RefreshToken      string
 	ExpiresAt         string
 	Scopes            []string
+}
+
+type DocumentChunk struct {
+	ID         string         `json:"id"`
+	ExternalID string         `json:"externalId"`
+	Service    Service        `json:"service"`
+	Title      string         `json:"title"`
+	Source     string         `json:"source"`
+	URL        string         `json:"url"`
+	Content    string         `json:"content"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
 }

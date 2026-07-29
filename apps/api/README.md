@@ -242,6 +242,7 @@ Persisted entities:
 - `integration_configs`
 - `integration_tokens`
 - `work_events`
+- `document_chunks`
 - `dashboard_snapshots`
 
 Runtime behavior:
@@ -253,7 +254,9 @@ Runtime behavior:
 - `POST /v1/tokens` stores sealed tokens server-side only.
 - `POST /v1/tokens/refresh` exchanges refresh tokens with the provider, persists the new access token, and never returns token material.
 - `POST /v1/sync` persists generated `work_events` and updates `integration_configs.last_synced_at`.
+- Notion sync persists private `document_chunks` for future semantic search. Chunk content is not returned in the sync response or `WorkEvent.raw`.
 - Sync writes are idempotent by `(workspace_id, service, external_id)`.
+- Document chunk writes are idempotent by `(workspace_id, service, external_id)`.
 - `integration_configs` tracks `sync_cursor`, `last_sync_error`, `last_sync_records_scanned`, and `last_sync_events_created`.
 
 Without Supabase env vars, the API uses an in-memory store for local development.
@@ -267,7 +270,7 @@ OAuth env vars:
 - `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_OAUTH_SCOPES`
 - `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_OAUTH_SCOPES`
 - `TRELLO_CLIENT_ID`, `TRELLO_CLIENT_SECRET`, `TRELLO_OAUTH_SCOPES`
-- `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_OAUTH_SCOPES`
+- `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_OAUTH_SCOPES`, `NOTION_VERSION`
 - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_OAUTH_SCOPES`
 
 ## Tests

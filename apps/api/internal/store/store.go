@@ -23,6 +23,7 @@ var ErrTokenNotFound = errors.New("integration token not found")
 
 type Store interface {
 	SaveWorkEvents(context.Context, domain.GatewayContext, []domain.WorkEvent) error
+	SaveDocumentChunks(context.Context, domain.GatewayContext, []domain.DocumentChunk) error
 	SaveSyncResult(context.Context, domain.GatewayContext, domain.SyncResult) error
 	SaveSyncFailure(context.Context, domain.GatewayContext, domain.Service, error) error
 	GetDashboard(context.Context, domain.GatewayContext) (domain.DashboardPayload, error)
@@ -50,20 +51,24 @@ func NewFromEnv() Store {
 }
 
 type MemoryStore struct {
-	events    []domain.WorkEvent
-	eventKeys map[string]bool
-	configs   map[string]domain.UserConfig
-	tokens    map[string]domain.TokenUpsertRequest
-	syncs     map[domain.Service]domain.SyncResult
+	events         []domain.WorkEvent
+	eventKeys      map[string]bool
+	documentChunks []domain.DocumentChunk
+	chunkKeys      map[string]bool
+	configs        map[string]domain.UserConfig
+	tokens         map[string]domain.TokenUpsertRequest
+	syncs          map[domain.Service]domain.SyncResult
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		events:    []domain.WorkEvent{},
-		eventKeys: map[string]bool{},
-		configs:   map[string]domain.UserConfig{},
-		tokens:    map[string]domain.TokenUpsertRequest{},
-		syncs:     map[domain.Service]domain.SyncResult{},
+		events:         []domain.WorkEvent{},
+		eventKeys:      map[string]bool{},
+		documentChunks: []domain.DocumentChunk{},
+		chunkKeys:      map[string]bool{},
+		configs:        map[string]domain.UserConfig{},
+		tokens:         map[string]domain.TokenUpsertRequest{},
+		syncs:          map[domain.Service]domain.SyncResult{},
 	}
 }
 
@@ -75,6 +80,18 @@ func (s *MemoryStore) SaveWorkEvents(_ context.Context, _ domain.GatewayContext,
 		}
 		s.eventKeys[key] = true
 		s.events = append(s.events, event)
+	}
+	return nil
+}
+
+func (s *MemoryStore) SaveDocumentChunks(_ context.Context, _ domain.GatewayContext, chunks []domain.DocumentChunk) error {
+	for _, chunk := range chunks {
+		key := chunkKey(chunk)
+		if s.chunkKeys[key] {
+			continue
+		}
+		s.chunkKeys[key] = true
+		s.documentChunks = append(s.documentChunks, chunk)
 	}
 	return nil
 }
@@ -230,6 +247,32 @@ func (s *SupabaseStore) SaveWorkEvents(ctx context.Context, gatewayCtx domain.Ga
 	}
 
 	return s.rest(ctx, http.MethodPost, "work_events?on_conflict=workspace_id,service,external_id", rows, nil)
+}
+
+func (s *SupabaseStore) SaveDocumentChunks(ctx context.Context, gatewayCtx domain.GatewayContext, chunks []domain.DocumentChunk) error {
+	if len(chunks) == 0 {
+		return nil
+	}
+	if err := s.ensureWorkspace(ctx, gatewayCtx); err != nil {
+		return err
+	}
+
+	rows := make([]map[string]any, 0, len(chunks))
+	for _, chunk := range chunks {
+		rows = append(rows, map[string]any{
+			"workspace_id": gatewayCtx.WorkspaceID,
+			"external_id":  chunk.ExternalID,
+			"service":      chunk.Service,
+			"title":        chunk.Title,
+			"source":       chunk.Source,
+			"url":          chunk.URL,
+			"content":      chunk.Content,
+			"metadata":     chunk.Metadata,
+			"updated_at":   chunk.UpdatedAt,
+		})
+	}
+
+	return s.rest(ctx, http.MethodPost, "document_chunks?on_conflict=workspace_id,service,external_id", rows, nil)
 }
 
 func (s *SupabaseStore) GetDashboard(ctx context.Context, gatewayCtx domain.GatewayContext) (domain.DashboardPayload, error) {
@@ -702,6 +745,14 @@ func eventKey(event domain.WorkEvent) string {
 		externalID = event.ID
 	}
 	return string(event.Service) + ":" + externalID
+}
+
+func chunkKey(chunk domain.DocumentChunk) string {
+	externalID := chunk.ExternalID
+	if externalID == "" {
+		externalID = chunk.ID
+	}
+	return string(chunk.Service) + ":" + externalID
 }
 
 func cursorValue(cursor *string) string {
