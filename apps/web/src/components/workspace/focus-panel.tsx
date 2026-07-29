@@ -2,7 +2,7 @@ import { ArrowUpRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { WorkEvent } from "@/lib/api-client";
+import type { FocusItem, WorkEvent } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/dashboard-view-model";
 
 function buildFocusItems(events: WorkEvent[]) {
@@ -13,12 +13,12 @@ function buildFocusItems(events: WorkEvent[]) {
       title: event.title,
       reason: `${event.summary} ${event.source} · ${formatRelativeTime(event.occurredAt)}.`,
       action: event.service === "github" ? "Open repository context" : "Inspect source context",
-      severity: event.priority === "high" ? "high" : "medium",
+      priority: event.priority === "high" ? "high" : "medium",
     }));
 }
 
-export function FocusPanel({ events }: { events: WorkEvent[] }) {
-  const focusItems = buildFocusItems(events);
+export function FocusPanel({ events, focus }: { events: WorkEvent[]; focus?: FocusItem[] }) {
+  const focusItems = focus?.length ? focus : buildFocusItems(events);
 
   return (
     <Card className="p-5">
@@ -36,7 +36,7 @@ export function FocusPanel({ events }: { events: WorkEvent[] }) {
           <div key={item.title} className="rounded-md border border-zinc-200 p-4">
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-sm font-semibold">{item.title}</h3>
-              <Badge tone={item.severity === "high" ? "red" : "amber"}>{item.severity}</Badge>
+              <Badge tone={item.priority === "high" ? "red" : "amber"}>{item.priority}</Badge>
             </div>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{item.reason}</p>
             <Button variant="ghost" size="sm" className="mt-3 px-0">

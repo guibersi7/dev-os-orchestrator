@@ -10,7 +10,6 @@ import { getDashboardState } from "@/lib/api-client";
 import {
   buildIssueQueue,
   buildReviewQueue,
-  buildWeeklySummary,
   emptyDashboard,
   latestSyncLabel,
   sourceEventCounts,
@@ -20,9 +19,9 @@ import {
 export default async function DashboardPage() {
   const dashboardState = await getDashboardState();
   const dashboard = dashboardState.data?.dashboard ?? emptyDashboard();
-  const reviewQueue = buildReviewQueue(dashboard.events);
-  const issueQueue = buildIssueQueue(dashboard.events);
-  const weeklySummary = buildWeeklySummary(dashboard.events);
+  const reviewQueue = buildReviewQueue(dashboard.today.prsWaitingForReview.length ? dashboard.today.prsWaitingForReview : dashboard.events);
+  const issueQueue = buildIssueQueue(dashboard.today.assignedIssues.length ? dashboard.today.assignedIssues : dashboard.events);
+  const weeklySummary = dashboard.weeklySummary;
   const eventCounts = sourceEventCounts(dashboard.events);
   const healthByService = sourceHealthByService(dashboard.sourceHealth);
   const metrics = [
@@ -75,7 +74,7 @@ export default async function DashboardPage() {
           <Timeline events={dashboard.events} />
         </div>
         <div className="space-y-6">
-          <FocusPanel events={dashboard.events} />
+          <FocusPanel events={dashboard.events} focus={dashboard.focus} />
           <Card className="p-5">
             <h2 className="text-base font-semibold">Connected sources</h2>
             <div className="mt-4 space-y-3">
@@ -106,15 +105,15 @@ export default async function DashboardPage() {
             <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
               <div className="rounded-md bg-zinc-50 p-3">
                 <dt className="text-zinc-500">Merged PRs</dt>
-                <dd className="mt-1 text-2xl font-semibold">{weeklySummary.mergedPrs}</dd>
+                <dd className="mt-1 text-2xl font-semibold">{weeklySummary.mergedPrs.length}</dd>
               </div>
               <div className="rounded-md bg-zinc-50 p-3">
                 <dt className="text-zinc-500">Closed issues</dt>
-                <dd className="mt-1 text-2xl font-semibold">{weeklySummary.closedIssues}</dd>
+                <dd className="mt-1 text-2xl font-semibold">{weeklySummary.closedIssues.length}</dd>
               </div>
               <div className="rounded-md bg-zinc-50 p-3">
                 <dt className="text-zinc-500">Decisions</dt>
-                <dd className="mt-1 text-2xl font-semibold">{weeklySummary.decisions}</dd>
+                <dd className="mt-1 text-2xl font-semibold">{dashboard.metrics.decisionsFound}</dd>
               </div>
             </dl>
             <div className="mt-4 space-y-2">

@@ -31,8 +31,41 @@ export type DashboardPayload = {
   workspaceId: string;
   generatedAt: string;
   metrics: DashboardMetrics;
+  today: DashboardToday;
+  focus: FocusItem[];
+  weeklySummary: WeeklySummary;
   events: WorkEvent[];
   sourceHealth: SourceHealth[];
+};
+
+export type DashboardToday = {
+  prsWaitingForReview: WorkEvent[];
+  blockedPrs: WorkEvent[];
+  failedChecks: WorkEvent[];
+  assignedIssues: WorkEvent[];
+  recentImportantChanges: WorkEvent[];
+};
+
+export type FocusItem = {
+  id: string;
+  title: string;
+  reason: string;
+  action: string;
+  priority: "low" | "medium" | "high" | string;
+  service: Service;
+  sources: string[];
+  eventIds: string[];
+  createdAt: string;
+};
+
+export type WeeklySummary = {
+  completedWork: string[];
+  mergedPrs: WorkEvent[];
+  closedIssues: WorkEvent[];
+  activeWork: WorkEvent[];
+  risks: string[];
+  blockers: WorkEvent[];
+  summaryStrategy: string;
 };
 
 export type ConnectorInfo = {

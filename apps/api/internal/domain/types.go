@@ -97,11 +97,14 @@ type SourceHealth struct {
 }
 
 type DashboardPayload struct {
-	WorkspaceID  string           `json:"workspaceId"`
-	GeneratedAt  time.Time        `json:"generatedAt"`
-	Metrics      DashboardMetrics `json:"metrics"`
-	Events       []WorkEvent      `json:"events"`
-	SourceHealth []SourceHealth   `json:"sourceHealth"`
+	WorkspaceID   string           `json:"workspaceId"`
+	GeneratedAt   time.Time        `json:"generatedAt"`
+	Metrics       DashboardMetrics `json:"metrics"`
+	Today         DashboardToday   `json:"today"`
+	Focus         []FocusItem      `json:"focus"`
+	WeeklySummary WeeklySummary    `json:"weeklySummary"`
+	Events        []WorkEvent      `json:"events"`
+	SourceHealth  []SourceHealth   `json:"sourceHealth"`
 }
 
 type DashboardMetrics struct {
@@ -109,6 +112,36 @@ type DashboardMetrics struct {
 	WaitingReview     int `json:"waitingReview"`
 	CrossToolBlockers int `json:"crossToolBlockers"`
 	DecisionsFound    int `json:"decisionsFound"`
+}
+
+type DashboardToday struct {
+	PRsWaitingForReview    []WorkEvent `json:"prsWaitingForReview"`
+	BlockedPRs             []WorkEvent `json:"blockedPrs"`
+	FailedChecks           []WorkEvent `json:"failedChecks"`
+	AssignedIssues         []WorkEvent `json:"assignedIssues"`
+	RecentImportantChanges []WorkEvent `json:"recentImportantChanges"`
+}
+
+type FocusItem struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Reason    string    `json:"reason"`
+	Action    string    `json:"action"`
+	Priority  string    `json:"priority"`
+	Service   Service   `json:"service"`
+	Sources   []string  `json:"sources"`
+	EventIDs  []string  `json:"eventIds"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type WeeklySummary struct {
+	CompletedWork   []string    `json:"completedWork"`
+	MergedPRs       []WorkEvent `json:"mergedPrs"`
+	ClosedIssues    []WorkEvent `json:"closedIssues"`
+	ActiveWork      []WorkEvent `json:"activeWork"`
+	Risks           []string    `json:"risks"`
+	Blockers        []WorkEvent `json:"blockers"`
+	SummaryStrategy string      `json:"summaryStrategy"`
 }
 
 type UserConfig struct {

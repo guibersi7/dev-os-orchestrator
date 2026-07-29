@@ -39,6 +39,23 @@ export function emptyDashboard(): DashboardPayload {
     workspaceId: "offline",
     generatedAt: new Date().toISOString(),
     metrics: emptyMetrics,
+    today: {
+      prsWaitingForReview: [],
+      blockedPrs: [],
+      failedChecks: [],
+      assignedIssues: [],
+      recentImportantChanges: [],
+    },
+    focus: [],
+    weeklySummary: {
+      completedWork: [],
+      mergedPrs: [],
+      closedIssues: [],
+      activeWork: [],
+      risks: [],
+      blockers: [],
+      summaryStrategy: "offline",
+    },
     events: [],
     sourceHealth: [],
   };

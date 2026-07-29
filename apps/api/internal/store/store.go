@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/developer-os/api/internal/domain"
+	"github.com/developer-os/api/internal/intelligence"
 )
 
 var ErrTokenNotFound = errors.New("integration token not found")
@@ -110,35 +111,26 @@ func (s *MemoryStore) SaveSyncFailure(_ context.Context, _ domain.GatewayContext
 }
 
 func (s *MemoryStore) GetDashboard(_ context.Context, ctx domain.GatewayContext) (domain.DashboardPayload, error) {
-	events := s.events
-	if len(events) == 0 {
-		events = demoEvents()
-	}
-
-	return domain.DashboardPayload{
-		WorkspaceID: ctx.WorkspaceID,
-		GeneratedAt: time.Now().UTC(),
-		Metrics: domain.DashboardMetrics{
-			ConnectedSources:  4,
-			WaitingReview:     countType(events, "review.requested"),
-			CrossToolBlockers: countPriority(events, "high"),
-			DecisionsFound:    countDecisions(events),
-		},
-		Events: events,
-		SourceHealth: []domain.SourceHealth{
-			{Service: domain.ServiceGitHub, Status: "connected"},
-			{Service: domain.ServiceSlack, Status: "connected"},
-			{Service: domain.ServiceLinear, Status: "connected"},
-			{Service: domain.ServiceNotion, Status: "connected"},
-			{Service: domain.ServiceJira, Status: "available"},
-			{Service: domain.ServiceTrello, Status: "available"},
-			{Service: domain.ServiceCalendar, Status: "available"},
-		},
-	}, nil
+	return intelligence.BuildDashboard(ctx, s.events, s.memorySourceHealth(), time.Now().UTC()), nil
 }
 
 func (s *MemoryStore) SaveDashboardSnapshot(_ context.Context, _ domain.GatewayContext, _ domain.DashboardPayload) error {
 	return nil
+}
+
+func (s *MemoryStore) memorySourceHealth() []domain.SourceHealth {
+	health := make([]domain.SourceHealth, 0, len(s.syncs))
+	for service, sync := range s.syncs {
+		status := sync.Status
+		if status == "" {
+			status = "available"
+		}
+		health = append(health, domain.SourceHealth{
+			Service: service,
+			Status:  status,
+		})
+	}
+	return health
 }
 
 func (s *MemoryStore) GetUserConfig(_ context.Context, ctx domain.GatewayContext) (domain.UserConfig, error) {
@@ -321,18 +313,7 @@ func (s *SupabaseStore) GetDashboard(ctx context.Context, gatewayCtx domain.Gate
 		sourceHealth = []domain.SourceHealth{}
 	}
 
-	return domain.DashboardPayload{
-		WorkspaceID: gatewayCtx.WorkspaceID,
-		GeneratedAt: time.Now().UTC(),
-		Metrics: domain.DashboardMetrics{
-			ConnectedSources:  4,
-			WaitingReview:     countType(events, "review.requested"),
-			CrossToolBlockers: countPriority(events, "high"),
-			DecisionsFound:    countDecisions(events),
-		},
-		Events:       events,
-		SourceHealth: sourceHealth,
-	}, nil
+	return intelligence.BuildDashboard(gatewayCtx, events, sourceHealth, time.Now().UTC()), nil
 }
 
 func (s *SupabaseStore) SaveSyncResult(ctx context.Context, gatewayCtx domain.GatewayContext, result domain.SyncResult) error {
@@ -554,53 +535,6 @@ func (s *SupabaseStore) rest(ctx context.Context, method string, path string, in
 	}
 
 	return json.NewDecoder(resp.Body).Decode(output)
-}
-
-func demoEvents() []domain.WorkEvent {
-	now := time.Now().UTC()
-	return []domain.WorkEvent{
-		{
-			ID:         "evt-demo-github",
-			Service:    domain.ServiceGitHub,
-			Type:       "check.failed",
-			Title:      "Auth session refresh checks failed",
-			Source:     "GitHub · devos-web",
-			Actor:      "GitHub Actions",
-			Priority:   "high",
-			Summary:    "The API gateway can serve dashboard data even before Supabase is configured.",
-			OccurredAt: now,
-		},
-	}
-}
-
-func countType(events []domain.WorkEvent, eventType string) int {
-	count := 0
-	for _, event := range events {
-		if event.Type == eventType {
-			count++
-		}
-	}
-	return count
-}
-
-func countPriority(events []domain.WorkEvent, priority string) int {
-	count := 0
-	for _, event := range events {
-		if event.Priority == priority {
-			count++
-		}
-	}
-	return count
-}
-
-func countDecisions(events []domain.WorkEvent) int {
-	count := 0
-	for _, event := range events {
-		if strings.Contains(event.Type, "decision") {
-			count++
-		}
-	}
-	return count
 }
 
 func seal(token string) string {
