@@ -27,7 +27,7 @@ func NewRegistry() *Registry {
 		NewJiraConnector(),
 		NewTrelloConnector(),
 		NewNotionConnector(),
-		newMockConnector(domain.ServiceCalendar, "Calendar", "oauth", "polling_first", []string{"oauth", "initial_sync", "polling", "semantic_context"}, []string{"meetings", "attendees", "descriptions", "follow_ups"}),
+		NewCalendarConnector(),
 	}
 
 	registry := &Registry{connectors: map[domain.Service]Connector{}}
