@@ -1,14 +1,13 @@
-import { AlertTriangle, GitPullRequest, MessagesSquare, Workflow } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
-const metrics = [
-  { label: "Connected sources", value: "4", icon: Workflow },
-  { label: "Waiting review", value: "7", icon: GitPullRequest },
-  { label: "Cross-tool blockers", value: "5", icon: AlertTriangle },
-  { label: "Decisions found", value: "18", icon: MessagesSquare },
-];
+export type MetricItem = {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+};
 
-export function MetricStrip() {
+export function MetricStrip({ metrics }: { metrics: MetricItem[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => (
