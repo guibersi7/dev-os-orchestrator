@@ -38,6 +38,14 @@ func NewRegistry() *Registry {
 	return registry
 }
 
+func NewRegistryWithConnectors(connectors ...Connector) *Registry {
+	registry := &Registry{connectors: map[domain.Service]Connector{}}
+	for _, connector := range connectors {
+		registry.connectors[connector.Info().ID] = connector
+	}
+	return registry
+}
+
 func (r *Registry) Get(service domain.Service) (Connector, bool) {
 	connector, ok := r.connectors[service]
 	return connector, ok

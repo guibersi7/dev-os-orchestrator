@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type Config struct {
 	GatewaySecret    string
 	OAuthStateSecret string
 	HTTPClient       *http.Client
+	Logger           *slog.Logger
 }
 
 type Server struct {
@@ -28,6 +30,7 @@ type Server struct {
 	gatewaySecret    string
 	oauthStateSecret string
 	httpClient       *http.Client
+	logger           *slog.Logger
 }
 
 func NewServer(config Config) *Server {
@@ -40,6 +43,10 @@ func NewServer(config Config) *Server {
 	if oauthStateSecret == "" {
 		oauthStateSecret = config.GatewaySecret
 	}
+	logger := config.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 
 	return &Server{
 		registry:         config.Registry,
@@ -47,6 +54,7 @@ func NewServer(config Config) *Server {
 		gatewaySecret:    config.GatewaySecret,
 		oauthStateSecret: oauthStateSecret,
 		httpClient:       httpClient,
+		logger:           logger,
 	}
 }
 
@@ -256,21 +264,47 @@ func (s *Server) sync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !input.Service.Valid() {
+		s.logger.WarnContext(r.Context(), "sync_rejected",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"reason", "unsupported_service",
+		)
 		s.writeError(w, ctx, http.StatusBadRequest, "unsupported_service", "unsupported integration service", map[string]any{"service": input.Service})
 		return
 	}
 
 	connector, ok := s.registry.Get(input.Service)
 	if !ok {
+		s.logger.WarnContext(r.Context(), "sync_rejected",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"reason", "connector_not_registered",
+		)
 		s.writeError(w, ctx, http.StatusNotFound, "unsupported_service", "unsupported integration service", map[string]any{"service": input.Service})
 		return
 	}
+
+	startedAt := time.Now()
+	s.logger.InfoContext(r.Context(), "sync_started",
+		"request_id", ctx.RequestID,
+		"workspace_id", ctx.WorkspaceID,
+		"user_id", ctx.UserID,
+		"service", input.Service,
+	)
 
 	token, err := s.store.GetToken(r.Context(), ctx, input.Service)
 	var tokenRef *domain.ProviderToken
 	if err == nil {
 		tokenRef = &token
 	} else if !errors.Is(err, store.ErrTokenNotFound) {
+		s.logger.ErrorContext(r.Context(), "sync_token_read_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"error", err.Error(),
+		)
 		s.writeError(w, ctx, http.StatusInternalServerError, "token_read_failed", err.Error(), map[string]any{"service": input.Service})
 		return
 	}
@@ -278,27 +312,69 @@ func (s *Server) sync(w http.ResponseWriter, r *http.Request) {
 	result, err := connector.Sync(r.Context(), ctx, tokenRef)
 	if err != nil {
 		_ = s.store.SaveSyncFailure(r.Context(), ctx, input.Service, err)
-		s.writeError(w, ctx, http.StatusBadGateway, "provider_sync_failed", err.Error(), map[string]any{"service": input.Service})
+		details := syncErrorDetails(input.Service, err)
+		s.logger.ErrorContext(r.Context(), "sync_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"duration_ms", time.Since(startedAt).Milliseconds(),
+			"error", err.Error(),
+			"error_type", details["type"],
+			"retryable", details["retryable"],
+		)
+		s.writeError(w, ctx, http.StatusBadGateway, "provider_sync_failed", err.Error(), details)
 		return
 	}
 
 	if err := s.store.SaveWorkEvents(r.Context(), ctx, result.Events); err != nil {
+		s.logger.ErrorContext(r.Context(), "sync_persist_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"stage", "work_events",
+			"error", err.Error(),
+		)
 		s.writeError(w, ctx, http.StatusInternalServerError, "work_event_persist_failed", err.Error(), map[string]any{"service": input.Service})
 		return
 	}
 
 	if err := s.store.SaveDocumentChunks(r.Context(), ctx, result.DocumentChunks); err != nil {
+		s.logger.ErrorContext(r.Context(), "sync_persist_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"stage", "document_chunks",
+			"error", err.Error(),
+		)
 		s.writeError(w, ctx, http.StatusInternalServerError, "document_chunk_persist_failed", err.Error(), map[string]any{"service": input.Service})
 		return
 	}
 
 	if err := s.store.SaveSyncResult(r.Context(), ctx, result); err != nil {
+		s.logger.ErrorContext(r.Context(), "sync_persist_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"service", input.Service,
+			"stage", "sync_state",
+			"error", err.Error(),
+		)
 		s.writeError(w, ctx, http.StatusInternalServerError, "sync_state_persist_failed", err.Error(), map[string]any{"service": input.Service})
 		return
 	}
 
 	publicResult := result
 	publicResult.DocumentChunks = nil
+
+	s.logger.InfoContext(r.Context(), "sync_completed",
+		"request_id", ctx.RequestID,
+		"workspace_id", ctx.WorkspaceID,
+		"service", input.Service,
+		"status", result.Status,
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"records_scanned", result.RecordsScanned,
+		"events_created", result.EventsCreated,
+		"document_chunks_created", len(result.DocumentChunks),
+	)
 
 	s.write(w, ctx, http.StatusOK, map[string]any{
 		"connector": connector.Info(),
@@ -570,4 +646,45 @@ func nullableString(value string) any {
 	}
 
 	return value
+}
+
+func syncErrorDetails(service domain.Service, err error) map[string]any {
+	errorType, retryable := classifySyncError(err)
+	return map[string]any{
+		"service":   service,
+		"type":      errorType,
+		"retryable": retryable,
+		"action":    syncErrorAction(errorType),
+	}
+}
+
+func classifySyncError(err error) (string, bool) {
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "401"), strings.Contains(message, "403"), strings.Contains(message, "unauthorized"), strings.Contains(message, "forbidden"):
+		return "auth", false
+	case strings.Contains(message, "429"), strings.Contains(message, "rate limit"), strings.Contains(message, "too many requests"):
+		return "rate_limit", true
+	case strings.Contains(message, "decode"), strings.Contains(message, "json"), strings.Contains(message, "schema"):
+		return "schema", false
+	case strings.Contains(message, "timeout"), strings.Contains(message, "connection refused"), strings.Contains(message, "no such host"):
+		return "network", true
+	default:
+		return "provider", true
+	}
+}
+
+func syncErrorAction(errorType string) string {
+	switch errorType {
+	case "auth":
+		return "Reconnect the integration or refresh the provider token."
+	case "rate_limit":
+		return "Retry after the provider rate limit resets."
+	case "schema":
+		return "Inspect provider response shape and update the normalizer."
+	case "network":
+		return "Retry the sync and verify provider availability."
+	default:
+		return "Inspect provider logs and retry the sync."
+	}
 }

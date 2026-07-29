@@ -206,6 +206,56 @@ On success, the API stores the refreshed token server-side and returns only safe
 
 If the workspace has no token or no refresh token, response `data.status` is `missing_token` or `missing_refresh_token`.
 
+## Sync Observability
+
+The gateway writes structured JSON logs for every `/v1/sync` attempt.
+
+Important log events:
+
+- `sync_started`: request accepted and connector selected.
+- `sync_completed`: provider sync and persistence succeeded.
+- `sync_failed`: provider call failed before persistence.
+- `sync_persist_failed`: provider sync succeeded but persistence failed.
+- `sync_token_read_failed`: gateway could not read the stored provider token.
+- `sync_rejected`: unsupported service or missing connector.
+
+Each sync log includes:
+
+- `request_id`
+- `workspace_id`
+- `user_id` when available
+- `service`
+- `duration_ms`
+- `records_scanned`
+- `events_created`
+- `document_chunks_created`
+- `error_type` and `retryable` for failures
+
+Provider sync failures return actionable details in the API envelope:
+
+```json
+{
+  "error": {
+    "code": "provider_sync_failed",
+    "message": "429 rate limit exceeded",
+    "details": {
+      "service": "github",
+      "type": "rate_limit",
+      "retryable": true,
+      "action": "Retry after the provider rate limit resets."
+    }
+  }
+}
+```
+
+Troubleshooting guide:
+
+- `auth`: reconnect the integration or refresh the provider token.
+- `rate_limit`: back off and retry after the provider reset window.
+- `schema`: inspect the provider response and update the connector normalizer.
+- `network`: retry sync and verify provider availability.
+- `provider`: inspect provider logs, request IDs, and retry manually.
+
 ## Local Run
 
 ```bash

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -21,6 +21,7 @@ func main() {
 		Store:            persistence,
 		GatewaySecret:    os.Getenv("API_GATEWAY_SECRET"),
 		OAuthStateSecret: os.Getenv("OAUTH_STATE_SECRET"),
+		Logger:           slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 	})
 
 	httpServer := &http.Server{
@@ -29,9 +30,10 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Printf("Developer OS API gateway listening on %s", addr)
+	slog.Info("Developer OS API gateway listening", "addr", addr)
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		slog.Error("Developer OS API gateway stopped", "error", err)
+		os.Exit(1)
 	}
 }
 

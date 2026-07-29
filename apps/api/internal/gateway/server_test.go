@@ -1,7 +1,11 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -74,6 +78,54 @@ func TestSyncRejectsUnsupportedService(t *testing.T) {
 
 	if apiError["code"] != "unsupported_service" {
 		t.Fatalf("expected unsupported_service, got %v", apiError["code"])
+	}
+}
+
+func TestSyncFailureWritesStructuredLogAndActionableError(t *testing.T) {
+	var logs bytes.Buffer
+	server := NewServer(Config{
+		Registry: integrations.NewRegistryWithConnectors(failingConnector{}),
+		Store:    store.NewMemoryStore(),
+		Logger:   slog.New(slog.NewJSONHandler(&logs, nil)),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/sync", strings.NewReader(`{"service":"github"}`))
+	req.Header.Set("x-request-id", "req_sync_failure")
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	apiError, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatal("expected error envelope")
+	}
+	details, ok := apiError["details"].(map[string]any)
+	if !ok {
+		t.Fatal("expected actionable error details")
+	}
+	if details["type"] != "rate_limit" {
+		t.Fatalf("expected rate_limit error type, got %v", details["type"])
+	}
+	if details["retryable"] != true {
+		t.Fatalf("expected retryable error, got %v", details["retryable"])
+	}
+	if details["action"] == "" {
+		t.Fatal("expected recovery action")
+	}
+
+	logText := logs.String()
+	for _, expected := range []string{"sync_started", "sync_failed", "req_sync_failure", "duration_ms", "rate_limit"} {
+		if !strings.Contains(logText, expected) {
+			t.Fatalf("expected log to contain %q, got %s", expected, logText)
+		}
 	}
 }
 
@@ -222,4 +274,28 @@ func TestRefreshTokenExchangesAndDoesNotLeakTokens(t *testing.T) {
 	if token.AccessToken != "new-access-token" || token.RefreshToken != "new-refresh-token" {
 		t.Fatalf("expected refreshed tokens to be persisted, got %#v", token)
 	}
+}
+
+type failingConnector struct{}
+
+func (f failingConnector) Info() domain.ConnectorInfo {
+	return domain.ConnectorInfo{
+		ID:           domain.ServiceGitHub,
+		Name:         "GitHub",
+		AuthStrategy: "oauth",
+		SyncMode:     "incremental",
+	}
+}
+
+func (f failingConnector) FetchRecentRecords(context.Context, domain.GatewayContext, *domain.ProviderToken) ([]domain.ExternalRecord, error) {
+	return nil, errors.New("429 rate limit exceeded")
+}
+
+func (f failingConnector) Normalize([]domain.ExternalRecord) []domain.WorkEvent {
+	return nil
+}
+
+func (f failingConnector) Sync(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken) (domain.SyncResult, error) {
+	_, err := f.FetchRecentRecords(ctx, gatewayContext, token)
+	return domain.SyncResult{}, err
 }
