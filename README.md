@@ -14,6 +14,9 @@ npm run dev:web
 npm run dev:api
 npm run build
 npm run lint
+npm run test:api
 ```
 
 The backend stores data in Supabase when `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured. Without those env vars, it uses an in-memory fallback for local development.
+
+Deployment, environment mapping, CI, and Supabase checklist are documented in [docs/deployment.md](docs/deployment.md).
