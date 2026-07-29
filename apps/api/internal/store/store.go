@@ -3,9 +3,13 @@ package store
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -560,12 +564,65 @@ func seal(token string) string {
 	if token == "" {
 		return ""
 	}
+
+	key, err := tokenSealingKey()
+	if err == nil {
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return ""
+		}
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			return ""
+		}
+
+		nonce := make([]byte, gcm.NonceSize())
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			return ""
+		}
+
+		ciphertext := gcm.Seal(nil, nonce, []byte(token), nil)
+		sealed := append(nonce, ciphertext...)
+		return "sealed:v1:" + base64.StdEncoding.EncodeToString(sealed)
+	}
+
 	return "sealed:" + base64.StdEncoding.EncodeToString([]byte(token))
 }
 
 func unseal(value string) string {
 	if value == "" {
 		return ""
+	}
+	if strings.HasPrefix(value, "sealed:v1:") {
+		key, err := tokenSealingKey()
+		if err != nil {
+			return ""
+		}
+
+		encrypted, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, "sealed:v1:"))
+		if err != nil {
+			return ""
+		}
+
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return ""
+		}
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			return ""
+		}
+		if len(encrypted) < gcm.NonceSize() {
+			return ""
+		}
+
+		nonce := encrypted[:gcm.NonceSize()]
+		ciphertext := encrypted[gcm.NonceSize():]
+		plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			return ""
+		}
+		return string(plaintext)
 	}
 	if !strings.HasPrefix(value, "sealed:") {
 		return value
@@ -577,6 +634,24 @@ func unseal(value string) string {
 	}
 
 	return string(decoded)
+}
+
+func tokenSealingKey() ([]byte, error) {
+	value := strings.TrimSpace(os.Getenv("TOKEN_SEALING_KEY"))
+	if value == "" {
+		return nil, errors.New("TOKEN_SEALING_KEY is not configured")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err == nil && len(decoded) == 32 {
+		return decoded, nil
+	}
+
+	if len(value) == 32 {
+		return []byte(value), nil
+	}
+
+	return nil, errors.New("TOKEN_SEALING_KEY must be 32 bytes or base64-encoded 32 bytes")
 }
 
 func nullable(value string) any {

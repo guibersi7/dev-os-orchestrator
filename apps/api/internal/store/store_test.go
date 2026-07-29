@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,5 +58,44 @@ func TestMemoryStorePersistsSyncResult(t *testing.T) {
 	result := store.syncs[domain.ServiceSlack]
 	if result.NextCursor == nil || *result.NextCursor != cursor {
 		t.Fatalf("expected cursor %q, got %v", cursor, result.NextCursor)
+	}
+}
+
+func TestSealUsesAESGCMWhenKeyIsConfigured(t *testing.T) {
+	t.Setenv("TOKEN_SEALING_KEY", base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012")))
+
+	sealed := seal("secret-access-token")
+	if !strings.HasPrefix(sealed, "sealed:v1:") {
+		t.Fatalf("expected v1 sealed token, got %q", sealed)
+	}
+	if strings.Contains(sealed, "secret-access-token") {
+		t.Fatal("sealed value contains plaintext token")
+	}
+
+	unsealed := unseal(sealed)
+	if unsealed != "secret-access-token" {
+		t.Fatalf("expected token round-trip, got %q", unsealed)
+	}
+}
+
+func TestUnsealRejectsAESGCMTokenWithWrongKey(t *testing.T) {
+	t.Setenv("TOKEN_SEALING_KEY", base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012")))
+	sealed := seal("secret-access-token")
+
+	t.Setenv("TOKEN_SEALING_KEY", base64.StdEncoding.EncodeToString([]byte("abcdefghijklmnopqrstuvwxzy123456")))
+	if unsealed := unseal(sealed); unsealed != "" {
+		t.Fatalf("expected wrong key to fail closed, got %q", unsealed)
+	}
+}
+
+func TestUnsealSupportsLegacyDevelopmentTokens(t *testing.T) {
+	t.Setenv("TOKEN_SEALING_KEY", "")
+
+	legacy := seal("local-token")
+	if !strings.HasPrefix(legacy, "sealed:") || strings.HasPrefix(legacy, "sealed:v1:") {
+		t.Fatalf("expected legacy sealed value, got %q", legacy)
+	}
+	if unsealed := unseal(legacy); unsealed != "local-token" {
+		t.Fatalf("expected legacy token round-trip, got %q", unsealed)
 	}
 }

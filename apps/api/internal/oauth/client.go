@@ -105,6 +105,60 @@ func ExchangeCode(ctx context.Context, client *http.Client, provider Provider, c
 	}, nil
 }
 
+func RefreshToken(ctx context.Context, client *http.Client, provider Provider, refreshToken string) (TokenResponse, error) {
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	if strings.TrimSpace(refreshToken) == "" {
+		return TokenResponse{}, errors.New("refresh token is required")
+	}
+
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refreshToken)
+	form.Set("client_id", provider.ClientID)
+	form.Set("client_secret", provider.ClientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	req.Header.Set("accept", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 400 {
+		return TokenResponse{}, errors.New(res.Status)
+	}
+
+	var providerResponse providerTokenResponse
+	if err := json.NewDecoder(res.Body).Decode(&providerResponse); err != nil {
+		return TokenResponse{}, err
+	}
+	if providerResponse.AccessToken == "" {
+		return TokenResponse{}, errors.New("provider response did not include access token")
+	}
+
+	var expiresAt *time.Time
+	if providerResponse.ExpiresIn > 0 {
+		expires := time.Now().UTC().Add(time.Duration(providerResponse.ExpiresIn) * time.Second)
+		expiresAt = &expires
+	}
+
+	return TokenResponse{
+		AccessToken:       providerResponse.AccessToken,
+		RefreshToken:      providerResponse.RefreshToken,
+		ExpiresAt:         expiresAt,
+		Scopes:            responseScopes(providerResponse.Scope, provider.Scopes),
+		ProviderAccountID: providerAccountID(providerResponse),
+	}, nil
+}
+
 func responseScopes(scope string, fallback []string) []string {
 	if strings.TrimSpace(scope) == "" {
 		return fallback

@@ -335,13 +335,67 @@ func (s *Server) refreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := s.store.RefreshTokenStatus(r.Context(), ctx, input.Service)
+	currentToken, err := s.store.GetToken(r.Context(), ctx, input.Service)
+	if errors.Is(err, store.ErrTokenNotFound) {
+		s.write(w, ctx, http.StatusOK, map[string]any{"service": input.Service, "status": "missing_token"})
+		return
+	}
 	if err != nil {
-		s.writeError(w, ctx, http.StatusInternalServerError, "token_refresh_failed", err.Error(), map[string]any{"service": input.Service})
+		s.writeError(w, ctx, http.StatusInternalServerError, "token_read_failed", err.Error(), map[string]any{"service": input.Service})
+		return
+	}
+	if strings.TrimSpace(currentToken.RefreshToken) == "" {
+		s.write(w, ctx, http.StatusOK, map[string]any{"service": input.Service, "status": "missing_refresh_token"})
 		return
 	}
 
-	s.write(w, ctx, http.StatusOK, status)
+	provider, ok := oauth.ProviderFor(input.Service)
+	if !ok || !provider.Configured() {
+		s.writeError(w, ctx, http.StatusBadRequest, "provider_not_configured", "oauth provider is not configured", map[string]any{"service": input.Service})
+		return
+	}
+
+	refreshedToken, err := oauth.RefreshToken(r.Context(), s.httpClient, provider, currentToken.RefreshToken)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusBadGateway, "token_refresh_failed", err.Error(), map[string]any{"service": input.Service})
+		return
+	}
+
+	refreshToken := refreshedToken.RefreshToken
+	if refreshToken == "" {
+		refreshToken = currentToken.RefreshToken
+	}
+
+	providerAccountID := refreshedToken.ProviderAccountID
+	if providerAccountID == "" || providerAccountID == "default" {
+		providerAccountID = currentToken.ProviderAccountID
+	}
+
+	expiresAt := ""
+	if refreshedToken.ExpiresAt != nil {
+		expiresAt = refreshedToken.ExpiresAt.Format(time.RFC3339)
+	}
+
+	if err := s.store.UpsertToken(r.Context(), ctx, domain.TokenUpsertRequest{
+		WorkspaceID:       ctx.WorkspaceID,
+		Service:           input.Service,
+		ProviderAccountID: providerAccountID,
+		AccessToken:       refreshedToken.AccessToken,
+		RefreshToken:      refreshToken,
+		ExpiresAt:         expiresAt,
+		Scopes:            refreshedToken.Scopes,
+	}); err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "token_write_failed", err.Error(), map[string]any{"service": input.Service})
+		return
+	}
+
+	s.write(w, ctx, http.StatusOK, map[string]any{
+		"service":           input.Service,
+		"status":            "connected",
+		"providerAccountId": providerAccountID,
+		"expiresAt":         nullableString(expiresAt),
+		"scopes":            refreshedToken.Scopes,
+	})
 }
 
 func (s *Server) withAuth(handler http.HandlerFunc) http.HandlerFunc {

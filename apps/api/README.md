@@ -184,13 +184,27 @@ Stores a provider token server-side.
 
 ### `POST /v1/tokens/refresh`
 
-Checks refresh state for one provider.
+Refreshes one provider token when a refresh token is available.
 
 ```json
 {
   "service": "github"
 }
 ```
+
+On success, the API stores the refreshed token server-side and returns only safe metadata:
+
+```json
+{
+  "service": "linear",
+  "status": "connected",
+  "providerAccountId": "provider-account-id",
+  "expiresAt": "2026-08-01T00:00:00Z",
+  "scopes": ["read", "write"]
+}
+```
+
+If the workspace has no token or no refresh token, response `data.status` is `missing_token` or `missing_refresh_token`.
 
 ## Local Run
 
@@ -212,6 +226,7 @@ The API uses Supabase when these env vars are present:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 API_GATEWAY_SECRET=replace-with-a-long-random-secret
+TOKEN_SEALING_KEY=base64-encoded-32-byte-key
 ```
 
 Apply the schema in:
@@ -236,7 +251,7 @@ Runtime behavior:
 - `GET /v1/config` reads persisted user preferences and falls back to local defaults when no row exists.
 - `PUT /v1/config` upserts user preferences by `(workspace_id, user_id)`.
 - `POST /v1/tokens` stores sealed tokens server-side only.
-- `POST /v1/tokens/refresh` returns token refresh status without exposing token material.
+- `POST /v1/tokens/refresh` exchanges refresh tokens with the provider, persists the new access token, and never returns token material.
 - `POST /v1/sync` persists generated `work_events` and updates `integration_configs.last_synced_at`.
 - Sync writes are idempotent by `(workspace_id, service, external_id)`.
 - `integration_configs` tracks `sync_cursor`, `last_sync_error`, `last_sync_records_scanned`, and `last_sync_events_created`.
@@ -246,6 +261,7 @@ Without Supabase env vars, the API uses an in-memory store for local development
 OAuth env vars:
 
 - `OAUTH_STATE_SECRET`
+- `TOKEN_SEALING_KEY`
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`
 - `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_OAUTH_SCOPES`
 - `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_OAUTH_SCOPES`
