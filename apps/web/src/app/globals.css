@@ -1,9 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
-  --foreground: #09090b;
-  --ring: #18181b;
+  --quantum-blue: #2457ff;
+  --ice-glass: #dff7ff;
+  --brand-primary: var(--quantum-blue);
+  --brand-primary-hover: #1c46d6;
+  --brand-surface: var(--ice-glass);
+  --brand-muted: #eefbff;
+  --brand-border: #bdeeff;
+  --brand-ink: #06131f;
+  --background: #fbfdff;
+  --foreground: var(--brand-ink);
+  --ring: var(--brand-primary);
+}
+
+@theme inline {
+  --color-quantum-blue: var(--quantum-blue);
+  --color-ice-glass: var(--ice-glass);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-border: var(--brand-border);
+  --color-brand-ink: var(--brand-ink);
 }
 
 * {
