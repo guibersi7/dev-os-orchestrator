@@ -27,6 +27,31 @@ export type SourceHealth = {
   lastSyncedAt?: string | null;
 };
 
+export type ConnectionStatus = {
+  service: Service;
+  status: string;
+  providerConfigured: boolean;
+  hasToken: boolean;
+  hasRefreshToken: boolean;
+  providerAccountId?: string;
+  expiresAt?: string | null;
+  scopes: string[];
+  lastSyncedAt?: string | null;
+  lastSyncError?: string;
+  lastSyncRecordsScanned: number;
+  lastSyncEventsCreated: number;
+  updatedAt?: string | null;
+};
+
+export type OAuthStartResponse = {
+  service: Service;
+  status: "ready" | "needs_config" | string;
+  authorizationUrl?: string;
+  state?: string;
+  scopes?: string[];
+  missing?: string[];
+};
+
 export type DashboardPayload = {
   workspaceId: string;
   generatedAt: string;
@@ -191,6 +216,25 @@ export function getDashboardState() {
 
 export function getConfigState() {
   return captureGatewayState(() => requestGateway<{ config: UserConfig }>("/v1/config"));
+}
+
+export function getConnectionsState() {
+  return captureGatewayState(() => requestGateway<{ connections: ConnectionStatus[] }>("/v1/connections"));
+}
+
+export function disconnectConnection(service: Service) {
+  return captureGatewayState(() =>
+    requestGateway<{ connection: ConnectionStatus }>(`/v1/connections/${service}`, {
+      method: "DELETE",
+    }),
+  );
+}
+
+export function startOAuthConnection(service: Service) {
+  const redirectUri = `${API_BASE_URL}/v1/oauth/${service}/callback`;
+  return captureGatewayState(() =>
+    requestGateway<OAuthStartResponse>(`/v1/oauth/${service}/start?redirectUri=${encodeURIComponent(redirectUri)}`),
+  );
 }
 
 export function syncIntegration(service: Service) {

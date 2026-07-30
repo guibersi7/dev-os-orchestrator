@@ -64,6 +64,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /v1/dashboard", s.withAuth(s.dashboard))
 	mux.HandleFunc("GET /v1/config", s.withAuth(s.getConfig))
 	mux.HandleFunc("PUT /v1/config", s.withAuth(s.putConfig))
+	mux.HandleFunc("GET /v1/connections", s.withAuth(s.listConnections))
+	mux.HandleFunc("DELETE /v1/connections/{service}", s.withAuth(s.disconnectConnection))
 	mux.HandleFunc("GET /v1/oauth/{service}/start", s.withAuth(s.oauthStart))
 	mux.HandleFunc("GET /v1/oauth/{service}/callback", s.oauthCallback)
 	mux.HandleFunc("POST /v1/sync", s.withAuth(s.sync))
@@ -133,6 +135,49 @@ func (s *Server) putConfig(w http.ResponseWriter, r *http.Request) {
 	s.write(w, ctx, http.StatusOK, map[string]any{"persisted": true})
 }
 
+func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	connections, err := s.store.ListConnectionStatuses(r.Context(), ctx)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "connections_read_failed", err.Error(), nil)
+		return
+	}
+
+	connections = s.annotateProviderConfig(connections)
+	s.write(w, ctx, http.StatusOK, map[string]any{"connections": connections})
+}
+
+func (s *Server) disconnectConnection(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	service := domain.Service(r.PathValue("service"))
+	if !service.Valid() {
+		s.writeError(w, ctx, http.StatusBadRequest, "unsupported_service", "unsupported integration service", map[string]any{"service": service})
+		return
+	}
+
+	connection, err := s.store.DisconnectConnection(r.Context(), ctx, service)
+	if err != nil {
+		s.logger.ErrorContext(r.Context(), "connection_disconnect_failed",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"user_id", ctx.UserID,
+			"service", service,
+			"error", err.Error(),
+		)
+		s.writeError(w, ctx, http.StatusInternalServerError, "connection_disconnect_failed", err.Error(), map[string]any{"service": service})
+		return
+	}
+
+	connection.ProviderConfigured = providerConfigured(service)
+	s.logger.InfoContext(r.Context(), "connection_disconnected",
+		"request_id", ctx.RequestID,
+		"workspace_id", ctx.WorkspaceID,
+		"user_id", ctx.UserID,
+		"service", service,
+	)
+	s.write(w, ctx, http.StatusOK, map[string]any{"connection": connection})
+}
+
 func (s *Server) oauthStart(w http.ResponseWriter, r *http.Request) {
 	ctx := gatewayContext(r)
 	service := domain.Service(r.PathValue("service"))
@@ -154,6 +199,12 @@ func (s *Server) oauthStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !provider.Configured() {
+		s.logger.InfoContext(r.Context(), "connection_oauth_needs_config",
+			"request_id", ctx.RequestID,
+			"workspace_id", ctx.WorkspaceID,
+			"user_id", ctx.UserID,
+			"service", service,
+		)
 		s.write(w, ctx, http.StatusOK, map[string]any{
 			"service": service,
 			"status":  "needs_config",
@@ -173,6 +224,12 @@ func (s *Server) oauthStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.InfoContext(r.Context(), "connection_oauth_started",
+		"request_id", ctx.RequestID,
+		"workspace_id", ctx.WorkspaceID,
+		"user_id", ctx.UserID,
+		"service", service,
+	)
 	s.write(w, ctx, http.StatusOK, map[string]any{
 		"service":          service,
 		"status":           "ready",
@@ -244,6 +301,13 @@ func (s *Server) oauthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.InfoContext(r.Context(), "connection_oauth_connected",
+		"request_id", callbackCtx.RequestID,
+		"workspace_id", callbackCtx.WorkspaceID,
+		"user_id", callbackCtx.UserID,
+		"service", service,
+		"provider_account_id", token.ProviderAccountID,
+	)
 	s.write(w, callbackCtx, http.StatusOK, map[string]any{
 		"service":           service,
 		"status":            "connected",
@@ -503,7 +567,7 @@ func (s *Server) withAuth(handler http.HandlerFunc) http.HandlerFunc {
 func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("access-control-allow-origin", "*")
-		w.Header().Set("access-control-allow-methods", "GET,POST,PUT,OPTIONS")
+		w.Header().Set("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS")
 		w.Header().Set("access-control-allow-headers", "authorization,content-type,x-request-id,x-user-id,x-workspace-id")
 
 		if r.Method == http.MethodOptions {
@@ -646,6 +710,21 @@ func nullableString(value string) any {
 	}
 
 	return value
+}
+
+func (s *Server) annotateProviderConfig(connections []domain.ConnectionStatus) []domain.ConnectionStatus {
+	for index := range connections {
+		connections[index].ProviderConfigured = providerConfigured(connections[index].Service)
+		if !connections[index].ProviderConfigured && connections[index].Status == "available" {
+			connections[index].Status = "needs_config"
+		}
+	}
+	return connections
+}
+
+func providerConfigured(service domain.Service) bool {
+	provider, ok := oauth.ProviderFor(service)
+	return ok && provider.Configured()
 }
 
 func syncErrorDetails(service domain.Service, err error) map[string]any {

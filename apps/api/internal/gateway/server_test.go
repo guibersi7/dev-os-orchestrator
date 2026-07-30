@@ -129,6 +129,119 @@ func TestSyncFailureWritesStructuredLogAndActionableError(t *testing.T) {
 	}
 }
 
+func TestConnectionsListDoesNotLeakTokens(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	if err := memoryStore.UpsertToken(context.Background(), ctx, domain.TokenUpsertRequest{
+		WorkspaceID:       ctx.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-account",
+		AccessToken:       "secret-access-token",
+		RefreshToken:      "secret-refresh-token",
+		Scopes:            []string{"repo"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewServer(Config{
+		Registry: integrations.NewRegistry(),
+		Store:    memoryStore,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/connections", nil)
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+
+	bodyText := res.Body.String()
+	if strings.Contains(bodyText, "secret-access-token") || strings.Contains(bodyText, "secret-refresh-token") {
+		t.Fatalf("connection response leaked token material: %s", bodyText)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal([]byte(bodyText), &body); err != nil {
+		t.Fatal(err)
+	}
+	data, ok := body["data"].(map[string]any)
+	if !ok {
+		t.Fatal("expected data envelope")
+	}
+	connections, ok := data["connections"].([]any)
+	if !ok {
+		t.Fatal("expected connections array")
+	}
+
+	var github map[string]any
+	for _, value := range connections {
+		connection := value.(map[string]any)
+		if connection["service"] == "github" {
+			github = connection
+			break
+		}
+	}
+	if github == nil {
+		t.Fatal("expected github connection")
+	}
+	if github["hasToken"] != true || github["hasRefreshToken"] != true {
+		t.Fatalf("expected safe token metadata, got %#v", github)
+	}
+	if github["status"] != "connected" && github["status"] != "needs_config" {
+		t.Fatalf("expected connected or needs_config status, got %#v", github["status"])
+	}
+}
+
+func TestDisconnectConnectionRemovesTokenAndLogsAuditEvent(t *testing.T) {
+	var logs bytes.Buffer
+	memoryStore := store.NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	if err := memoryStore.UpsertToken(context.Background(), ctx, domain.TokenUpsertRequest{
+		WorkspaceID:       ctx.WorkspaceID,
+		Service:           domain.ServiceSlack,
+		ProviderAccountID: "slack-account",
+		AccessToken:       "secret-access-token",
+		RefreshToken:      "secret-refresh-token",
+		Scopes:            []string{"channels:read"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewServer(Config{
+		Registry: integrations.NewRegistry(),
+		Store:    memoryStore,
+		Logger:   slog.New(slog.NewJSONHandler(&logs, nil)),
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/connections/slack", nil)
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	req.Header.Set("x-request-id", "req_disconnect")
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+
+	if _, err := memoryStore.GetToken(context.Background(), ctx, domain.ServiceSlack); !errors.Is(err, store.ErrTokenNotFound) {
+		t.Fatalf("expected token to be removed, got %v", err)
+	}
+
+	bodyText := res.Body.String()
+	if strings.Contains(bodyText, "secret-access-token") || strings.Contains(bodyText, "secret-refresh-token") {
+		t.Fatalf("disconnect response leaked token material: %s", bodyText)
+	}
+	if !strings.Contains(logs.String(), "connection_disconnected") || !strings.Contains(logs.String(), "req_disconnect") {
+		t.Fatalf("expected disconnect audit log, got %s", logs.String())
+	}
+}
+
 func TestProtectedRoutesRequireGatewaySecret(t *testing.T) {
 	server := NewServer(Config{
 		Registry:      integrations.NewRegistry(),

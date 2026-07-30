@@ -34,6 +34,8 @@ type Store interface {
 	UpsertToken(context.Context, domain.GatewayContext, domain.TokenUpsertRequest) error
 	GetToken(context.Context, domain.GatewayContext, domain.Service) (domain.ProviderToken, error)
 	RefreshTokenStatus(context.Context, domain.GatewayContext, domain.Service) (map[string]any, error)
+	ListConnectionStatuses(context.Context, domain.GatewayContext) ([]domain.ConnectionStatus, error)
+	DisconnectConnection(context.Context, domain.GatewayContext, domain.Service) (domain.ConnectionStatus, error)
 }
 
 func NewFromEnv() Store {
@@ -200,6 +202,61 @@ func (s *MemoryStore) RefreshTokenStatus(_ context.Context, ctx domain.GatewayCo
 	}
 
 	return map[string]any{"service": service, "status": "missing_refresh_token"}, nil
+}
+
+func (s *MemoryStore) ListConnectionStatuses(_ context.Context, ctx domain.GatewayContext) ([]domain.ConnectionStatus, error) {
+	statuses := make([]domain.ConnectionStatus, 0, len(allServices()))
+	for _, service := range allServices() {
+		statuses = append(statuses, s.memoryConnectionStatus(ctx, service))
+	}
+	return statuses, nil
+}
+
+func (s *MemoryStore) DisconnectConnection(_ context.Context, ctx domain.GatewayContext, service domain.Service) (domain.ConnectionStatus, error) {
+	for key := range s.tokens {
+		if strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") {
+			delete(s.tokens, key)
+		}
+	}
+	s.syncs[service] = domain.SyncResult{Service: service, Status: "available"}
+	return s.memoryConnectionStatus(ctx, service), nil
+}
+
+func (s *MemoryStore) memoryConnectionStatus(ctx domain.GatewayContext, service domain.Service) domain.ConnectionStatus {
+	status := "available"
+	if sync, ok := s.syncs[service]; ok && sync.Status != "" {
+		status = sync.Status
+	}
+
+	connection := domain.ConnectionStatus{
+		Service: service,
+		Status:  status,
+		Scopes:  []string{},
+	}
+
+	for key, token := range s.tokens {
+		if !strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") {
+			continue
+		}
+		connection.HasToken = true
+		connection.HasRefreshToken = strings.TrimSpace(token.RefreshToken) != ""
+		connection.ProviderAccountID = token.ProviderAccountID
+		connection.Scopes = token.Scopes
+		if token.ExpiresAt != "" {
+			if expiresAt, err := time.Parse(time.RFC3339, token.ExpiresAt); err == nil {
+				connection.ExpiresAt = &expiresAt
+				if expiresAt.Before(time.Now().UTC()) {
+					connection.Status = "expired"
+				}
+			}
+		}
+		if connection.Status == "available" {
+			connection.Status = "connected"
+		}
+		break
+	}
+
+	return connection
 }
 
 type SupabaseStore struct {
@@ -498,6 +555,115 @@ func (s *SupabaseStore) RefreshTokenStatus(ctx context.Context, gatewayCtx domai
 	}, nil
 }
 
+func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx domain.GatewayContext) ([]domain.ConnectionStatus, error) {
+	var configRows []struct {
+		Service                domain.Service `json:"service"`
+		Status                 string         `json:"status"`
+		LastSyncError          *string        `json:"last_sync_error"`
+		LastSyncRecordsScanned int            `json:"last_sync_records_scanned"`
+		LastSyncEventsCreated  int            `json:"last_sync_events_created"`
+		LastSyncedAt           *time.Time     `json:"last_synced_at"`
+		UpdatedAt              *time.Time     `json:"updated_at"`
+	}
+	configPath := "integration_configs?select=service,status,last_sync_error,last_sync_records_scanned,last_sync_events_created,last_synced_at,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID)
+	if err := s.rest(ctx, http.MethodGet, configPath, nil, &configRows); err != nil {
+		return s.fallback.ListConnectionStatuses(ctx, gatewayCtx)
+	}
+
+	var tokenRows []struct {
+		Service               domain.Service `json:"service"`
+		ProviderAccountID     string         `json:"provider_account_id"`
+		EncryptedRefreshToken *string        `json:"encrypted_refresh_token"`
+		ExpiresAt             *time.Time     `json:"expires_at"`
+		Scopes                []string       `json:"scopes"`
+	}
+	tokenPath := "integration_tokens?select=service,provider_account_id,encrypted_refresh_token,expires_at,scopes&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID)
+	if err := s.rest(ctx, http.MethodGet, tokenPath, nil, &tokenRows); err != nil {
+		return s.fallback.ListConnectionStatuses(ctx, gatewayCtx)
+	}
+
+	statuses := map[domain.Service]domain.ConnectionStatus{}
+	for _, service := range allServices() {
+		statuses[service] = domain.ConnectionStatus{
+			Service: service,
+			Status:  "available",
+			Scopes:  []string{},
+		}
+	}
+
+	for _, row := range configRows {
+		status := statuses[row.Service]
+		status.Status = row.Status
+		if row.LastSyncError != nil {
+			status.LastSyncError = *row.LastSyncError
+		}
+		status.LastSyncRecordsScanned = row.LastSyncRecordsScanned
+		status.LastSyncEventsCreated = row.LastSyncEventsCreated
+		status.LastSyncedAt = row.LastSyncedAt
+		status.UpdatedAt = row.UpdatedAt
+		statuses[row.Service] = status
+	}
+
+	for _, row := range tokenRows {
+		status := statuses[row.Service]
+		status.HasToken = true
+		status.HasRefreshToken = row.EncryptedRefreshToken != nil && strings.TrimSpace(*row.EncryptedRefreshToken) != ""
+		status.ProviderAccountID = row.ProviderAccountID
+		status.ExpiresAt = row.ExpiresAt
+		status.Scopes = row.Scopes
+		if row.ExpiresAt != nil && row.ExpiresAt.Before(time.Now().UTC()) {
+			status.Status = "expired"
+		} else if status.Status == "available" || status.Status == "" {
+			status.Status = "connected"
+		}
+		statuses[row.Service] = status
+	}
+
+	connections := make([]domain.ConnectionStatus, 0, len(statuses))
+	for _, service := range allServices() {
+		connections = append(connections, statuses[service])
+	}
+	return connections, nil
+}
+
+func (s *SupabaseStore) DisconnectConnection(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service) (domain.ConnectionStatus, error) {
+	if err := s.ensureWorkspace(ctx, gatewayCtx); err != nil {
+		return domain.ConnectionStatus{}, err
+	}
+
+	tokenPath := "integration_tokens?workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&service=eq." + url.QueryEscape(string(service))
+	if err := s.rest(ctx, http.MethodDelete, tokenPath, nil, nil); err != nil {
+		return domain.ConnectionStatus{}, err
+	}
+
+	row := map[string]any{
+		"workspace_id":              gatewayCtx.WorkspaceID,
+		"service":                   service,
+		"status":                    "available",
+		"scopes":                    []string{},
+		"sync_cursor":               nil,
+		"last_sync_error":           nil,
+		"last_sync_records_scanned": 0,
+		"last_sync_events_created":  0,
+		"updated_at":                time.Now().UTC(),
+	}
+	if err := s.rest(ctx, http.MethodPost, "integration_configs?on_conflict=workspace_id,service", row, nil); err != nil {
+		return domain.ConnectionStatus{}, err
+	}
+
+	statuses, err := s.ListConnectionStatuses(ctx, gatewayCtx)
+	if err != nil {
+		return domain.ConnectionStatus{}, err
+	}
+	for _, status := range statuses {
+		if status.Service == service {
+			return status, nil
+		}
+	}
+
+	return domain.ConnectionStatus{Service: service, Status: "available", Scopes: []string{}}, nil
+}
+
 func (s *SupabaseStore) rest(ctx context.Context, method string, path string, input any, output any) error {
 	var body *bytes.Reader
 	if input == nil {
@@ -694,4 +860,16 @@ func cursorValue(cursor *string) string {
 		return ""
 	}
 	return *cursor
+}
+
+func allServices() []domain.Service {
+	return []domain.Service{
+		domain.ServiceGitHub,
+		domain.ServiceSlack,
+		domain.ServiceLinear,
+		domain.ServiceJira,
+		domain.ServiceTrello,
+		domain.ServiceNotion,
+		domain.ServiceCalendar,
+	}
 }

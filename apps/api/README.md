@@ -16,6 +16,10 @@ Go backend for the Developer OS API Gateway.
 - `GET /v1/dashboard`
 - `GET /v1/config`
 - `PUT /v1/config`
+- `GET /v1/connections`
+- `DELETE /v1/connections/{service}`
+- `GET /v1/oauth/{service}/start`
+- `GET /v1/oauth/{service}/callback`
 - `POST /v1/sync`
 - `POST /v1/tokens`
 - `POST /v1/tokens/refresh`
@@ -93,6 +97,60 @@ Upserts user preferences.
     "blockers": true,
     "failedChecks": true,
     "decisions": true
+  }
+}
+```
+
+### `GET /v1/connections`
+
+Returns the unified connection state for every supported service. This is the primary backend contract for the web Connection Center.
+
+The response intentionally returns token metadata only. It never exposes provider access tokens or refresh tokens.
+
+```json
+{
+  "connections": [
+    {
+      "service": "github",
+      "status": "connected",
+      "providerConfigured": true,
+      "hasToken": true,
+      "hasRefreshToken": true,
+      "providerAccountId": "provider-account-id",
+      "expiresAt": "2026-08-01T00:00:00Z",
+      "scopes": ["repo", "read:user"],
+      "lastSyncedAt": "2026-07-30T10:00:00Z",
+      "lastSyncRecordsScanned": 24,
+      "lastSyncEventsCreated": 12
+    }
+  ]
+}
+```
+
+Common statuses:
+
+- `available`: service is supported but not connected.
+- `needs_config`: service is missing server-side OAuth env vars.
+- `connected`: token material exists server-side.
+- `syncing`: last sync is in progress or recently persisted that status.
+- `expired`: stored token has expired.
+- `error`: last sync failed.
+
+### `DELETE /v1/connections/{service}`
+
+Disconnects one service for the workspace by deleting stored token material and resetting sync metadata.
+
+On success, the API writes a `connection_disconnected` audit log and returns safe connection metadata:
+
+```json
+{
+  "connection": {
+    "service": "slack",
+    "status": "available",
+    "providerConfigured": true,
+    "hasToken": false,
+    "hasRefreshToken": false,
+    "scopes": []
   }
 }
 ```
@@ -301,6 +359,8 @@ Runtime behavior:
 - `GET /v1/dashboard` reads persisted `work_events`, source health from `integration_configs`, and stores a `dashboard_snapshots` record.
 - `GET /v1/config` reads persisted user preferences and falls back to local defaults when no row exists.
 - `PUT /v1/config` upserts user preferences by `(workspace_id, user_id)`.
+- `GET /v1/connections` reads connection state from `integration_configs` and token metadata from `integration_tokens` without returning token material.
+- `DELETE /v1/connections/{service}` deletes provider tokens and resets sync status for that service.
 - `POST /v1/tokens` stores sealed tokens server-side only.
 - `POST /v1/tokens/refresh` exchanges refresh tokens with the provider, persists the new access token, and never returns token material.
 - `POST /v1/sync` persists generated `work_events` and updates `integration_configs.last_synced_at`.

@@ -96,6 +96,22 @@ type SourceHealth struct {
 	LastSyncedAt *time.Time `json:"lastSyncedAt"`
 }
 
+type ConnectionStatus struct {
+	Service                Service    `json:"service"`
+	Status                 string     `json:"status"`
+	ProviderConfigured     bool       `json:"providerConfigured"`
+	HasToken               bool       `json:"hasToken"`
+	HasRefreshToken        bool       `json:"hasRefreshToken"`
+	ProviderAccountID      string     `json:"providerAccountId,omitempty"`
+	ExpiresAt              *time.Time `json:"expiresAt,omitempty"`
+	Scopes                 []string   `json:"scopes"`
+	LastSyncedAt           *time.Time `json:"lastSyncedAt,omitempty"`
+	LastSyncError          string     `json:"lastSyncError,omitempty"`
+	LastSyncRecordsScanned int        `json:"lastSyncRecordsScanned"`
+	LastSyncEventsCreated  int        `json:"lastSyncEventsCreated"`
+	UpdatedAt              *time.Time `json:"updatedAt,omitempty"`
+}
+
 type DashboardPayload struct {
 	WorkspaceID   string           `json:"workspaceId"`
 	GeneratedAt   time.Time        `json:"generatedAt"`
