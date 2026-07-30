@@ -8,18 +8,18 @@ Primary colors:
 
 | Token | Name | Hex | Usage |
 | --- | --- | --- | --- |
-| `jet-stream` | Jet Stream | `#BDD9D7` | Soft surfaces, calm panels, subtle highlights, secondary backgrounds |
-| `blue-whale` | Blue Whale | `#03363D` | Primary text, navigation, primary actions, dark surfaces, brand anchors |
+| `quantum-blue` | Quantum Blue | `#2457FF` | Primary actions, active navigation, focus states, brand accents, data highlights |
+| `ice-glass` | Ice Glass | `#DFF7FF` | Soft surfaces, calm panels, subtle highlights, secondary backgrounds |
 
 All landing page and in-app design system work must be created from this palette first.
 
 ## Usage Rules
 
-- Use `Blue Whale #03363D` as the main brand color for high-emphasis UI: primary buttons, headers, active navigation, dark hero surfaces, and important text.
-- Use `Jet Stream #BDD9D7` as the supporting brand color for background bands, hover states, selected surfaces, data highlights, and soft UI depth.
+- Use `Quantum Blue #2457FF` as the main brand color for high-emphasis UI: primary buttons, active navigation, focus states, selected controls, and important product accents.
+- Use `Ice Glass #DFF7FF` as the supporting brand color for background bands, hover states, selected surfaces, soft cards, and calm UI depth.
 - Keep neutral grays available for borders, disabled states, body copy, and dense dashboard layout, but do not introduce a competing brand hue without a documented reason.
 - Accent colors for semantic states are allowed only when they carry meaning: success, warning, danger, info.
-- The landing page may use richer composition and motion, but it must still derive its visual identity from Jet Stream and Blue Whale.
+- The landing page may use richer composition and motion, but it must still derive its visual identity from Quantum Blue and Ice Glass.
 - The authenticated app should stay quiet, fast, and operational: use the palette with restraint and prioritize scanability.
 
 ## Implementation Notes

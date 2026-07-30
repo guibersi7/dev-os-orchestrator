@@ -21,4 +21,4 @@ The backend stores data in Supabase when `NEXT_PUBLIC_SUPABASE_URL` and `SUPABAS
 
 Deployment, environment mapping, CI, and Supabase checklist are documented in [docs/deployment.md](docs/deployment.md).
 
-Design system decisions, including the required Jet Stream and Blue Whale brand palette for both the landing page and product UI, are documented in [docs/design-system.md](docs/design-system.md).
+Design system decisions, including the required Quantum Blue and Ice Glass brand palette for both the landing page and product UI, are documented in [docs/design-system.md](docs/design-system.md).
