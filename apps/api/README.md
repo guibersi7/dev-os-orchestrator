@@ -232,7 +232,7 @@ Stores a provider token server-side.
 {
   "workspaceId": "00000000-0000-4000-8000-000000000001",
   "service": "github",
-  "providerAccountId": "provider-user-or-installation-id",
+  "providerAccountId": "provider-user-id",
   "accessToken": "access-token",
   "refreshToken": "refresh-token",
   "expiresAt": "2026-08-01T00:00:00Z",

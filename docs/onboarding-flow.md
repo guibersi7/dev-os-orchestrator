@@ -10,8 +10,8 @@ Developer OS should get a new workspace to real engineering context as quickly a
 
 2. Workspace onboarding
    - User sees setup progress.
-   - User chooses the first integrations to connect.
-   - Recommended first services are GitHub, Linear, Slack, and Notion.
+   - User gets one primary action: connect GitHub.
+   - Other services stay available as optional next connections after GitHub is working.
 
 3. OAuth start
    - User clicks `Connect` for a service.
@@ -40,9 +40,10 @@ Developer OS should get a new workspace to real engineering context as quickly a
 ## Product Rules
 
 - Onboarding must be actionable, not informational.
-- The fastest happy path is connect, sync, dashboard.
+- The fastest happy path is connect GitHub, sync GitHub, dashboard.
 - The frontend must never receive access tokens or refresh tokens.
 - A service connection belongs to the user who authorized OAuth inside the workspace.
+- Every integration uses OAuth user authorization with the provider's own auth screen.
 - Every connected provider must expose safe connection state through `GET /v1/connections`.
 - Every external object must become an internal `WorkEvent` before powering product features.
 
