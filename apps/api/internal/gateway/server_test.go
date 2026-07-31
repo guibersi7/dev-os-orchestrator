@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/developer-os/api/internal/domain"
 	"github.com/developer-os/api/internal/integrations"
@@ -48,6 +49,99 @@ func TestDashboardUsesVersionedEnvelope(t *testing.T) {
 
 	if body["data"] == nil {
 		t.Fatal("expected data envelope")
+	}
+}
+
+func TestWorkspaceRoutesCreateAndListUserWorkspaces(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace-default", UserID: "user-1"}
+	server := NewServer(Config{
+		Registry: integrations.NewRegistry(),
+		Store:    memoryStore,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workspaces", strings.NewReader(`{"name":"Mobile Platform"}`))
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/workspaces", nil)
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res = httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	data := body["data"].(map[string]any)
+	if data["integrationScope"] != "per_workspace" || data["crossWorkspaceData"] != false {
+		t.Fatalf("expected per-workspace isolation metadata, got %#v", data)
+	}
+	workspaces := data["workspaces"].([]any)
+	if len(workspaces) != 2 {
+		t.Fatalf("expected default plus created workspace, got %#v", workspaces)
+	}
+}
+
+func TestWorkspaceDataIsIsolatedByWorkspaceID(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctxA := domain.GatewayContext{WorkspaceID: "workspace-a", UserID: "user-1"}
+	ctxB := domain.GatewayContext{WorkspaceID: "workspace-b", UserID: "user-1"}
+
+	if err := memoryStore.SaveWorkEvents(context.Background(), ctxA, []domain.WorkEvent{{
+		ID:         "event-a",
+		ExternalID: "event-a",
+		Service:    domain.ServiceGitHub,
+		Type:       "pull_request.review_requested",
+		Title:      "Workspace A review",
+		Source:     "repo-a",
+		Actor:      "Ana",
+		Priority:   "high",
+		Summary:    "Only workspace A should see this event.",
+		OccurredAt: time.Now().UTC(),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := memoryStore.UpsertToken(context.Background(), ctxA, domain.TokenUpsertRequest{
+		WorkspaceID:       ctxA.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-account",
+		AccessToken:       "workspace-a-token",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dashboardA, err := memoryStore.GetDashboard(context.Background(), ctxA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dashboardB, err := memoryStore.GetDashboard(context.Background(), ctxB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dashboardA.Events) != 1 {
+		t.Fatalf("expected workspace A event, got %#v", dashboardA.Events)
+	}
+	if len(dashboardB.Events) != 0 {
+		t.Fatalf("expected workspace B to have no events, got %#v", dashboardB.Events)
+	}
+
+	if _, err := memoryStore.GetToken(context.Background(), ctxB, domain.ServiceGitHub); !errors.Is(err, store.ErrTokenNotFound) {
+		t.Fatalf("expected workspace B to have no github token, got %v", err)
 	}
 }
 
@@ -191,8 +285,11 @@ func TestConnectionsListDoesNotLeakTokens(t *testing.T) {
 	if github["hasToken"] != true || github["hasRefreshToken"] != true {
 		t.Fatalf("expected safe token metadata, got %#v", github)
 	}
-	if github["status"] != "connected" && github["status"] != "needs_config" {
-		t.Fatalf("expected connected or needs_config status, got %#v", github["status"])
+	if github["status"] != "needs_selection" && github["status"] != "needs_config" {
+		t.Fatalf("expected needs_selection or needs_config status, got %#v", github["status"])
+	}
+	if github["selectionStatus"] != "needs_selection" {
+		t.Fatalf("expected needs_selection selection status, got %#v", github["selectionStatus"])
 	}
 }
 
@@ -386,6 +483,112 @@ func TestRefreshTokenExchangesAndDoesNotLeakTokens(t *testing.T) {
 	}
 	if token.AccessToken != "new-access-token" || token.RefreshToken != "new-refresh-token" {
 		t.Fatalf("expected refreshed tokens to be persisted, got %#v", token)
+	}
+}
+
+func TestResourceSelectionUpdatesConnectionStatus(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	if err := memoryStore.UpsertToken(context.Background(), ctx, domain.TokenUpsertRequest{
+		WorkspaceID:       ctx.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-account",
+		AccessToken:       "access-token",
+		Scopes:            []string{"repo"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewServer(Config{
+		Registry: integrations.NewRegistry(),
+		Store:    memoryStore,
+	})
+
+	payload := `{"resources":[{"id":"acme/api","type":"repository","name":"acme/api","externalUrl":"https://github.com/acme/api","metadata":{"fullName":"acme/api"}}]}`
+	req := httptest.NewRequest(http.MethodPut, "/v1/connections/github/selection", strings.NewReader(payload))
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/connections", nil)
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res = httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	data := body["data"].(map[string]any)
+	connections := data["connections"].([]any)
+	var github map[string]any
+	for _, value := range connections {
+		connection := value.(map[string]any)
+		if connection["service"] == "github" {
+			github = connection
+			break
+		}
+	}
+	if github == nil {
+		t.Fatal("expected github connection")
+	}
+	if github["selectionStatus"] != "selected" {
+		t.Fatalf("expected selected status, got %#v", github)
+	}
+	if github["selectedResourceCount"] != float64(1) {
+		t.Fatalf("expected one selected resource, got %#v", github["selectedResourceCount"])
+	}
+}
+
+func TestSyncRequiresSelectionWhenTokenExists(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	if err := memoryStore.UpsertToken(context.Background(), ctx, domain.TokenUpsertRequest{
+		WorkspaceID:       ctx.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-account",
+		AccessToken:       "access-token",
+		Scopes:            []string{"repo"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	server := NewServer(Config{
+		Registry: integrations.NewRegistryWithConnectors(failingConnector{}),
+		Store:    memoryStore,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/sync", strings.NewReader(`{"service":"github"}`))
+	req.Header.Set("x-workspace-id", ctx.WorkspaceID)
+	req.Header.Set("x-user-id", ctx.UserID)
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	data := body["data"].(map[string]any)
+	result := data["result"].(map[string]any)
+	if result["status"] != "needs_selection" {
+		t.Fatalf("expected needs_selection, got %#v", result)
 	}
 }
 

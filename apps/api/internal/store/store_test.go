@@ -56,7 +56,7 @@ func TestMemoryStorePersistsSyncResult(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := store.syncs[domain.ServiceSlack]
+	result := store.syncs[syncKey(ctx, domain.ServiceSlack)]
 	if result.NextCursor == nil || *result.NextCursor != cursor {
 		t.Fatalf("expected cursor %q, got %v", cursor, result.NextCursor)
 	}

@@ -63,6 +63,39 @@ func (c *JiraConnector) FetchRecentRecords(ctx context.Context, _ domain.Gateway
 	return records, nil
 }
 
+func (c *JiraConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := jiraAccessToken(token)
+	if accessToken == "" {
+		return nil, errJiraNeedsAuth
+	}
+	if c.baseURL == "" {
+		return nil, errJiraNeedsSiteConfig
+	}
+
+	projects, err := c.fetchProjects(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(projects))
+	for _, project := range projects {
+		if project.Key == "" {
+			continue
+		}
+		resources = append(resources, domain.SelectableResource{
+			ID:          project.Key,
+			Type:        "project",
+			Name:        project.Name,
+			ExternalURL: strings.TrimRight(c.baseURL, "/") + "/jira/software/c/projects/" + url.PathEscape(project.Key),
+			Metadata: map[string]any{
+				"projectId":  project.ID,
+				"projectKey": project.Key,
+			},
+		})
+	}
+	return resources, nil
+}
+
 func (c *JiraConnector) Normalize(records []domain.ExternalRecord) []domain.WorkEvent {
 	events := make([]domain.WorkEvent, 0, len(records))
 	for _, record := range records {
@@ -113,11 +146,52 @@ func (c *JiraConnector) Sync(ctx context.Context, gatewayContext domain.GatewayC
 	}, nil
 }
 
+func (c *JiraConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := jiraAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+	if c.baseURL == "" {
+		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_site_config", Events: []domain.WorkEvent{}}, nil
+	}
+
+	projectKeys := selectedJiraProjectKeys(selection)
+	if len(projectKeys) == 0 {
+		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	issues, err := c.searchIssuesForProjectKeys(ctx, accessToken, projectKeys)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	records := make([]domain.ExternalRecord, 0, len(issues))
+	for _, issue := range issues {
+		records = append(records, issue.toRecord(c.baseURL))
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+
+	return domain.SyncResult{
+		Service:        domain.ServiceJira,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
 func (c *JiraConnector) searchIssues(ctx context.Context, token string) ([]jiraIssue, error) {
+	return c.searchIssuesForProjectKeys(ctx, token, c.projectKeys)
+}
+
+func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token string, projectKeys []string) ([]jiraIssue, error) {
 	jql := "updated >= -14d ORDER BY updated DESC"
-	if len(c.projectKeys) > 0 {
-		quoted := make([]string, 0, len(c.projectKeys))
-		for _, key := range c.projectKeys {
+	if len(projectKeys) > 0 {
+		quoted := make([]string, 0, len(projectKeys))
+		for _, key := range projectKeys {
 			quoted = append(quoted, `"`+strings.ReplaceAll(key, `"`, `\"`)+`"`)
 		}
 		jql = "project in (" + strings.Join(quoted, ",") + ") AND " + jql
@@ -148,6 +222,37 @@ func (c *JiraConnector) searchIssues(ctx context.Context, token string) ([]jiraI
 		return nil, err
 	}
 	return response.Issues, nil
+}
+
+func (c *JiraConnector) fetchProjects(ctx context.Context, token string) ([]jiraProject, error) {
+	var response struct {
+		Values []jiraProject `json:"values"`
+	}
+	if err := c.get(ctx, token, "/rest/api/3/project/search?maxResults=100", &response); err != nil {
+		return nil, err
+	}
+	return response.Values, nil
+}
+
+func (c *JiraConnector) get(ctx context.Context, token string, path string, output any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("authorization", "Bearer "+token)
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("user-agent", "developer-os-api")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("jira api request failed: %s", resp.Status)
+	}
+	return json.NewDecoder(resp.Body).Decode(output)
 }
 
 func (c *JiraConnector) post(ctx context.Context, token string, path string, input any, output any) error {
@@ -210,6 +315,7 @@ type jiraNamedEntity struct {
 }
 
 type jiraProject struct {
+	ID   string `json:"id"`
 	Key  string `json:"key"`
 	Name string `json:"name"`
 }
@@ -346,4 +452,26 @@ func jiraAccessToken(token *domain.ProviderToken) string {
 	}
 
 	return strings.TrimSpace(os.Getenv("JIRA_ACCESS_TOKEN"))
+}
+
+func selectedJiraProjectKeys(selection domain.ResourceSelection) []string {
+	projectKeys := []string{}
+	seen := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "project" && resource.Type != "board" {
+			continue
+		}
+
+		projectKey := strings.TrimSpace(resource.ID)
+		if metadataKey, ok := resource.Metadata["projectKey"].(string); ok && strings.TrimSpace(metadataKey) != "" {
+			projectKey = strings.TrimSpace(metadataKey)
+		}
+		if projectKey == "" || seen[projectKey] {
+			continue
+		}
+
+		seen[projectKey] = true
+		projectKeys = append(projectKeys, projectKey)
+	}
+	return projectKeys
 }

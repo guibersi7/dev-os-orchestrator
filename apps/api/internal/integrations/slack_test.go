@@ -40,8 +40,45 @@ func TestSlackSyncReportsMissingChannelSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if result.Status != "needs_channel_selection" {
-		t.Fatalf("expected needs_channel_selection, got %q", result.Status)
+	if result.Status != "needs_selection" {
+		t.Fatalf("expected needs_selection, got %q", result.Status)
+	}
+}
+
+func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/conversations.list" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("types") != "public_channel,private_channel" {
+			t.Fatalf("expected channel types query, got %s", r.URL.RawQuery)
+		}
+		writeSlackJSON(t, w, map[string]any{
+			"ok": true,
+			"channels": []map[string]any{
+				{"id": "C123", "name": "eng"},
+				{"id": "C999", "name": "release"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+	if resources[0].ID != "C123" || resources[0].Type != "channel" || resources[0].Name != "#eng" {
+		t.Fatalf("unexpected first resource: %#v", resources[0])
 	}
 }
 
@@ -134,6 +171,79 @@ func TestSlackSyncFetchesThreadsAndNormalizesDecisionsAndBlockers(t *testing.T) 
 		if !eventTypes[eventType] {
 			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
 		}
+	}
+}
+
+func TestSlackSyncSelectedUsesOnlySelectedChannels(t *testing.T) {
+	seenChannels := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("authorization") != "Bearer token" {
+			t.Fatalf("expected bearer token, got %q", r.Header.Get("authorization"))
+		}
+
+		channelID := r.URL.Query().Get("channel")
+		if channelID != "" {
+			seenChannels[channelID] = true
+		}
+
+		switch r.URL.Path {
+		case "/conversations.info":
+			if channelID != "C999" {
+				t.Fatalf("unexpected selected channel %s", channelID)
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok":      true,
+				"channel": map[string]any{"id": "C999", "name": "release"},
+			})
+		case "/conversations.history":
+			if channelID != "C999" {
+				t.Fatalf("unexpected selected channel %s", channelID)
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U2",
+						"text": "Blocked waiting on GitHub checks",
+						"ts":   "1785326500.000000",
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		channelIDs: []string{"C123"},
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "C999", Type: "channel", Name: "#release", Metadata: map[string]any{"channelId": "C999"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Status != "connected" {
+		t.Fatalf("expected connected, got %q", result.Status)
+	}
+	if result.EventsCreated != 1 {
+		t.Fatalf("expected one event, got %d", result.EventsCreated)
+	}
+	if seenChannels["C123"] {
+		t.Fatal("sync used env channel instead of selected channel")
+	}
+	if !seenChannels["C999"] {
+		t.Fatal("sync did not use selected channel")
 	}
 }
 

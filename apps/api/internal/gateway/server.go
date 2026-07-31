@@ -61,11 +61,15 @@ func NewServer(config Config) *Server {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
+	mux.HandleFunc("GET /v1/workspaces", s.withAuth(s.listWorkspaces))
+	mux.HandleFunc("POST /v1/workspaces", s.withAuth(s.createWorkspace))
 	mux.HandleFunc("GET /v1/dashboard", s.withAuth(s.dashboard))
 	mux.HandleFunc("GET /v1/config", s.withAuth(s.getConfig))
 	mux.HandleFunc("PUT /v1/config", s.withAuth(s.putConfig))
 	mux.HandleFunc("GET /v1/connections", s.withAuth(s.listConnections))
 	mux.HandleFunc("DELETE /v1/connections/{service}", s.withAuth(s.disconnectConnection))
+	mux.HandleFunc("GET /v1/connections/{service}/resources", s.withAuth(s.listSelectableResources))
+	mux.HandleFunc("PUT /v1/connections/{service}/selection", s.withAuth(s.saveResourceSelection))
 	mux.HandleFunc("GET /v1/oauth/{service}/start", s.withAuth(s.oauthStart))
 	mux.HandleFunc("GET /v1/oauth/{service}/callback", s.oauthCallback)
 	mux.HandleFunc("POST /v1/sync", s.withAuth(s.sync))
@@ -99,6 +103,54 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	s.write(w, ctx, http.StatusOK, map[string]any{
 		"gateway":   "developer-os",
 		"dashboard": payload,
+	})
+}
+
+func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	workspaces, err := s.store.ListWorkspaces(r.Context(), ctx)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "workspaces_read_failed", err.Error(), nil)
+		return
+	}
+
+	s.write(w, ctx, http.StatusOK, map[string]any{
+		"workspaces":         workspaces,
+		"activeWorkspaceId":  ctx.WorkspaceID,
+		"workspaceCount":     len(workspaces),
+		"isolationStrategy":  "workspace_id",
+		"integrationScope":   "per_workspace",
+		"crossWorkspaceData": false,
+	})
+}
+
+func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	var input domain.CreateWorkspaceRequest
+	if err := httpjson.Read(r, &input); err != nil {
+		s.writeError(w, ctx, http.StatusBadRequest, "invalid_payload", "invalid workspace payload", map[string]any{"cause": err.Error()})
+		return
+	}
+	if strings.TrimSpace(input.Name) == "" {
+		s.writeError(w, ctx, http.StatusBadRequest, "invalid_workspace", "workspace name is required", nil)
+		return
+	}
+
+	workspace, err := s.store.CreateWorkspace(r.Context(), ctx, input)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "workspace_write_failed", err.Error(), nil)
+		return
+	}
+
+	s.write(w, domain.GatewayContext{
+		WorkspaceID: workspace.ID,
+		UserID:      ctx.UserID,
+		RequestID:   ctx.RequestID,
+	}, http.StatusCreated, map[string]any{
+		"workspace":          workspace,
+		"isolationStrategy":  "workspace_id",
+		"integrationScope":   "per_workspace",
+		"crossWorkspaceData": false,
 	})
 }
 
@@ -176,6 +228,102 @@ func (s *Server) disconnectConnection(w http.ResponseWriter, r *http.Request) {
 		"service", service,
 	)
 	s.write(w, ctx, http.StatusOK, map[string]any{"connection": connection})
+}
+
+func (s *Server) listSelectableResources(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	service := domain.Service(r.PathValue("service"))
+	if !service.Valid() {
+		s.writeError(w, ctx, http.StatusBadRequest, "unsupported_service", "unsupported integration service", map[string]any{"service": service})
+		return
+	}
+
+	connector, ok := s.registry.Get(service)
+	if !ok {
+		s.writeError(w, ctx, http.StatusNotFound, "unsupported_service", "unsupported integration service", map[string]any{"service": service})
+		return
+	}
+
+	token, err := s.store.GetToken(r.Context(), ctx, service)
+	if errors.Is(err, store.ErrTokenNotFound) {
+		s.write(w, ctx, http.StatusOK, map[string]any{
+			"service":   service,
+			"status":    "needs_auth",
+			"resources": []domain.SelectableResource{},
+		})
+		return
+	}
+	if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "token_read_failed", err.Error(), map[string]any{"service": service})
+		return
+	}
+
+	lister, ok := connector.(integrations.ResourceLister)
+	if !ok {
+		s.write(w, ctx, http.StatusOK, map[string]any{
+			"service":   service,
+			"status":    "not_implemented",
+			"resources": []domain.SelectableResource{},
+		})
+		return
+	}
+
+	resources, err := lister.ListSelectableResources(r.Context(), ctx, &token)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusBadGateway, "resources_fetch_failed", err.Error(), syncErrorDetails(service, err))
+		return
+	}
+
+	selection, err := s.store.GetResourceSelection(r.Context(), ctx, service)
+	selectedIDs := []string{}
+	if err == nil {
+		selectedIDs = selection.ResourceIDs
+	} else if !errors.Is(err, store.ErrResourceSelectionNotFound) {
+		s.writeError(w, ctx, http.StatusInternalServerError, "selection_read_failed", err.Error(), map[string]any{"service": service})
+		return
+	}
+
+	s.write(w, ctx, http.StatusOK, map[string]any{
+		"service":             service,
+		"status":              "available",
+		"resources":           resources,
+		"selectedResourceIds": selectedIDs,
+	})
+}
+
+func (s *Server) saveResourceSelection(w http.ResponseWriter, r *http.Request) {
+	ctx := gatewayContext(r)
+	service := domain.Service(r.PathValue("service"))
+	if !service.Valid() {
+		s.writeError(w, ctx, http.StatusBadRequest, "unsupported_service", "unsupported integration service", map[string]any{"service": service})
+		return
+	}
+
+	var input domain.ResourceSelectionRequest
+	if err := httpjson.Read(r, &input); err != nil {
+		s.writeError(w, ctx, http.StatusBadRequest, "invalid_payload", "invalid resource selection payload", map[string]any{"cause": err.Error()})
+		return
+	}
+	if err := validateResourceSelection(input); err != nil {
+		s.writeError(w, ctx, http.StatusBadRequest, "invalid_resource_selection", err.Error(), nil)
+		return
+	}
+
+	if _, err := s.store.GetToken(r.Context(), ctx, service); errors.Is(err, store.ErrTokenNotFound) {
+		s.writeError(w, ctx, http.StatusConflict, "needs_auth", "connect the integration before selecting resources", map[string]any{"service": service})
+		return
+	} else if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "token_read_failed", err.Error(), map[string]any{"service": service})
+		return
+	}
+
+	selection, err := s.store.SaveResourceSelection(r.Context(), ctx, service, input.Resources)
+	if err != nil {
+		s.writeError(w, ctx, http.StatusInternalServerError, "selection_write_failed", err.Error(), map[string]any{"service": service})
+		return
+	}
+
+	s.write(w, ctx, http.StatusOK, map[string]any{"selection": selection})
 }
 
 func (s *Server) oauthStart(w http.ResponseWriter, r *http.Request) {
@@ -373,7 +521,34 @@ func (s *Server) sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := connector.Sync(r.Context(), ctx, tokenRef)
+	selection, selectionErr := s.store.GetResourceSelection(r.Context(), ctx, input.Service)
+	if selectionErr != nil && !errors.Is(selectionErr, store.ErrResourceSelectionNotFound) {
+		s.writeError(w, ctx, http.StatusInternalServerError, "selection_read_failed", selectionErr.Error(), map[string]any{"service": input.Service})
+		return
+	}
+	if tokenRef != nil && errors.Is(selectionErr, store.ErrResourceSelectionNotFound) {
+		result := domain.SyncResult{
+			Service: input.Service,
+			Status:  "needs_selection",
+			Events:  []domain.WorkEvent{},
+		}
+		if err := s.store.SaveSyncResult(r.Context(), ctx, result); err != nil {
+			s.writeError(w, ctx, http.StatusInternalServerError, "sync_state_persist_failed", err.Error(), map[string]any{"service": input.Service})
+			return
+		}
+		s.write(w, ctx, http.StatusOK, map[string]any{
+			"connector": connector.Info(),
+			"result":    result,
+		})
+		return
+	}
+
+	var result domain.SyncResult
+	if scopedConnector, ok := connector.(integrations.ScopedConnector); ok && selectionErr == nil {
+		result, err = scopedConnector.SyncSelected(r.Context(), ctx, tokenRef, selection)
+	} else {
+		result, err = connector.Sync(r.Context(), ctx, tokenRef)
+	}
 	if err != nil {
 		_ = s.store.SaveSyncFailure(r.Context(), ctx, input.Service, err)
 		details := syncErrorDetails(input.Service, err)
@@ -673,6 +848,32 @@ func validateTokenRequest(input domain.TokenUpsertRequest) error {
 
 	if strings.TrimSpace(input.AccessToken) == "" {
 		return errValidation("accessToken is required")
+	}
+
+	return nil
+}
+
+func validateResourceSelection(input domain.ResourceSelectionRequest) error {
+	if len(input.Resources) == 0 {
+		return errValidation("resources must contain at least one selected resource")
+	}
+
+	seen := map[string]bool{}
+	for _, resource := range input.Resources {
+		id := strings.TrimSpace(resource.ID)
+		if id == "" {
+			return errValidation("resources[].id is required")
+		}
+		if strings.TrimSpace(resource.Type) == "" {
+			return errValidation("resources[].type is required")
+		}
+		if strings.TrimSpace(resource.Name) == "" {
+			return errValidation("resources[].name is required")
+		}
+		if seen[id] {
+			return errValidation("resources must not contain duplicate ids")
+		}
+		seen[id] = true
 	}
 
 	return nil

@@ -73,6 +73,40 @@ func (c *NotionConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 	return records, nil
 }
 
+func (c *NotionConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := notionAccessToken(token)
+	if accessToken == "" {
+		return nil, errNotionNeedsAuth
+	}
+
+	pages, err := c.searchWorkspaceObjects(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(pages))
+	for _, page := range pages {
+		if page.ID == "" {
+			continue
+		}
+		resourceType := page.Object
+		if resourceType == "" {
+			resourceType = "page"
+		}
+		resources = append(resources, domain.SelectableResource{
+			ID:          page.ID,
+			Type:        resourceType,
+			Name:        page.title(),
+			ExternalURL: page.URL,
+			Metadata: map[string]any{
+				"object": page.Object,
+				"pageId": page.ID,
+			},
+		})
+	}
+	return resources, nil
+}
+
 func (c *NotionConnector) Normalize(records []domain.ExternalRecord) []domain.WorkEvent {
 	events := make([]domain.WorkEvent, 0, len(records))
 	for _, record := range records {
@@ -121,6 +155,75 @@ func (c *NotionConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 		Events:         events,
 		DocumentChunks: chunks,
 	}, nil
+}
+
+func (c *NotionConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := notionAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceNotion, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+
+	selectedIDs := selectedNotionResourceIDs(selection)
+	if len(selectedIDs) == 0 {
+		return domain.SyncResult{Service: domain.ServiceNotion, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	pages, err := c.searchPages(ctx, accessToken)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	records := []domain.ExternalRecord{}
+	for _, page := range pages {
+		if !selectedIDs[page.ID] {
+			continue
+		}
+		blocks, err := c.fetchBlockChildren(ctx, accessToken, page.ID)
+		if err != nil {
+			return domain.SyncResult{}, err
+		}
+		comments, err := c.fetchComments(ctx, accessToken, page.ID)
+		if err != nil {
+			comments = []notionComment{}
+		}
+
+		record, ok := page.toRecord(blocks, comments)
+		if ok {
+			records = append(records, record)
+		}
+	}
+
+	events := c.Normalize(records)
+	chunks := notionDocumentChunks(records)
+	cursor := latestRecordCursor(records)
+
+	return domain.SyncResult{
+		Service:        domain.ServiceNotion,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+		DocumentChunks: chunks,
+	}, nil
+}
+
+func (c *NotionConnector) searchWorkspaceObjects(ctx context.Context, token string) ([]notionPage, error) {
+	var response struct {
+		Results []notionPage `json:"results"`
+	}
+
+	payload := map[string]any{
+		"sort": map[string]any{
+			"direction": "descending",
+			"timestamp": "last_edited_time",
+		},
+		"page_size": 50,
+	}
+	if err := c.post(ctx, token, "/search", payload, &response); err != nil {
+		return nil, err
+	}
+	return response.Results, nil
 }
 
 func (c *NotionConnector) searchPages(ctx context.Context, token string) ([]notionPage, error) {
@@ -217,6 +320,7 @@ func (c *NotionConnector) setHeaders(req *http.Request, token string) {
 }
 
 type notionPage struct {
+	Object         string                    `json:"object"`
 	ID             string                    `json:"id"`
 	URL            string                    `json:"url"`
 	CreatedTime    time.Time                 `json:"created_time"`
@@ -466,4 +570,22 @@ func notionAccessToken(token *domain.ProviderToken) string {
 		return token.AccessToken
 	}
 	return strings.TrimSpace(os.Getenv("NOTION_ACCESS_TOKEN"))
+}
+
+func selectedNotionResourceIDs(selection domain.ResourceSelection) map[string]bool {
+	ids := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "page" && resource.Type != "database" {
+			continue
+		}
+
+		id := strings.TrimSpace(resource.ID)
+		if pageID, ok := resource.Metadata["pageId"].(string); ok && strings.TrimSpace(pageID) != "" {
+			id = strings.TrimSpace(pageID)
+		}
+		if id != "" {
+			ids[id] = true
+		}
+	}
+	return ids
 }

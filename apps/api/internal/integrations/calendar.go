@@ -52,6 +52,72 @@ func (c *CalendarConnector) FetchRecentRecords(ctx context.Context, _ domain.Gat
 		calendarIDs = []string{"primary"}
 	}
 
+	return c.fetchRecentRecordsForCalendars(ctx, accessToken, calendarIDs)
+}
+
+func (c *CalendarConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := calendarAccessToken(token)
+	if accessToken == "" {
+		return nil, errCalendarNeedsAuth
+	}
+
+	calendars, err := c.fetchCalendars(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(calendars))
+	for _, calendar := range calendars {
+		if calendar.ID == "" {
+			continue
+		}
+		name := calendar.Summary
+		if name == "" {
+			name = calendar.ID
+		}
+		resources = append(resources, domain.SelectableResource{
+			ID:          calendar.ID,
+			Type:        "calendar",
+			Name:        name,
+			ExternalURL: calendar.HTMLLink,
+			Metadata: map[string]any{
+				"calendarId": calendar.ID,
+				"primary":    calendar.Primary,
+			},
+		})
+	}
+	return resources, nil
+}
+
+func (c *CalendarConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := calendarAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceCalendar, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+
+	calendarIDs := selectedCalendarIDs(selection)
+	if len(calendarIDs) == 0 {
+		return domain.SyncResult{Service: domain.ServiceCalendar, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	records, err := c.fetchRecentRecordsForCalendars(ctx, accessToken, calendarIDs)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+	return domain.SyncResult{
+		Service:        domain.ServiceCalendar,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
+func (c *CalendarConnector) fetchRecentRecordsForCalendars(ctx context.Context, accessToken string, calendarIDs []string) ([]domain.ExternalRecord, error) {
 	records := []domain.ExternalRecord{}
 	for _, calendarID := range calendarIDs {
 		events, err := c.fetchEvents(ctx, accessToken, calendarID)
@@ -134,6 +200,16 @@ func (c *CalendarConnector) fetchEvents(ctx context.Context, token string, calen
 	return response.Items, nil
 }
 
+func (c *CalendarConnector) fetchCalendars(ctx context.Context, token string) ([]calendarListEntry, error) {
+	var response struct {
+		Items []calendarListEntry `json:"items"`
+	}
+	if err := c.get(ctx, token, "/users/me/calendarList?minAccessRole=reader", &response); err != nil {
+		return nil, err
+	}
+	return response.Items, nil
+}
+
 func (c *CalendarConnector) get(ctx context.Context, token string, path string, output any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(c.apiBaseURL, "/")+path, nil)
 	if err != nil {
@@ -176,6 +252,13 @@ type calendarEvent struct {
 			URI            string `json:"uri"`
 		} `json:"entryPoints"`
 	} `json:"conferenceData"`
+}
+
+type calendarListEntry struct {
+	ID       string `json:"id"`
+	Summary  string `json:"summary"`
+	HTMLLink string `json:"htmlLink"`
+	Primary  bool   `json:"primary"`
 }
 
 type calendarEventTime struct {
@@ -302,4 +385,26 @@ func calendarAccessToken(token *domain.ProviderToken) string {
 		return token.AccessToken
 	}
 	return strings.TrimSpace(os.Getenv("GOOGLE_CALENDAR_ACCESS_TOKEN"))
+}
+
+func selectedCalendarIDs(selection domain.ResourceSelection) []string {
+	calendarIDs := []string{}
+	seen := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "calendar" {
+			continue
+		}
+
+		calendarID := strings.TrimSpace(resource.ID)
+		if metadataID, ok := resource.Metadata["calendarId"].(string); ok && strings.TrimSpace(metadataID) != "" {
+			calendarID = strings.TrimSpace(metadataID)
+		}
+		if calendarID == "" || seen[calendarID] {
+			continue
+		}
+
+		seen[calendarID] = true
+		calendarIDs = append(calendarIDs, calendarID)
+	}
+	return calendarIDs
 }

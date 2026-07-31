@@ -34,6 +34,37 @@ type APIContext struct {
 	UserID      string `json:"userId"`
 }
 
+type User struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email,omitempty"`
+	Name      string    `json:"name,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type Workspace struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	Role      string    `json:"role,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type WorkspaceMember struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspaceId"`
+	UserID      string    `json:"userId"`
+	Role        string    `json:"role"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type CreateWorkspaceRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug,omitempty"`
+}
+
 type APIError struct {
 	Code    string         `json:"code"`
 	Message string         `json:"message"`
@@ -102,6 +133,8 @@ type ConnectionStatus struct {
 	ProviderConfigured     bool       `json:"providerConfigured"`
 	HasToken               bool       `json:"hasToken"`
 	HasRefreshToken        bool       `json:"hasRefreshToken"`
+	SelectionStatus        string     `json:"selectionStatus"`
+	SelectedResourceCount  int        `json:"selectedResourceCount"`
 	ProviderAccountID      string     `json:"providerAccountId,omitempty"`
 	ExpiresAt              *time.Time `json:"expiresAt,omitempty"`
 	Scopes                 []string   `json:"scopes"`
@@ -110,6 +143,27 @@ type ConnectionStatus struct {
 	LastSyncRecordsScanned int        `json:"lastSyncRecordsScanned"`
 	LastSyncEventsCreated  int        `json:"lastSyncEventsCreated"`
 	UpdatedAt              *time.Time `json:"updatedAt,omitempty"`
+}
+
+type SelectableResource struct {
+	ID          string         `json:"id"`
+	Type        string         `json:"type"`
+	Name        string         `json:"name"`
+	ExternalURL string         `json:"externalUrl,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+}
+
+type ResourceSelection struct {
+	Service     Service              `json:"service"`
+	Status      string               `json:"status"`
+	Resources   []SelectableResource `json:"resources"`
+	SelectedAt  time.Time            `json:"selectedAt"`
+	SelectedBy  string               `json:"selectedBy"`
+	ResourceIDs []string             `json:"resourceIds"`
+}
+
+type ResourceSelectionRequest struct {
+	Resources []SelectableResource `json:"resources"`
 }
 
 type DashboardPayload struct {

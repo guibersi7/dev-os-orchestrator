@@ -51,8 +51,70 @@ func (c *SlackConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatewa
 		return nil, errSlackChannelsNotConfigured
 	}
 
+	return c.fetchRecentRecordsForChannels(ctx, accessToken, c.channelIDs)
+}
+
+func (c *SlackConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := slackAccessToken(token)
+	if accessToken == "" {
+		return nil, errSlackNeedsAuth
+	}
+
+	channels, err := c.fetchChannels(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(channels))
+	for _, channel := range channels {
+		if channel.ID == "" || channel.Name == "" {
+			continue
+		}
+		resources = append(resources, domain.SelectableResource{
+			ID:   channel.ID,
+			Type: "channel",
+			Name: "#" + channel.Name,
+			Metadata: map[string]any{
+				"channelId":   channel.ID,
+				"channelName": channel.Name,
+			},
+		})
+	}
+	return resources, nil
+}
+
+func (c *SlackConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := slackAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+
+	channelIDs := selectedSlackChannelIDs(selection)
+	if len(channelIDs) == 0 {
+		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	records, err := c.fetchRecentRecordsForChannels(ctx, accessToken, channelIDs)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+
+	return domain.SyncResult{
+		Service:        domain.ServiceSlack,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
+func (c *SlackConnector) fetchRecentRecordsForChannels(ctx context.Context, accessToken string, channelIDs []string) ([]domain.ExternalRecord, error) {
 	records := []domain.ExternalRecord{}
-	for _, channelID := range c.channelIDs {
+	for _, channelID := range channelIDs {
 		channel, err := c.fetchChannel(ctx, accessToken, channelID)
 		if err != nil {
 			return nil, err
@@ -114,7 +176,7 @@ func (c *SlackConnector) Sync(ctx context.Context, gatewayContext domain.Gateway
 		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
 	}
 	if errors.Is(err, errSlackChannelsNotConfigured) {
-		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_channel_selection", Events: []domain.WorkEvent{}}, nil
+		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
 	}
 	if err != nil {
 		return domain.SyncResult{}, err
@@ -131,6 +193,29 @@ func (c *SlackConnector) Sync(ctx context.Context, gatewayContext domain.Gateway
 		NextCursor:     cursor,
 		Events:         events,
 	}, nil
+}
+
+func (c *SlackConnector) fetchChannels(ctx context.Context, token string) ([]slackChannel, error) {
+	var response struct {
+		OK               bool           `json:"ok"`
+		Error            string         `json:"error"`
+		Channels         []slackChannel `json:"channels"`
+		ResponseMetadata struct {
+			NextCursor string `json:"next_cursor"`
+		} `json:"response_metadata"`
+	}
+	values := url.Values{
+		"exclude_archived": []string{"true"},
+		"limit":            []string{"200"},
+		"types":            []string{"public_channel,private_channel"},
+	}
+	if err := c.get(ctx, token, "conversations.list", values, &response); err != nil {
+		return nil, err
+	}
+	if !response.OK {
+		return nil, fmt.Errorf("slack conversations.list failed: %s", response.Error)
+	}
+	return response.Channels, nil
 }
 
 func (c *SlackConnector) fetchChannel(ctx context.Context, token string, channelID string) (slackChannel, error) {
@@ -330,6 +415,28 @@ func slackAccessToken(token *domain.ProviderToken) string {
 	}
 
 	return strings.TrimSpace(os.Getenv("SLACK_ACCESS_TOKEN"))
+}
+
+func selectedSlackChannelIDs(selection domain.ResourceSelection) []string {
+	channelIDs := []string{}
+	seen := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "channel" {
+			continue
+		}
+
+		channelID := strings.TrimSpace(resource.ID)
+		if metadataID, ok := resource.Metadata["channelId"].(string); ok && strings.TrimSpace(metadataID) != "" {
+			channelID = strings.TrimSpace(metadataID)
+		}
+		if channelID == "" || seen[channelID] {
+			continue
+		}
+
+		seen[channelID] = true
+		channelIDs = append(channelIDs, channelID)
+	}
+	return channelIDs
 }
 
 func parseCSV(value string) []string {

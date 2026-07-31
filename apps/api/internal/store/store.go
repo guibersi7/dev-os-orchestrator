@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,8 +22,11 @@ import (
 )
 
 var ErrTokenNotFound = errors.New("integration token not found")
+var ErrResourceSelectionNotFound = errors.New("integration resource selection not found")
 
 type Store interface {
+	ListWorkspaces(context.Context, domain.GatewayContext) ([]domain.Workspace, error)
+	CreateWorkspace(context.Context, domain.GatewayContext, domain.CreateWorkspaceRequest) (domain.Workspace, error)
 	SaveWorkEvents(context.Context, domain.GatewayContext, []domain.WorkEvent) error
 	SaveDocumentChunks(context.Context, domain.GatewayContext, []domain.DocumentChunk) error
 	SaveSyncResult(context.Context, domain.GatewayContext, domain.SyncResult) error
@@ -36,6 +40,8 @@ type Store interface {
 	RefreshTokenStatus(context.Context, domain.GatewayContext, domain.Service) (map[string]any, error)
 	ListConnectionStatuses(context.Context, domain.GatewayContext) ([]domain.ConnectionStatus, error)
 	DisconnectConnection(context.Context, domain.GatewayContext, domain.Service) (domain.ConnectionStatus, error)
+	GetResourceSelection(context.Context, domain.GatewayContext, domain.Service) (domain.ResourceSelection, error)
+	SaveResourceSelection(context.Context, domain.GatewayContext, domain.Service, []domain.SelectableResource) (domain.ResourceSelection, error)
 }
 
 func NewFromEnv() Store {
@@ -54,58 +60,95 @@ func NewFromEnv() Store {
 }
 
 type MemoryStore struct {
-	events         []domain.WorkEvent
+	workspaces     map[string]domain.Workspace
+	memberships    map[string]domain.WorkspaceMember
+	events         map[string][]domain.WorkEvent
 	eventKeys      map[string]bool
-	documentChunks []domain.DocumentChunk
+	documentChunks map[string][]domain.DocumentChunk
 	chunkKeys      map[string]bool
 	configs        map[string]domain.UserConfig
 	tokens         map[string]domain.TokenUpsertRequest
-	syncs          map[domain.Service]domain.SyncResult
+	syncs          map[string]domain.SyncResult
+	selections     map[string]domain.ResourceSelection
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		events:         []domain.WorkEvent{},
+		workspaces:     map[string]domain.Workspace{},
+		memberships:    map[string]domain.WorkspaceMember{},
+		events:         map[string][]domain.WorkEvent{},
 		eventKeys:      map[string]bool{},
-		documentChunks: []domain.DocumentChunk{},
+		documentChunks: map[string][]domain.DocumentChunk{},
 		chunkKeys:      map[string]bool{},
 		configs:        map[string]domain.UserConfig{},
 		tokens:         map[string]domain.TokenUpsertRequest{},
-		syncs:          map[domain.Service]domain.SyncResult{},
+		syncs:          map[string]domain.SyncResult{},
+		selections:     map[string]domain.ResourceSelection{},
 	}
 }
 
-func (s *MemoryStore) SaveWorkEvents(_ context.Context, _ domain.GatewayContext, events []domain.WorkEvent) error {
+func (s *MemoryStore) ListWorkspaces(_ context.Context, ctx domain.GatewayContext) ([]domain.Workspace, error) {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	workspaces := []domain.Workspace{}
+	for key, member := range s.memberships {
+		if !strings.HasSuffix(key, ":"+ctx.UserID) || member.UserID != ctx.UserID {
+			continue
+		}
+		workspace, ok := s.workspaces[member.WorkspaceID]
+		if !ok {
+			continue
+		}
+		workspace.Role = member.Role
+		workspaces = append(workspaces, workspace)
+	}
+	return workspaces, nil
+}
+
+func (s *MemoryStore) CreateWorkspace(_ context.Context, ctx domain.GatewayContext, input domain.CreateWorkspaceRequest) (domain.Workspace, error) {
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = "Developer OS Workspace"
+	}
+	workspaceID := "workspace_" + strconv.FormatInt(time.Now().UTC().UnixNano(), 36)
+	workspace := s.ensureMemoryWorkspace(domain.GatewayContext{WorkspaceID: workspaceID, UserID: ctx.UserID}, name)
+	return workspace, nil
+}
+
+func (s *MemoryStore) SaveWorkEvents(_ context.Context, ctx domain.GatewayContext, events []domain.WorkEvent) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	for _, event := range events {
-		key := eventKey(event)
+		key := eventKey(ctx, event)
 		if s.eventKeys[key] {
 			continue
 		}
 		s.eventKeys[key] = true
-		s.events = append(s.events, event)
+		s.events[ctx.WorkspaceID] = append(s.events[ctx.WorkspaceID], event)
 	}
 	return nil
 }
 
-func (s *MemoryStore) SaveDocumentChunks(_ context.Context, _ domain.GatewayContext, chunks []domain.DocumentChunk) error {
+func (s *MemoryStore) SaveDocumentChunks(_ context.Context, ctx domain.GatewayContext, chunks []domain.DocumentChunk) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	for _, chunk := range chunks {
-		key := chunkKey(chunk)
+		key := chunkKey(ctx, chunk)
 		if s.chunkKeys[key] {
 			continue
 		}
 		s.chunkKeys[key] = true
-		s.documentChunks = append(s.documentChunks, chunk)
+		s.documentChunks[ctx.WorkspaceID] = append(s.documentChunks[ctx.WorkspaceID], chunk)
 	}
 	return nil
 }
 
-func (s *MemoryStore) SaveSyncResult(_ context.Context, _ domain.GatewayContext, result domain.SyncResult) error {
-	s.syncs[result.Service] = result
+func (s *MemoryStore) SaveSyncResult(_ context.Context, ctx domain.GatewayContext, result domain.SyncResult) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	s.syncs[syncKey(ctx, result.Service)] = result
 	return nil
 }
 
-func (s *MemoryStore) SaveSyncFailure(_ context.Context, _ domain.GatewayContext, service domain.Service, _ error) error {
-	s.syncs[service] = domain.SyncResult{
+func (s *MemoryStore) SaveSyncFailure(_ context.Context, ctx domain.GatewayContext, service domain.Service, _ error) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	s.syncs[syncKey(ctx, service)] = domain.SyncResult{
 		Service: service,
 		Status:  "error",
 	}
@@ -113,22 +156,27 @@ func (s *MemoryStore) SaveSyncFailure(_ context.Context, _ domain.GatewayContext
 }
 
 func (s *MemoryStore) GetDashboard(_ context.Context, ctx domain.GatewayContext) (domain.DashboardPayload, error) {
-	return intelligence.BuildDashboard(ctx, s.events, s.memorySourceHealth(), time.Now().UTC()), nil
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	return intelligence.BuildDashboard(ctx, s.events[ctx.WorkspaceID], s.memorySourceHealth(ctx), time.Now().UTC()), nil
 }
 
 func (s *MemoryStore) SaveDashboardSnapshot(_ context.Context, _ domain.GatewayContext, _ domain.DashboardPayload) error {
 	return nil
 }
 
-func (s *MemoryStore) memorySourceHealth() []domain.SourceHealth {
-	health := make([]domain.SourceHealth, 0, len(s.syncs))
-	for service, sync := range s.syncs {
+func (s *MemoryStore) memorySourceHealth(ctx domain.GatewayContext) []domain.SourceHealth {
+	health := []domain.SourceHealth{}
+	prefix := ctx.WorkspaceID + ":"
+	for key, sync := range s.syncs {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
 		status := sync.Status
 		if status == "" {
 			status = "available"
 		}
 		health = append(health, domain.SourceHealth{
-			Service: service,
+			Service: sync.Service,
 			Status:  status,
 		})
 	}
@@ -136,6 +184,7 @@ func (s *MemoryStore) memorySourceHealth() []domain.SourceHealth {
 }
 
 func (s *MemoryStore) GetUserConfig(_ context.Context, ctx domain.GatewayContext) (domain.UserConfig, error) {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	key := ctx.WorkspaceID + ":" + ctx.UserID
 	if config, ok := s.configs[key]; ok {
 		return config, nil
@@ -165,11 +214,13 @@ func (s *MemoryStore) GetUserConfig(_ context.Context, ctx domain.GatewayContext
 }
 
 func (s *MemoryStore) UpsertUserConfig(_ context.Context, ctx domain.GatewayContext, config domain.UserConfig) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	s.configs[ctx.WorkspaceID+":"+ctx.UserID] = config
 	return nil
 }
 
 func (s *MemoryStore) UpsertToken(_ context.Context, ctx domain.GatewayContext, token domain.TokenUpsertRequest) error {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	if token.ProviderAccountID == "" {
 		token.ProviderAccountID = "default"
 	}
@@ -218,20 +269,50 @@ func (s *MemoryStore) DisconnectConnection(_ context.Context, ctx domain.Gateway
 			delete(s.tokens, key)
 		}
 	}
-	s.syncs[service] = domain.SyncResult{Service: service, Status: "available"}
+	delete(s.selections, selectionKey(ctx, service))
+	s.syncs[syncKey(ctx, service)] = domain.SyncResult{Service: service, Status: "available"}
 	return s.memoryConnectionStatus(ctx, service), nil
+}
+
+func (s *MemoryStore) GetResourceSelection(_ context.Context, ctx domain.GatewayContext, service domain.Service) (domain.ResourceSelection, error) {
+	selection, ok := s.selections[selectionKey(ctx, service)]
+	if !ok || len(selection.Resources) == 0 {
+		return domain.ResourceSelection{}, ErrResourceSelectionNotFound
+	}
+	return selection, nil
+}
+
+func (s *MemoryStore) SaveResourceSelection(_ context.Context, ctx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource) (domain.ResourceSelection, error) {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	selection := domain.ResourceSelection{
+		Service:     service,
+		Status:      "selected",
+		Resources:   resources,
+		SelectedAt:  time.Now().UTC(),
+		SelectedBy:  ctx.UserID,
+		ResourceIDs: resourceIDs(resources),
+	}
+	s.selections[selectionKey(ctx, service)] = selection
+	s.syncs[syncKey(ctx, service)] = domain.SyncResult{Service: service, Status: "selected"}
+	return selection, nil
 }
 
 func (s *MemoryStore) memoryConnectionStatus(ctx domain.GatewayContext, service domain.Service) domain.ConnectionStatus {
 	status := "available"
-	if sync, ok := s.syncs[service]; ok && sync.Status != "" {
+	if sync, ok := s.syncs[syncKey(ctx, service)]; ok && sync.Status != "" {
 		status = sync.Status
 	}
 
 	connection := domain.ConnectionStatus{
-		Service: service,
-		Status:  status,
-		Scopes:  []string{},
+		Service:         service,
+		Status:          status,
+		SelectionStatus: "needs_selection",
+		Scopes:          []string{},
+	}
+
+	if selection, ok := s.selections[selectionKey(ctx, service)]; ok && len(selection.Resources) > 0 {
+		connection.SelectionStatus = "selected"
+		connection.SelectedResourceCount = len(selection.Resources)
 	}
 
 	for key, token := range s.tokens {
@@ -251,7 +332,11 @@ func (s *MemoryStore) memoryConnectionStatus(ctx domain.GatewayContext, service 
 			}
 		}
 		if connection.Status == "available" {
-			connection.Status = "connected"
+			if connection.SelectedResourceCount == 0 {
+				connection.Status = "needs_selection"
+			} else {
+				connection.Status = "selected"
+			}
 		}
 		break
 	}
@@ -264,6 +349,110 @@ type SupabaseStore struct {
 	serviceKey string
 	client     *http.Client
 	fallback   Store
+}
+
+func (s *SupabaseStore) ListWorkspaces(ctx context.Context, gatewayCtx domain.GatewayContext) ([]domain.Workspace, error) {
+	if err := s.ensureWorkspace(ctx, gatewayCtx); err != nil {
+		return s.fallback.ListWorkspaces(ctx, gatewayCtx)
+	}
+
+	var memberRows []struct {
+		WorkspaceID string `json:"workspace_id"`
+		Role        string `json:"role"`
+	}
+	memberPath := "workspace_members?select=workspace_id,role&user_id=eq." + url.QueryEscape(gatewayCtx.UserID)
+	if err := s.rest(ctx, http.MethodGet, memberPath, nil, &memberRows); err != nil {
+		return s.fallback.ListWorkspaces(ctx, gatewayCtx)
+	}
+	if len(memberRows) == 0 {
+		return []domain.Workspace{}, nil
+	}
+
+	rolesByWorkspace := map[string]string{}
+	ids := make([]string, 0, len(memberRows))
+	for _, row := range memberRows {
+		rolesByWorkspace[row.WorkspaceID] = row.Role
+		ids = append(ids, row.WorkspaceID)
+	}
+
+	var workspaceRows []struct {
+		ID        string    `json:"id"`
+		Name      string    `json:"name"`
+		Slug      string    `json:"slug"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+	workspacePath := "workspaces?select=id,name,slug,created_at,updated_at&id=in.(" + strings.Join(ids, ",") + ")&order=created_at.asc"
+	if err := s.rest(ctx, http.MethodGet, workspacePath, nil, &workspaceRows); err != nil {
+		return s.fallback.ListWorkspaces(ctx, gatewayCtx)
+	}
+
+	workspaces := make([]domain.Workspace, 0, len(workspaceRows))
+	for _, row := range workspaceRows {
+		workspaces = append(workspaces, domain.Workspace{
+			ID:        row.ID,
+			Name:      row.Name,
+			Slug:      row.Slug,
+			Role:      rolesByWorkspace[row.ID],
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		})
+	}
+	return workspaces, nil
+}
+
+func (s *SupabaseStore) CreateWorkspace(ctx context.Context, gatewayCtx domain.GatewayContext, input domain.CreateWorkspaceRequest) (domain.Workspace, error) {
+	if err := s.ensureUser(ctx, gatewayCtx); err != nil {
+		return domain.Workspace{}, err
+	}
+
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = "Developer OS Workspace"
+	}
+	slug := strings.TrimSpace(input.Slug)
+	if slug == "" {
+		slug = slugify(name) + "-" + strconv.FormatInt(time.Now().UTC().Unix(), 36)
+	}
+
+	var rows []struct {
+		ID        string    `json:"id"`
+		Name      string    `json:"name"`
+		Slug      string    `json:"slug"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+	row := map[string]any{
+		"name":       name,
+		"slug":       slug,
+		"updated_at": time.Now().UTC(),
+	}
+	if err := s.rest(ctx, http.MethodPost, "workspaces", row, &rows); err != nil {
+		return domain.Workspace{}, err
+	}
+	if len(rows) == 0 {
+		return domain.Workspace{}, errors.New("workspace create returned no rows")
+	}
+
+	member := map[string]any{
+		"workspace_id": rows[0].ID,
+		"user_id":      gatewayCtx.UserID,
+		"role":         "owner",
+		"updated_at":   time.Now().UTC(),
+	}
+	if err := s.rest(ctx, http.MethodPost, "workspace_members?on_conflict=workspace_id,user_id", member, nil); err != nil {
+		return domain.Workspace{}, err
+	}
+
+	workspace := domain.Workspace{
+		ID:        rows[0].ID,
+		Name:      rows[0].Name,
+		Slug:      rows[0].Slug,
+		Role:      "owner",
+		CreatedAt: rows[0].CreatedAt,
+		UpdatedAt: rows[0].UpdatedAt,
+	}
+	return workspace, nil
 }
 
 func (s *SupabaseStore) SaveWorkEvents(ctx context.Context, gatewayCtx domain.GatewayContext, events []domain.WorkEvent) error {
@@ -560,13 +749,14 @@ func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx d
 	var configRows []struct {
 		Service                domain.Service `json:"service"`
 		Status                 string         `json:"status"`
+		Settings               map[string]any `json:"settings"`
 		LastSyncError          *string        `json:"last_sync_error"`
 		LastSyncRecordsScanned int            `json:"last_sync_records_scanned"`
 		LastSyncEventsCreated  int            `json:"last_sync_events_created"`
 		LastSyncedAt           *time.Time     `json:"last_synced_at"`
 		UpdatedAt              *time.Time     `json:"updated_at"`
 	}
-	configPath := "integration_configs?select=service,status,last_sync_error,last_sync_records_scanned,last_sync_events_created,last_synced_at,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID)
+	configPath := "integration_configs?select=service,status,settings,last_sync_error,last_sync_records_scanned,last_sync_events_created,last_synced_at,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID)
 	if err := s.rest(ctx, http.MethodGet, configPath, nil, &configRows); err != nil {
 		return s.fallback.ListConnectionStatuses(ctx, gatewayCtx)
 	}
@@ -586,9 +776,10 @@ func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx d
 	statuses := map[domain.Service]domain.ConnectionStatus{}
 	for _, service := range allServices() {
 		statuses[service] = domain.ConnectionStatus{
-			Service: service,
-			Status:  "available",
-			Scopes:  []string{},
+			Service:         service,
+			Status:          "available",
+			SelectionStatus: "needs_selection",
+			Scopes:          []string{},
 		}
 	}
 
@@ -602,6 +793,10 @@ func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx d
 		status.LastSyncEventsCreated = row.LastSyncEventsCreated
 		status.LastSyncedAt = row.LastSyncedAt
 		status.UpdatedAt = row.UpdatedAt
+		if resources := selectedResourcesFromSettings(row.Settings); len(resources) > 0 {
+			status.SelectionStatus = "selected"
+			status.SelectedResourceCount = len(resources)
+		}
 		statuses[row.Service] = status
 	}
 
@@ -615,7 +810,11 @@ func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx d
 		if row.ExpiresAt != nil && row.ExpiresAt.Before(time.Now().UTC()) {
 			status.Status = "expired"
 		} else if status.Status == "available" || status.Status == "" {
-			status.Status = "connected"
+			if status.SelectedResourceCount == 0 {
+				status.Status = "needs_selection"
+			} else {
+				status.Status = "selected"
+			}
 		}
 		statuses[row.Service] = status
 	}
@@ -642,6 +841,7 @@ func (s *SupabaseStore) DisconnectConnection(ctx context.Context, gatewayCtx dom
 		"service":                   service,
 		"status":                    "available",
 		"scopes":                    []string{},
+		"settings":                  map[string]any{},
 		"sync_cursor":               nil,
 		"last_sync_error":           nil,
 		"last_sync_records_scanned": 0,
@@ -663,6 +863,74 @@ func (s *SupabaseStore) DisconnectConnection(ctx context.Context, gatewayCtx dom
 	}
 
 	return domain.ConnectionStatus{Service: service, Status: "available", Scopes: []string{}}, nil
+}
+
+func (s *SupabaseStore) GetResourceSelection(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service) (domain.ResourceSelection, error) {
+	var rows []struct {
+		Service   domain.Service `json:"service"`
+		Settings  map[string]any `json:"settings"`
+		UpdatedAt *time.Time     `json:"updated_at"`
+	}
+
+	path := "integration_configs?select=service,settings,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&service=eq." + url.QueryEscape(string(service)) + "&limit=1"
+	if err := s.rest(ctx, http.MethodGet, path, nil, &rows); err != nil {
+		return s.fallback.GetResourceSelection(ctx, gatewayCtx, service)
+	}
+	if len(rows) == 0 {
+		return domain.ResourceSelection{}, ErrResourceSelectionNotFound
+	}
+
+	resources := selectedResourcesFromSettings(rows[0].Settings)
+	if len(resources) == 0 {
+		return domain.ResourceSelection{}, ErrResourceSelectionNotFound
+	}
+
+	selectedAt := time.Now().UTC()
+	if rows[0].UpdatedAt != nil {
+		selectedAt = *rows[0].UpdatedAt
+	}
+
+	return domain.ResourceSelection{
+		Service:     service,
+		Status:      "selected",
+		Resources:   resources,
+		SelectedAt:  selectedAt,
+		SelectedBy:  gatewayCtx.UserID,
+		ResourceIDs: resourceIDs(resources),
+	}, nil
+}
+
+func (s *SupabaseStore) SaveResourceSelection(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource) (domain.ResourceSelection, error) {
+	if err := s.ensureWorkspace(ctx, gatewayCtx); err != nil {
+		return domain.ResourceSelection{}, err
+	}
+
+	selectedAt := time.Now().UTC()
+	settings := map[string]any{
+		"selectedResources": resources,
+		"selectedBy":        gatewayCtx.UserID,
+		"selectedAt":        selectedAt,
+	}
+	row := map[string]any{
+		"workspace_id": gatewayCtx.WorkspaceID,
+		"service":      service,
+		"status":       "selected",
+		"settings":     settings,
+		"updated_at":   selectedAt,
+	}
+
+	if err := s.rest(ctx, http.MethodPost, "integration_configs?on_conflict=workspace_id,service", row, nil); err != nil {
+		return domain.ResourceSelection{}, err
+	}
+
+	return domain.ResourceSelection{
+		Service:     service,
+		Status:      "selected",
+		Resources:   resources,
+		SelectedAt:  selectedAt,
+		SelectedBy:  gatewayCtx.UserID,
+		ResourceIDs: resourceIDs(resources),
+	}, nil
 }
 
 func (s *SupabaseStore) rest(ctx context.Context, method string, path string, input any, output any) error {
@@ -806,6 +1074,10 @@ func nullable(value string) any {
 }
 
 func (s *SupabaseStore) ensureWorkspace(ctx context.Context, gatewayCtx domain.GatewayContext) error {
+	if err := s.ensureUser(ctx, gatewayCtx); err != nil {
+		return err
+	}
+
 	row := map[string]any{
 		"id":         gatewayCtx.WorkspaceID,
 		"name":       "Developer OS Workspace",
@@ -813,7 +1085,25 @@ func (s *SupabaseStore) ensureWorkspace(ctx context.Context, gatewayCtx domain.G
 		"updated_at": time.Now().UTC(),
 	}
 
-	return s.rest(ctx, http.MethodPost, "workspaces?on_conflict=id", row, nil)
+	if err := s.rest(ctx, http.MethodPost, "workspaces?on_conflict=id", row, nil); err != nil {
+		return err
+	}
+
+	member := map[string]any{
+		"workspace_id": gatewayCtx.WorkspaceID,
+		"user_id":      gatewayCtx.UserID,
+		"role":         "owner",
+		"updated_at":   time.Now().UTC(),
+	}
+	return s.rest(ctx, http.MethodPost, "workspace_members?on_conflict=workspace_id,user_id", member, nil)
+}
+
+func (s *SupabaseStore) ensureUser(ctx context.Context, gatewayCtx domain.GatewayContext) error {
+	row := map[string]any{
+		"id":         gatewayCtx.UserID,
+		"updated_at": time.Now().UTC(),
+	}
+	return s.rest(ctx, http.MethodPost, "users?on_conflict=id", row, nil)
 }
 
 func (s *SupabaseStore) getSourceHealth(ctx context.Context, gatewayCtx domain.GatewayContext) ([]domain.SourceHealth, error) {
@@ -840,20 +1130,63 @@ func (s *SupabaseStore) getSourceHealth(ctx context.Context, gatewayCtx domain.G
 	return health, nil
 }
 
-func eventKey(event domain.WorkEvent) string {
+func (s *MemoryStore) ensureMemoryWorkspace(ctx domain.GatewayContext, name string) domain.Workspace {
+	now := time.Now().UTC()
+	if workspace, ok := s.workspaces[ctx.WorkspaceID]; ok {
+		memberKey := ctx.WorkspaceID + ":" + ctx.UserID
+		if _, ok := s.memberships[memberKey]; !ok {
+			s.memberships[memberKey] = domain.WorkspaceMember{
+				ID:          "member_" + strings.ReplaceAll(memberKey, ":", "_"),
+				WorkspaceID: ctx.WorkspaceID,
+				UserID:      ctx.UserID,
+				Role:        "owner",
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+		}
+		workspace.Role = s.memberships[memberKey].Role
+		return workspace
+	}
+
+	slug := "developer-os-" + strings.ReplaceAll(ctx.WorkspaceID, "-", "")
+	workspace := domain.Workspace{
+		ID:        ctx.WorkspaceID,
+		Name:      name,
+		Slug:      slug,
+		Role:      "owner",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.workspaces[ctx.WorkspaceID] = workspace
+	s.memberships[ctx.WorkspaceID+":"+ctx.UserID] = domain.WorkspaceMember{
+		ID:          "member_" + strings.ReplaceAll(ctx.WorkspaceID+":"+ctx.UserID, ":", "_"),
+		WorkspaceID: ctx.WorkspaceID,
+		UserID:      ctx.UserID,
+		Role:        "owner",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	return workspace
+}
+
+func eventKey(ctx domain.GatewayContext, event domain.WorkEvent) string {
 	externalID := event.ExternalID
 	if externalID == "" {
 		externalID = event.ID
 	}
-	return string(event.Service) + ":" + externalID
+	return ctx.WorkspaceID + ":" + string(event.Service) + ":" + externalID
 }
 
-func chunkKey(chunk domain.DocumentChunk) string {
+func chunkKey(ctx domain.GatewayContext, chunk domain.DocumentChunk) string {
 	externalID := chunk.ExternalID
 	if externalID == "" {
 		externalID = chunk.ID
 	}
-	return string(chunk.Service) + ":" + externalID
+	return ctx.WorkspaceID + ":" + string(chunk.Service) + ":" + externalID
+}
+
+func syncKey(ctx domain.GatewayContext, service domain.Service) string {
+	return ctx.WorkspaceID + ":" + string(service)
 }
 
 func tokenKey(ctx domain.GatewayContext, service domain.Service, providerAccountID string) string {
@@ -864,11 +1197,72 @@ func tokenKeyPrefix(ctx domain.GatewayContext, service domain.Service) string {
 	return ctx.WorkspaceID + ":" + ctx.UserID + ":" + string(service) + ":"
 }
 
+func selectionKey(ctx domain.GatewayContext, service domain.Service) string {
+	return ctx.WorkspaceID + ":" + ctx.UserID + ":" + string(service)
+}
+
+func resourceIDs(resources []domain.SelectableResource) []string {
+	ids := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		if strings.TrimSpace(resource.ID) == "" {
+			continue
+		}
+		ids = append(ids, resource.ID)
+	}
+	return ids
+}
+
+func selectedResourcesFromSettings(settings map[string]any) []domain.SelectableResource {
+	raw, ok := settings["selectedResources"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+
+	var resources []domain.SelectableResource
+	if err := json.Unmarshal(payload, &resources); err != nil {
+		return nil
+	}
+	return resources
+}
+
 func cursorValue(cursor *string) string {
 	if cursor == nil {
 		return ""
 	}
 	return *cursor
+}
+
+func slugify(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "developer-os-workspace"
+	}
+
+	var builder strings.Builder
+	lastDash := false
+	for _, r := range value {
+		valid := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if valid {
+			builder.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+
+	slug := strings.Trim(builder.String(), "-")
+	if slug == "" {
+		return "developer-os-workspace"
+	}
+	return slug
 }
 
 func allServices() []domain.Service {

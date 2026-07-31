@@ -18,6 +18,8 @@ Go backend for the Developer OS API Gateway.
 - `PUT /v1/config`
 - `GET /v1/connections`
 - `DELETE /v1/connections/{service}`
+- `GET /v1/connections/{service}/resources`
+- `PUT /v1/connections/{service}/selection`
 - `GET /v1/oauth/{service}/start`
 - `GET /v1/oauth/{service}/callback`
 - `POST /v1/sync`
@@ -116,6 +118,8 @@ The response intentionally returns token metadata only. It never exposes provide
       "providerConfigured": true,
       "hasToken": true,
       "hasRefreshToken": true,
+      "selectionStatus": "selected",
+      "selectedResourceCount": 2,
       "providerAccountId": "provider-account-id",
       "expiresAt": "2026-08-01T00:00:00Z",
       "scopes": ["repo", "read:user"],
@@ -131,6 +135,8 @@ Common statuses:
 
 - `available`: service is supported but not connected.
 - `needs_config`: service is missing server-side OAuth env vars.
+- `needs_selection`: token exists, but the user has not selected which provider resources DevOS can sync.
+- `selected`: provider resources were selected, but sync has not completed yet.
 - `connected`: token material exists server-side.
 - `syncing`: last sync is in progress or recently persisted that status.
 - `expired`: stored token has expired.
@@ -154,6 +160,53 @@ On success, the API writes a `connection_disconnected` audit log and returns saf
   }
 }
 ```
+
+### `GET /v1/connections/{service}/resources`
+
+Lists provider resources the connected user can choose for sync. The response is intentionally generic so every connector can reuse the same onboarding UI.
+
+```json
+{
+  "service": "github",
+  "status": "available",
+  "resources": [
+    {
+      "id": "acme/api",
+      "type": "repository",
+      "name": "acme/api",
+      "externalUrl": "https://github.com/acme/api",
+      "metadata": {
+        "fullName": "acme/api"
+      }
+    }
+  ],
+  "selectedResourceIds": ["acme/api"]
+}
+```
+
+If the service is not connected yet, `status` is `needs_auth` and `resources` is empty.
+
+### `PUT /v1/connections/{service}/selection`
+
+Persists the resources the user explicitly selected for one connector. `POST /v1/sync` uses this selection before calling provider APIs and returns `needs_selection` when a connected provider has no selected resources.
+
+```json
+{
+  "resources": [
+    {
+      "id": "acme/api",
+      "type": "repository",
+      "name": "acme/api",
+      "externalUrl": "https://github.com/acme/api",
+      "metadata": {
+        "fullName": "acme/api"
+      }
+    }
+  ]
+}
+```
+
+The persisted selection is stored server-side in `integration_configs.settings.selectedResources`.
 
 ### `GET /v1/oauth/{service}/start`
 

@@ -61,6 +61,73 @@ func (c *GitHubConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 		repositories = discovered
 	}
 
+	return c.fetchRecentRecordsForRepositories(ctx, accessToken, repositories)
+}
+
+func (c *GitHubConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := githubAccessToken(token)
+	if accessToken == "" {
+		return nil, errGitHubNeedsAuth
+	}
+
+	repositories, err := c.fetchRepositories(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(repositories))
+	for _, repository := range repositories {
+		resources = append(resources, domain.SelectableResource{
+			ID:          repository,
+			Type:        "repository",
+			Name:        repository,
+			ExternalURL: "https://github.com/" + repository,
+			Metadata: map[string]any{
+				"fullName": repository,
+			},
+		})
+	}
+	return resources, nil
+}
+
+func (c *GitHubConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := githubAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{
+			Service: domain.ServiceGitHub,
+			Status:  "needs_auth",
+			Events:  []domain.WorkEvent{},
+		}, nil
+	}
+
+	repositories := selectedGitHubRepositories(selection)
+	if len(repositories) == 0 {
+		return domain.SyncResult{
+			Service: domain.ServiceGitHub,
+			Status:  "needs_selection",
+			Events:  []domain.WorkEvent{},
+		}, nil
+	}
+
+	records, err := c.fetchRecentRecordsForRepositories(ctx, accessToken, repositories)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+
+	return domain.SyncResult{
+		Service:        domain.ServiceGitHub,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
+func (c *GitHubConnector) fetchRecentRecordsForRepositories(ctx context.Context, accessToken string, repositories []string) ([]domain.ExternalRecord, error) {
 	records := []domain.ExternalRecord{}
 	for _, repository := range repositories {
 		pulls, err := c.fetchPullRequests(ctx, accessToken, repository)
@@ -495,6 +562,28 @@ func githubAccessToken(token *domain.ProviderToken) string {
 	}
 
 	return strings.TrimSpace(os.Getenv("GITHUB_ACCESS_TOKEN"))
+}
+
+func selectedGitHubRepositories(selection domain.ResourceSelection) []string {
+	repositories := []string{}
+	seen := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "repository" {
+			continue
+		}
+
+		repository := strings.TrimSpace(resource.ID)
+		if fullName, ok := resource.Metadata["fullName"].(string); ok && strings.TrimSpace(fullName) != "" {
+			repository = strings.TrimSpace(fullName)
+		}
+		if repository == "" || seen[repository] {
+			continue
+		}
+
+		seen[repository] = true
+		repositories = append(repositories, repository)
+	}
+	return repositories
 }
 
 func parseRepositories(value string) []string {

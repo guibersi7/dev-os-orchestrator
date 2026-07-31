@@ -55,8 +55,75 @@ func (c *TrelloConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 		return nil, errTrelloNeedsBoards
 	}
 
+	return c.fetchRecentRecordsForBoards(ctx, accessToken, c.boardIDs)
+}
+
+func (c *TrelloConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := trelloAccessToken(token)
+	if accessToken == "" {
+		return nil, errTrelloNeedsAuth
+	}
+	if c.apiKey == "" {
+		return nil, errTrelloNeedsAPIKey
+	}
+
+	boards, err := c.fetchBoards(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]domain.SelectableResource, 0, len(boards))
+	for _, board := range boards {
+		if board.ID == "" {
+			continue
+		}
+		resources = append(resources, domain.SelectableResource{
+			ID:          board.ID,
+			Type:        "board",
+			Name:        board.Name,
+			ExternalURL: board.URL,
+			Metadata: map[string]any{
+				"boardId": board.ID,
+			},
+		})
+	}
+	return resources, nil
+}
+
+func (c *TrelloConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := trelloAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+	if c.apiKey == "" {
+		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_api_key", Events: []domain.WorkEvent{}}, nil
+	}
+
+	boardIDs := selectedTrelloBoardIDs(selection)
+	if len(boardIDs) == 0 {
+		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	records, err := c.fetchRecentRecordsForBoards(ctx, accessToken, boardIDs)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+	return domain.SyncResult{
+		Service:        domain.ServiceTrello,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
+func (c *TrelloConnector) fetchRecentRecordsForBoards(ctx context.Context, accessToken string, boardIDs []string) ([]domain.ExternalRecord, error) {
 	records := []domain.ExternalRecord{}
-	for _, boardID := range c.boardIDs {
+	for _, boardID := range boardIDs {
 		board, err := c.fetchBoard(ctx, accessToken, boardID)
 		if err != nil {
 			return nil, err
@@ -115,7 +182,7 @@ func (c *TrelloConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_api_key", Events: []domain.WorkEvent{}}, nil
 	}
 	if errors.Is(err, errTrelloNeedsBoards) {
-		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_board_selection", Events: []domain.WorkEvent{}}, nil
+		return domain.SyncResult{Service: domain.ServiceTrello, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
 	}
 	if err != nil {
 		return domain.SyncResult{}, err
@@ -131,6 +198,17 @@ func (c *TrelloConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 		NextCursor:     cursor,
 		Events:         events,
 	}, nil
+}
+
+func (c *TrelloConnector) fetchBoards(ctx context.Context, token string) ([]trelloBoard, error) {
+	var boards []trelloBoard
+	values := url.Values{
+		"fields": []string{"name,url"},
+	}
+	if err := c.get(ctx, token, "/members/me/boards", values, &boards); err != nil {
+		return nil, err
+	}
+	return boards, nil
 }
 
 func (c *TrelloConnector) fetchBoard(ctx context.Context, token string, boardID string) (trelloBoard, error) {
@@ -330,4 +408,26 @@ func trelloAccessToken(token *domain.ProviderToken) string {
 		return token.AccessToken
 	}
 	return strings.TrimSpace(os.Getenv("TRELLO_ACCESS_TOKEN"))
+}
+
+func selectedTrelloBoardIDs(selection domain.ResourceSelection) []string {
+	boardIDs := []string{}
+	seen := map[string]bool{}
+	for _, resource := range selection.Resources {
+		if resource.Type != "" && resource.Type != "board" {
+			continue
+		}
+
+		boardID := strings.TrimSpace(resource.ID)
+		if metadataID, ok := resource.Metadata["boardId"].(string); ok && strings.TrimSpace(metadataID) != "" {
+			boardID = strings.TrimSpace(metadataID)
+		}
+		if boardID == "" || seen[boardID] {
+			continue
+		}
+
+		seen[boardID] = true
+		boardIDs = append(boardIDs, boardID)
+	}
+	return boardIDs
 }

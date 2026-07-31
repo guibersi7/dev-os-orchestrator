@@ -1,0 +1,34 @@
+# Render Blueprint for the Standup API (apps/api — Go HTTP gateway).
+# Connect this repo as a Blueprint in the Render dashboard; Render builds the
+# Dockerfile at apps/api and exposes it over HTTPS with a /health check.
+services:
+  - type: web
+    name: standup-api
+    runtime: docker
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Port the container listens on (matches the Dockerfile default).
+      - key: API_ADDR
+        value: ":8080"
+      # Shared secret between the web app and the API. Render generates it;
+      # copy the same value into Vercel's API_GATEWAY_SECRET so both sides match.
+      - key: API_GATEWAY_SECRET
+        generateValue: true
+      # Signing secret for OAuth state.
+      - key: OAUTH_STATE_SECRET
+        generateValue: true
+      # base64-encoded 32-byte key for sealing provider tokens. Set in the
+      # dashboard before storing real provider credentials.
+      - key: TOKEN_SEALING_KEY
+        sync: false
+      # Supabase persistence. Without both, the API falls back to in-memory.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

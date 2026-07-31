@@ -48,8 +48,43 @@ func TestTrelloSyncReportsSetupStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != "needs_board_selection" {
-		t.Fatalf("expected needs_board_selection, got %q", result.Status)
+	if result.Status != "needs_selection" {
+		t.Fatalf("expected needs_selection, got %q", result.Status)
+	}
+}
+
+func TestTrelloListSelectableResourcesReturnsBoards(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/members/me/boards" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("key") != "key" || r.URL.Query().Get("token") != "token" {
+			t.Fatalf("expected key/token query auth, got %s", r.URL.RawQuery)
+		}
+		writeTrelloJSON(t, w, []map[string]any{
+			{"id": "board-1", "name": "Launch", "url": "https://trello.com/b/board-1"},
+			{"id": "board-2", "name": "Support", "url": "https://trello.com/b/board-2"},
+		})
+	}))
+	defer server.Close()
+
+	connector := &TrelloConnector{
+		info:       NewTrelloConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		apiKey:     "key",
+	}
+
+	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 boards, got %d", len(resources))
+	}
+	if resources[0].ID != "board-1" || resources[0].Type != "board" {
+		t.Fatalf("unexpected board resource: %#v", resources[0])
 	}
 }
 
@@ -152,6 +187,69 @@ func TestTrelloSyncFetchesAndNormalizesCards(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
 		}
+	}
+}
+
+func TestTrelloSyncSelectedUsesSelectedBoard(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("key") != "key" || r.URL.Query().Get("token") != "token" {
+			t.Fatalf("expected key/token query auth, got %s", r.URL.RawQuery)
+		}
+
+		switch r.URL.Path {
+		case "/boards/selected-board":
+			writeTrelloJSON(t, w, map[string]any{"id": "selected-board", "name": "Selected", "url": "https://trello.com/b/selected"})
+		case "/boards/selected-board/lists":
+			writeTrelloJSON(t, w, []map[string]any{{"id": "list-1", "name": "Blocked"}})
+		case "/boards/selected-board/cards":
+			writeTrelloJSON(t, w, []map[string]any{
+				{
+					"id":               "card-1",
+					"name":             "Selected board card",
+					"url":              "https://trello.com/c/card-1",
+					"idList":           "list-1",
+					"dateLastActivity": "2026-07-29T12:00:00Z",
+					"due":              nil,
+					"dueComplete":      false,
+					"closed":           false,
+					"labels":           []map[string]any{{"name": "blocked", "color": "red"}},
+					"idMembers":        []string{},
+					"checklists":       []map[string]any{},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &TrelloConnector{
+		info:       NewTrelloConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		apiKey:     "key",
+		boardIDs:   []string{"env-board"},
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceTrello,
+		Resources: []domain.SelectableResource{
+			{ID: "selected-board", Type: "board", Name: "Selected", Metadata: map[string]any{"boardId": "selected-board"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Status != "connected" {
+		t.Fatalf("expected connected, got %q", result.Status)
+	}
+	if result.EventsCreated != 1 {
+		t.Fatalf("expected one selected board event, got %d", result.EventsCreated)
+	}
+	if result.Events[0].Title != "Selected board card" {
+		t.Fatalf("unexpected event title %q", result.Events[0].Title)
 	}
 }
 

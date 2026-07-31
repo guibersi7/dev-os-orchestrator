@@ -58,6 +58,51 @@ func (c *LinearConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 	return records, nil
 }
 
+func (c *LinearConnector) ListSelectableResources(ctx context.Context, _ domain.GatewayContext, token *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	accessToken := linearAccessToken(token)
+	if accessToken == "" {
+		return nil, errLinearNeedsAuth
+	}
+
+	teams, err := c.fetchTeams(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []domain.SelectableResource{}
+	for _, team := range teams {
+		if team.ID != "" {
+			resources = append(resources, domain.SelectableResource{
+				ID:   team.ID,
+				Type: "team",
+				Name: team.Name,
+				Metadata: map[string]any{
+					"teamId":  team.ID,
+					"teamKey": team.Key,
+				},
+			})
+		}
+
+		for _, project := range team.Projects.Nodes {
+			if project.ID == "" {
+				continue
+			}
+			resources = append(resources, domain.SelectableResource{
+				ID:   project.ID,
+				Type: "project",
+				Name: project.Name,
+				Metadata: map[string]any{
+					"projectId":   project.ID,
+					"projectName": project.Name,
+					"teamId":      team.ID,
+					"teamKey":     team.Key,
+				},
+			})
+		}
+	}
+	return resources, nil
+}
+
 func (c *LinearConnector) Normalize(records []domain.ExternalRecord) []domain.WorkEvent {
 	events := make([]domain.WorkEvent, 0, len(records))
 	for _, record := range records {
@@ -106,6 +151,81 @@ func (c *LinearConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 	}, nil
 }
 
+func (c *LinearConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, selection domain.ResourceSelection) (domain.SyncResult, error) {
+	accessToken := linearAccessToken(token)
+	if accessToken == "" {
+		return domain.SyncResult{Service: domain.ServiceLinear, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
+	}
+
+	scope := selectedLinearScope(selection)
+	if len(scope.teamIDs) == 0 && len(scope.teamKeys) == 0 && len(scope.projectIDs) == 0 && len(scope.projectNames) == 0 {
+		return domain.SyncResult{Service: domain.ServiceLinear, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
+	}
+
+	issues, err := c.fetchIssues(ctx, accessToken)
+	if err != nil {
+		return domain.SyncResult{}, err
+	}
+
+	records := []domain.ExternalRecord{}
+	for _, issue := range issues {
+		if !scope.includes(issue) {
+			continue
+		}
+		records = append(records, issue.toRecord())
+	}
+
+	events := c.Normalize(records)
+	cursor := latestRecordCursor(records)
+
+	return domain.SyncResult{
+		Service:        domain.ServiceLinear,
+		Status:         "connected",
+		RecordsScanned: len(records),
+		EventsCreated:  len(events),
+		NextCursor:     cursor,
+		Events:         events,
+	}, nil
+}
+
+func (c *LinearConnector) fetchTeams(ctx context.Context, token string) ([]linearTeamResource, error) {
+	var response struct {
+		Data struct {
+			Teams struct {
+				Nodes []linearTeamResource `json:"nodes"`
+			} `json:"teams"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	query := `query DeveloperOSTeams($first: Int!) {
+  teams(first: $first) {
+    nodes {
+      id
+      name
+      key
+      projects(first: 100) {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  }
+}`
+
+	if err := c.graphql(ctx, token, query, map[string]any{"first": 100}, &response); err != nil {
+		return nil, err
+	}
+	if len(response.Errors) > 0 {
+		return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
+	}
+
+	return response.Data.Teams.Nodes, nil
+}
+
 func (c *LinearConnector) fetchIssues(ctx context.Context, token string) ([]linearIssue, error) {
 	var response struct {
 		Data struct {
@@ -133,8 +253,8 @@ func (c *LinearConnector) fetchIssues(ctx context.Context, token string) ([]line
       canceledAt
       assignee { name }
       state { name type }
-      team { name key }
-      project { name }
+      team { id name key }
+      project { id name }
       cycle { name number }
       comments(first: 5) {
         nodes {
@@ -204,6 +324,7 @@ type linearIssue struct {
 	State         linearState `json:"state"`
 	Team          linearTeam  `json:"team"`
 	Project       *struct {
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"project"`
 	Cycle *struct {
@@ -225,8 +346,75 @@ type linearState struct {
 }
 
 type linearTeam struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 	Key  string `json:"key"`
+}
+
+type linearTeamResource struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Key      string `json:"key"`
+	Projects struct {
+		Nodes []linearProjectResource `json:"nodes"`
+	} `json:"projects"`
+}
+
+type linearProjectResource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type linearSelectionScope struct {
+	teamIDs      map[string]bool
+	teamKeys     map[string]bool
+	projectIDs   map[string]bool
+	projectNames map[string]bool
+}
+
+func selectedLinearScope(selection domain.ResourceSelection) linearSelectionScope {
+	scope := linearSelectionScope{
+		teamIDs:      map[string]bool{},
+		teamKeys:     map[string]bool{},
+		projectIDs:   map[string]bool{},
+		projectNames: map[string]bool{},
+	}
+
+	for _, resource := range selection.Resources {
+		switch resource.Type {
+		case "team":
+			addIfPresent(scope.teamIDs, firstMetadataString(resource, "teamId", resource.ID))
+			addIfPresent(scope.teamKeys, firstMetadataString(resource, "teamKey", resource.ID))
+		case "project":
+			addIfPresent(scope.projectIDs, firstMetadataString(resource, "projectId", resource.ID))
+			addIfPresent(scope.projectNames, firstMetadataString(resource, "projectName", resource.Name))
+		}
+	}
+
+	return scope
+}
+
+func (s linearSelectionScope) includes(issue linearIssue) bool {
+	if s.teamIDs[issue.Team.ID] || s.teamKeys[issue.Team.Key] {
+		return true
+	}
+	if issue.Project == nil {
+		return false
+	}
+	return s.projectIDs[issue.Project.ID] || s.projectNames[issue.Project.Name]
+}
+
+func firstMetadataString(resource domain.SelectableResource, key string, fallback string) string {
+	if value, ok := resource.Metadata[key].(string); ok && strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func addIfPresent(values map[string]bool, value string) {
+	if strings.TrimSpace(value) != "" {
+		values[strings.TrimSpace(value)] = true
+	}
 }
 
 type linearComment struct {

@@ -15,6 +15,14 @@ type Connector interface {
 	Sync(context.Context, domain.GatewayContext, *domain.ProviderToken) (domain.SyncResult, error)
 }
 
+type ResourceLister interface {
+	ListSelectableResources(context.Context, domain.GatewayContext, *domain.ProviderToken) ([]domain.SelectableResource, error)
+}
+
+type ScopedConnector interface {
+	SyncSelected(context.Context, domain.GatewayContext, *domain.ProviderToken, domain.ResourceSelection) (domain.SyncResult, error)
+}
+
 type Registry struct {
 	connectors map[domain.Service]Connector
 }
@@ -136,6 +144,44 @@ func (c *mockConnector) Sync(ctx context.Context, gatewayContext domain.GatewayC
 		NextCursor:     &cursor,
 		Events:         events,
 	}, nil
+}
+
+func (c *mockConnector) ListSelectableResources(_ context.Context, _ domain.GatewayContext, _ *domain.ProviderToken) ([]domain.SelectableResource, error) {
+	return []domain.SelectableResource{
+		{
+			ID:   string(c.info.ID) + "-primary",
+			Type: defaultResourceType(c.info.ID),
+			Name: c.info.Name + " primary scope",
+			Metadata: map[string]any{
+				"service": c.info.ID,
+			},
+		},
+	}, nil
+}
+
+func (c *mockConnector) SyncSelected(ctx context.Context, gatewayContext domain.GatewayContext, token *domain.ProviderToken, _ domain.ResourceSelection) (domain.SyncResult, error) {
+	return c.Sync(ctx, gatewayContext, token)
+}
+
+func defaultResourceType(service domain.Service) string {
+	switch service {
+	case domain.ServiceGitHub:
+		return "repository"
+	case domain.ServiceSlack:
+		return "channel"
+	case domain.ServiceLinear:
+		return "project"
+	case domain.ServiceJira:
+		return "project"
+	case domain.ServiceTrello:
+		return "board"
+	case domain.ServiceNotion:
+		return "page"
+	case domain.ServiceCalendar:
+		return "calendar"
+	default:
+		return "resource"
+	}
 }
 
 func primaryTitle(service domain.Service) string {
