@@ -104,7 +104,7 @@ export default async function SettingsPage() {
                 ) : null}
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={`/integrations/${integration.id}/connect`}>
+                  <Link href={`/api/integrations/${integration.id}/connect`}>
                     <Button size="sm" variant={connected ? "secondary" : "default"}>
                       {connected ? "Reconnect" : "Connect"}
                     </Button>

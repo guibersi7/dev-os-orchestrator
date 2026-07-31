@@ -15,10 +15,10 @@ Developer OS should get a new workspace to real engineering context as quickly a
 
 3. OAuth start
    - User clicks `Connect` for a service.
-   - Frontend opens `/integrations/{service}/connect`.
-   - The web app calls `GET /v1/oauth/{service}/start`.
+   - Frontend opens `/api/integrations/{service}/connect`.
+   - The route handler calls `GET /v1/oauth/{service}/start` server-side.
    - If provider env vars are present, the user is redirected to the provider OAuth URL.
-   - If provider env vars are missing, the user sees the missing server-side env vars.
+   - If provider env vars are missing, the user returns to onboarding with the missing server-side env vars.
 
 4. OAuth callback
    - Provider redirects to `GET /v1/oauth/{service}/callback`.
@@ -62,6 +62,7 @@ GitHub is the first provider that should behave like a real production integrati
 
 - `/onboarding`: guided first-run setup and quick connection actions.
 - `/settings`: full Connection Center for connect, reconnect, sync, details, and disconnect.
-- `/integrations/{service}/connect`: OAuth start and missing configuration state.
+- `/api/integrations/{service}/connect`: server-side OAuth starter that redirects directly to the provider auth screen.
+- `/integrations/{service}/connect`: fallback/manual OAuth diagnostic screen.
 - `/integrations/{service}`: connector details and normalized sync output.
 - `/dashboard`: working surface after data sync.

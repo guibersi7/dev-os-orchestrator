@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, GitPullRequest, RefreshCw, ShieldCheck, Workflow } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, GitPullRequest, RefreshCw, ShieldCheck, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,13 +27,21 @@ function connectionByService(connections: ConnectionStatus[] | undefined) {
   return new Map(connections?.map((connection) => [connection.service, connection]) ?? []);
 }
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string }>;
+}) {
+  const params = await searchParams;
   const connectionsState = await getConnectionsState();
   const connections = connectionByService(connectionsState.data?.connections);
   const githubConnection = connections.get("github");
   const githubStatus = githubConnection?.status ?? "available";
   const githubConnected = githubConnection?.hasToken ?? false;
   const githubSynced = Boolean(githubConnection?.lastSyncedAt);
+  const missingEnv = params?.missing?.split(",").filter(Boolean) ?? [];
+  const connectionError = params?.connectionError;
+  const failedService = params?.service === "github" ? "GitHub" : params?.service;
 
   return (
     <main className="min-h-screen bg-[#f7fbff] px-4 py-8 text-brand-ink sm:px-6">
@@ -54,7 +62,7 @@ export default async function OnboardingPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link href="/integrations/github/connect">
+            <Link href="/api/integrations/github/connect">
               <Button>
                 <GitPullRequest className="h-4 w-4" />
                 Connect GitHub
@@ -72,6 +80,32 @@ export default async function OnboardingPage() {
         {connectionsState.error ? (
           <Card className="mt-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             The API Gateway is not reachable yet. You can still review the onboarding flow, but connection status will load after the gateway starts.
+          </Card>
+        ) : null}
+        {connectionError ? (
+          <Card className="mt-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">
+                  {connectionError === "needs_config"
+                    ? `${failedService ?? "Provider"} OAuth is not configured yet.`
+                    : "Unable to start OAuth."}
+                </p>
+                <p className="mt-1">
+                  The Connect GitHub button now starts OAuth directly. Configure the gateway env vars and retry.
+                </p>
+                {missingEnv.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {missingEnv.map((env) => (
+                      <code key={env} className="rounded-md bg-white px-2 py-1 text-xs text-amber-950">
+                        {env}
+                      </code>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </Card>
         ) : null}
 
@@ -120,7 +154,7 @@ export default async function OnboardingPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Link href="/integrations/github/connect">
+                  <Link href="/api/integrations/github/connect">
                     <Button>
                       {githubConnected ? "Reconnect GitHub" : "Connect GitHub"}
                       <ArrowRight className="h-4 w-4" />
@@ -173,7 +207,7 @@ export default async function OnboardingPage() {
               return (
                 <Link
                   key={integration.id}
-                  href={`/integrations/${integration.id}/connect`}
+                  href={`/api/integrations/${integration.id}/connect`}
                   className="rounded-md border border-brand-border bg-white p-4 transition-colors hover:border-brand-primary"
                 >
                   <div className="flex items-start justify-between gap-3">
