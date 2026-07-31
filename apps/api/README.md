@@ -326,6 +326,15 @@ From repo root:
 npm run dev:api
 ```
 
+For local development, the API tries to load env vars from these files if they exist:
+
+- `.env`
+- `apps/api/.env`
+- `apps/web/.env`
+- `apps/web/.env.local`
+
+Real host environments should provide secrets as process env vars instead of relying on local `.env` files. Process env vars always win over file values.
+
 ## Supabase Persistence
 
 The API uses Supabase when these env vars are present:
