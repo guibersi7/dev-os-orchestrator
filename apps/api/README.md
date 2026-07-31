@@ -363,6 +363,7 @@ Runtime behavior:
 - `DELETE /v1/connections/{service}` deletes provider tokens and resets sync status for that service.
 - `POST /v1/tokens` stores sealed tokens server-side only.
 - `POST /v1/tokens/refresh` exchanges refresh tokens with the provider, persists the new access token, and never returns token material.
+- Provider tokens are scoped by `(workspace_id, user_id, service, provider_account_id)` so each workspace member owns their own service connections.
 - `POST /v1/sync` persists generated `work_events` and updates `integration_configs.last_synced_at`.
 - Notion sync persists private `document_chunks` for future semantic search. Chunk content is not returned in the sync response or `WorkEvent.raw`.
 - Sync writes are idempotent by `(workspace_id, service, external_id)`.
@@ -382,6 +383,17 @@ OAuth env vars:
 - `TRELLO_CLIENT_ID`, `TRELLO_CLIENT_SECRET`, `TRELLO_OAUTH_SCOPES`
 - `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_OAUTH_SCOPES`, `NOTION_VERSION`
 - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_OAUTH_SCOPES`, `GOOGLE_CALENDAR_IDS`
+
+GitHub sync behavior:
+
+- Uses the connected user's GitHub OAuth access token.
+- If `GITHUB_REPOSITORIES` is set, sync is limited to that comma-separated `owner/repo` list.
+- If `GITHUB_REPOSITORIES` is not set, the connector lists repositories accessible to the authenticated user through `/user/repos`.
+- If `GITHUB_ORGANIZATION` or `GITHUB_ORG` is set, repository discovery uses that organization through `/orgs/{org}/repos`.
+- For each repository, the connector paginates recent pull requests and issues.
+- For each pull request, the connector fetches reviews, review comments, and failed check runs.
+- Pull request WorkEvents include raw metrics such as review count, review comment count, reviewer count, lead time hours, and time to first review hours.
+- `GITHUB_SYNC_MAX_PAGES` controls pagination depth per resource. Default is `3`.
 
 ## Tests
 

@@ -29,11 +29,41 @@ func TestGitHubSyncReportsNeedsAuthWithoutToken(t *testing.T) {
 	}
 }
 
-func TestGitHubSyncReportsMissingRepositorySelection(t *testing.T) {
+func TestGitHubSyncDiscoversAuthenticatedUserRepositories(t *testing.T) {
+	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/user/repos":
+			writeJSON(t, w, []map[string]any{
+				{"full_name": "owner/repo", "archived": false},
+				{"full_name": "owner/archived", "archived": true},
+			})
+		case "/repos/owner/repo/pulls":
+			writeJSON(t, w, []map[string]any{})
+		case "/repos/owner/repo/issues":
+			writeJSON(t, w, []map[string]any{
+				{
+					"id":         11,
+					"number":     7,
+					"state":      "open",
+					"title":      "Wire repository selection",
+					"html_url":   "https://github.com/owner/repo/issues/7",
+					"user":       map[string]any{"login": "guilherme"},
+					"updated_at": now.Format(time.RFC3339),
+					"assignees":  []map[string]any{{"login": "guilherme"}},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
 	connector := &GitHubConnector{
 		info:       NewGitHubConnector().Info(),
-		client:     http.DefaultClient,
-		apiBaseURL: "https://api.github.test",
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		maxPages:   1,
 	}
 
 	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
@@ -41,8 +71,11 @@ func TestGitHubSyncReportsMissingRepositorySelection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if result.Status != "needs_repository_selection" {
-		t.Fatalf("expected needs_repository_selection, got %q", result.Status)
+	if result.Status != "connected" {
+		t.Fatalf("expected connected, got %q", result.Status)
+	}
+	if result.EventsCreated != 1 {
+		t.Fatalf("expected 1 event from discovered repo, got %d", result.EventsCreated)
 	}
 }
 
@@ -63,9 +96,27 @@ func TestGitHubSyncFetchesAndNormalizesRepositoryEvents(t *testing.T) {
 					"title":               "Add gateway auth",
 					"html_url":            "https://github.com/owner/repo/pull/42",
 					"user":                map[string]any{"login": "guilherme"},
+					"created_at":          now.Add(-24 * time.Hour).Format(time.RFC3339),
 					"updated_at":          now.Format(time.RFC3339),
 					"requested_reviewers": []map[string]any{{"login": "reviewer"}},
 					"head":                map[string]any{"sha": "abc123"},
+				},
+			})
+		case "/repos/owner/repo/pulls/42/reviews":
+			writeJSON(t, w, []map[string]any{
+				{
+					"id":           50,
+					"state":        "COMMENTED",
+					"user":         map[string]any{"login": "reviewer"},
+					"submitted_at": now.Add(-20 * time.Hour).Format(time.RFC3339),
+				},
+			})
+		case "/repos/owner/repo/pulls/42/comments":
+			writeJSON(t, w, []map[string]any{
+				{
+					"id":         51,
+					"user":       map[string]any{"login": "reviewer"},
+					"created_at": now.Add(-19 * time.Hour).Format(time.RFC3339),
 				},
 			})
 		case "/repos/owner/repo/commits/abc123/check-runs":
@@ -105,6 +156,7 @@ func TestGitHubSyncFetchesAndNormalizesRepositoryEvents(t *testing.T) {
 		client:       server.Client(),
 		apiBaseURL:   server.URL,
 		repositories: []string{"owner/repo"},
+		maxPages:     1,
 	}
 
 	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
@@ -129,6 +181,15 @@ func TestGitHubSyncFetchesAndNormalizesRepositoryEvents(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
 		}
+	}
+
+	prEvent := result.Events[0]
+	metrics, ok := prEvent.Raw["metrics"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected PR metrics in raw payload, got %#v", prEvent.Raw)
+	}
+	if metrics["reviewCount"] != 1 || metrics["reviewCommentCount"] != 1 || metrics["reviewerCount"] != 1 {
+		t.Fatalf("expected review metrics, got %#v", metrics)
 	}
 
 	if result.NextCursor == nil {

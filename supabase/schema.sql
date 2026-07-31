@@ -41,6 +41,7 @@ create table if not exists public.integration_configs (
 create table if not exists public.integration_tokens (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  user_id uuid not null,
   service text not null,
   provider_account_id text not null default 'default',
   encrypted_access_token text not null,
@@ -50,8 +51,24 @@ create table if not exists public.integration_tokens (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint integration_tokens_service_check check (service in ('github', 'slack', 'linear', 'jira', 'trello', 'notion', 'calendar')),
-  unique (workspace_id, service, provider_account_id)
+  unique (workspace_id, user_id, service, provider_account_id)
 );
+
+alter table public.integration_tokens
+  add column if not exists user_id uuid;
+
+update public.integration_tokens
+  set user_id = '00000000-0000-4000-8000-000000000002'
+  where user_id is null;
+
+alter table public.integration_tokens
+  alter column user_id set not null;
+
+alter table public.integration_tokens
+  drop constraint if exists integration_tokens_workspace_id_service_provider_account_id_key;
+
+create unique index if not exists integration_tokens_workspace_user_service_account_idx
+  on public.integration_tokens (workspace_id, user_id, service, provider_account_id);
 
 create table if not exists public.work_events (
   id uuid primary key default gen_random_uuid(),
@@ -104,8 +121,8 @@ create index if not exists work_events_workspace_service_idx
 create unique index if not exists work_events_workspace_external_id_idx
   on public.work_events (workspace_id, service, external_id);
 
-create index if not exists integration_tokens_workspace_service_idx
-  on public.integration_tokens (workspace_id, service);
+create index if not exists integration_tokens_workspace_user_service_idx
+  on public.integration_tokens (workspace_id, user_id, service);
 
 create index if not exists dashboard_snapshots_workspace_generated_idx
   on public.dashboard_snapshots (workspace_id, generated_at desc);

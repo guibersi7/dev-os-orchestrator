@@ -25,6 +25,7 @@ Developer OS should get a new workspace to real engineering context as quickly a
    - The Go API Gateway validates signed state.
    - The API Gateway exchanges the provider code for tokens.
    - Tokens are sealed and persisted server-side only.
+   - Connections are scoped to the current `(workspace, user, service)` so each workspace member connects their own provider account.
 
 5. First sync
    - User runs `Sync` from onboarding, Settings, or connector details.
@@ -41,8 +42,20 @@ Developer OS should get a new workspace to real engineering context as quickly a
 - Onboarding must be actionable, not informational.
 - The fastest happy path is connect, sync, dashboard.
 - The frontend must never receive access tokens or refresh tokens.
+- A service connection belongs to the user who authorized OAuth inside the workspace.
 - Every connected provider must expose safe connection state through `GET /v1/connections`.
 - Every external object must become an internal `WorkEvent` before powering product features.
+
+## GitHub First Sync
+
+GitHub is the first provider that should behave like a real production integration.
+
+- OAuth must use the GitHub app/client configured in the API Gateway.
+- The connector uses the authenticated user's access token.
+- Repository discovery uses the selected static repositories when configured, otherwise it lists repositories accessible to the user.
+- Organization discovery is enabled by configuring `GITHUB_ORGANIZATION` or `GITHUB_ORG`.
+- Pull request sync fetches PRs, reviews, review comments, and failed check runs.
+- Generated WorkEvents carry review metrics in `raw.metrics`, including review count, reviewer count, review comments, lead time, and time to first review.
 
 ## Current Screens
 

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +59,52 @@ func TestMemoryStorePersistsSyncResult(t *testing.T) {
 	result := store.syncs[domain.ServiceSlack]
 	if result.NextCursor == nil || *result.NextCursor != cursor {
 		t.Fatalf("expected cursor %q, got %v", cursor, result.NextCursor)
+	}
+}
+
+func TestMemoryStoreScopesTokensByWorkspaceUserAndService(t *testing.T) {
+	store := NewMemoryStore()
+	userA := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user-a"}
+	userB := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user-b"}
+
+	if err := store.UpsertToken(context.Background(), userA, domain.TokenUpsertRequest{
+		WorkspaceID:       userA.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-user-a",
+		AccessToken:       "token-a",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertToken(context.Background(), userB, domain.TokenUpsertRequest{
+		WorkspaceID:       userB.WorkspaceID,
+		Service:           domain.ServiceGitHub,
+		ProviderAccountID: "github-user-b",
+		AccessToken:       "token-b",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tokenA, err := store.GetToken(context.Background(), userA, domain.ServiceGitHub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokenA.AccessToken != "token-a" {
+		t.Fatalf("expected user A token, got %q", tokenA.AccessToken)
+	}
+
+	if _, err := store.DisconnectConnection(context.Background(), userA, domain.ServiceGitHub); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetToken(context.Background(), userA, domain.ServiceGitHub); !errors.Is(err, ErrTokenNotFound) {
+		t.Fatalf("expected user A token to be removed, got %v", err)
+	}
+
+	tokenB, err := store.GetToken(context.Background(), userB, domain.ServiceGitHub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokenB.AccessToken != "token-b" {
+		t.Fatalf("expected user B token to remain, got %q", tokenB.AccessToken)
 	}
 }
 

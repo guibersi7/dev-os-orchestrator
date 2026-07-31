@@ -173,13 +173,13 @@ func (s *MemoryStore) UpsertToken(_ context.Context, ctx domain.GatewayContext, 
 	if token.ProviderAccountID == "" {
 		token.ProviderAccountID = "default"
 	}
-	s.tokens[ctx.WorkspaceID+":"+string(token.Service)+":"+token.ProviderAccountID] = token
+	s.tokens[tokenKey(ctx, token.Service, token.ProviderAccountID)] = token
 	return nil
 }
 
 func (s *MemoryStore) GetToken(_ context.Context, ctx domain.GatewayContext, service domain.Service) (domain.ProviderToken, error) {
 	for key, token := range s.tokens {
-		if strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") {
+		if strings.HasPrefix(key, tokenKeyPrefix(ctx, service)) {
 			return domain.ProviderToken{
 				Service:           token.Service,
 				ProviderAccountID: token.ProviderAccountID,
@@ -196,7 +196,7 @@ func (s *MemoryStore) GetToken(_ context.Context, ctx domain.GatewayContext, ser
 
 func (s *MemoryStore) RefreshTokenStatus(_ context.Context, ctx domain.GatewayContext, service domain.Service) (map[string]any, error) {
 	for key, token := range s.tokens {
-		if strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") && token.RefreshToken != "" {
+		if strings.HasPrefix(key, tokenKeyPrefix(ctx, service)) && token.RefreshToken != "" {
 			return map[string]any{"service": service, "status": "refresh_required"}, nil
 		}
 	}
@@ -214,7 +214,7 @@ func (s *MemoryStore) ListConnectionStatuses(_ context.Context, ctx domain.Gatew
 
 func (s *MemoryStore) DisconnectConnection(_ context.Context, ctx domain.GatewayContext, service domain.Service) (domain.ConnectionStatus, error) {
 	for key := range s.tokens {
-		if strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") {
+		if strings.HasPrefix(key, tokenKeyPrefix(ctx, service)) {
 			delete(s.tokens, key)
 		}
 	}
@@ -235,7 +235,7 @@ func (s *MemoryStore) memoryConnectionStatus(ctx domain.GatewayContext, service 
 	}
 
 	for key, token := range s.tokens {
-		if !strings.HasPrefix(key, ctx.WorkspaceID+":"+string(service)+":") {
+		if !strings.HasPrefix(key, tokenKeyPrefix(ctx, service)) {
 			continue
 		}
 		connection.HasToken = true
@@ -476,6 +476,7 @@ func (s *SupabaseStore) UpsertToken(ctx context.Context, gatewayCtx domain.Gatew
 
 	row := map[string]any{
 		"workspace_id":            gatewayCtx.WorkspaceID,
+		"user_id":                 gatewayCtx.UserID,
 		"service":                 token.Service,
 		"provider_account_id":     token.ProviderAccountID,
 		"encrypted_access_token":  seal(token.AccessToken),
@@ -485,7 +486,7 @@ func (s *SupabaseStore) UpsertToken(ctx context.Context, gatewayCtx domain.Gatew
 		"updated_at":              time.Now().UTC(),
 	}
 
-	return s.rest(ctx, http.MethodPost, "integration_tokens?on_conflict=workspace_id,service,provider_account_id", row, nil)
+	return s.rest(ctx, http.MethodPost, "integration_tokens?on_conflict=workspace_id,user_id,service,provider_account_id", row, nil)
 }
 
 func (s *SupabaseStore) GetToken(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service) (domain.ProviderToken, error) {
@@ -498,7 +499,7 @@ func (s *SupabaseStore) GetToken(ctx context.Context, gatewayCtx domain.GatewayC
 		Scopes                []string       `json:"scopes"`
 	}
 
-	path := "integration_tokens?select=service,provider_account_id,encrypted_access_token,encrypted_refresh_token,expires_at,scopes&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&service=eq." + url.QueryEscape(string(service)) + "&limit=1"
+	path := "integration_tokens?select=service,provider_account_id,encrypted_access_token,encrypted_refresh_token,expires_at,scopes&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&user_id=eq." + url.QueryEscape(gatewayCtx.UserID) + "&service=eq." + url.QueryEscape(string(service)) + "&limit=1"
 	if err := s.rest(ctx, http.MethodGet, path, nil, &rows); err != nil {
 		return s.fallback.GetToken(ctx, gatewayCtx, service)
 	}
@@ -534,7 +535,7 @@ func (s *SupabaseStore) RefreshTokenStatus(ctx context.Context, gatewayCtx domai
 		ExpiresAt             *string `json:"expires_at"`
 	}
 
-	path := "integration_tokens?select=id,encrypted_refresh_token,expires_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&service=eq." + url.QueryEscape(string(service)) + "&limit=1"
+	path := "integration_tokens?select=id,encrypted_refresh_token,expires_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&user_id=eq." + url.QueryEscape(gatewayCtx.UserID) + "&service=eq." + url.QueryEscape(string(service)) + "&limit=1"
 	if err := s.rest(ctx, http.MethodGet, path, nil, &rows); err != nil {
 		return s.fallback.RefreshTokenStatus(ctx, gatewayCtx, service)
 	}
@@ -577,7 +578,7 @@ func (s *SupabaseStore) ListConnectionStatuses(ctx context.Context, gatewayCtx d
 		ExpiresAt             *time.Time     `json:"expires_at"`
 		Scopes                []string       `json:"scopes"`
 	}
-	tokenPath := "integration_tokens?select=service,provider_account_id,encrypted_refresh_token,expires_at,scopes&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID)
+	tokenPath := "integration_tokens?select=service,provider_account_id,encrypted_refresh_token,expires_at,scopes&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&user_id=eq." + url.QueryEscape(gatewayCtx.UserID)
 	if err := s.rest(ctx, http.MethodGet, tokenPath, nil, &tokenRows); err != nil {
 		return s.fallback.ListConnectionStatuses(ctx, gatewayCtx)
 	}
@@ -631,7 +632,7 @@ func (s *SupabaseStore) DisconnectConnection(ctx context.Context, gatewayCtx dom
 		return domain.ConnectionStatus{}, err
 	}
 
-	tokenPath := "integration_tokens?workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&service=eq." + url.QueryEscape(string(service))
+	tokenPath := "integration_tokens?workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&user_id=eq." + url.QueryEscape(gatewayCtx.UserID) + "&service=eq." + url.QueryEscape(string(service))
 	if err := s.rest(ctx, http.MethodDelete, tokenPath, nil, nil); err != nil {
 		return domain.ConnectionStatus{}, err
 	}
@@ -853,6 +854,14 @@ func chunkKey(chunk domain.DocumentChunk) string {
 		externalID = chunk.ID
 	}
 	return string(chunk.Service) + ":" + externalID
+}
+
+func tokenKey(ctx domain.GatewayContext, service domain.Service, providerAccountID string) string {
+	return tokenKeyPrefix(ctx, service) + providerAccountID
+}
+
+func tokenKeyPrefix(ctx domain.GatewayContext, service domain.Service) string {
+	return ctx.WorkspaceID + ":" + ctx.UserID + ":" + string(service) + ":"
 }
 
 func cursorValue(cursor *string) string {

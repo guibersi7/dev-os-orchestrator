@@ -20,6 +20,8 @@ type GitHubConnector struct {
 	client       *http.Client
 	apiBaseURL   string
 	repositories []string
+	organization string
+	maxPages     int
 }
 
 func NewGitHubConnector() Connector {
@@ -35,6 +37,8 @@ func NewGitHubConnector() Connector {
 		client:       &http.Client{Timeout: 15 * time.Second},
 		apiBaseURL:   envOrDefault("GITHUB_API_BASE_URL", "https://api.github.com"),
 		repositories: parseRepositories(os.Getenv("GITHUB_REPOSITORIES")),
+		organization: envOrDefault("GITHUB_ORGANIZATION", os.Getenv("GITHUB_ORG")),
+		maxPages:     positiveIntOrDefault(os.Getenv("GITHUB_SYNC_MAX_PAGES"), 3),
 	}
 }
 
@@ -50,7 +54,11 @@ func (c *GitHubConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 
 	repositories := c.repositories
 	if len(repositories) == 0 {
-		return nil, errGitHubRepositoriesNotConfigured
+		discovered, err := c.fetchRepositories(ctx, accessToken)
+		if err != nil {
+			return nil, err
+		}
+		repositories = discovered
 	}
 
 	records := []domain.ExternalRecord{}
@@ -60,7 +68,15 @@ func (c *GitHubConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 			return nil, err
 		}
 		for _, pull := range pulls {
-			records = append(records, pull.toRecord(repository))
+			reviews, err := c.fetchPullReviews(ctx, accessToken, repository, pull.Number)
+			if err != nil {
+				return nil, err
+			}
+			reviewComments, err := c.fetchPullReviewComments(ctx, accessToken, repository, pull.Number)
+			if err != nil {
+				return nil, err
+			}
+			records = append(records, pull.toRecord(repository, reviews, reviewComments))
 
 			checkRuns, err := c.fetchCheckRuns(ctx, accessToken, repository, pull.Head.SHA)
 			if err != nil {
@@ -154,22 +170,94 @@ func (c *GitHubConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 	}, nil
 }
 
+func (c *GitHubConnector) fetchRepositories(ctx context.Context, token string) ([]string, error) {
+	repositories := []string{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pageRepositories []githubRepository
+		path := fmt.Sprintf("user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&direction=desc&per_page=100&page=%d", page)
+		if c.organization != "" {
+			path = fmt.Sprintf("orgs/%s/repos?type=all&sort=pushed&direction=desc&per_page=100&page=%d", url.PathEscape(c.organization), page)
+		}
+		if err := c.get(ctx, token, path, &pageRepositories); err != nil {
+			return nil, err
+		}
+		for _, repository := range pageRepositories {
+			if repository.FullName != "" && !repository.Archived {
+				repositories = append(repositories, repository.FullName)
+			}
+		}
+		if len(pageRepositories) < 100 {
+			break
+		}
+	}
+	if len(repositories) == 0 {
+		return nil, errGitHubRepositoriesNotConfigured
+	}
+	return repositories, nil
+}
+
 func (c *GitHubConnector) fetchPullRequests(ctx context.Context, token string, repository string) ([]githubPullRequest, error) {
-	var pulls []githubPullRequest
-	path := fmt.Sprintf("repos/%s/pulls?state=all&sort=updated&direction=desc&per_page=30", repository)
-	if err := c.get(ctx, token, path, &pulls); err != nil {
-		return nil, err
+	pulls := []githubPullRequest{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pagePulls []githubPullRequest
+		path := fmt.Sprintf("repos/%s/pulls?state=all&sort=updated&direction=desc&per_page=30&page=%d", repository, page)
+		if err := c.get(ctx, token, path, &pagePulls); err != nil {
+			return nil, err
+		}
+		pulls = append(pulls, pagePulls...)
+		if len(pagePulls) < 30 {
+			break
+		}
 	}
 	return pulls, nil
 }
 
 func (c *GitHubConnector) fetchIssues(ctx context.Context, token string, repository string) ([]githubIssue, error) {
-	var issues []githubIssue
-	path := fmt.Sprintf("repos/%s/issues?state=all&sort=updated&direction=desc&per_page=30", repository)
-	if err := c.get(ctx, token, path, &issues); err != nil {
-		return nil, err
+	issues := []githubIssue{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pageIssues []githubIssue
+		path := fmt.Sprintf("repos/%s/issues?state=all&sort=updated&direction=desc&per_page=30&page=%d", repository, page)
+		if err := c.get(ctx, token, path, &pageIssues); err != nil {
+			return nil, err
+		}
+		issues = append(issues, pageIssues...)
+		if len(pageIssues) < 30 {
+			break
+		}
 	}
 	return issues, nil
+}
+
+func (c *GitHubConnector) fetchPullReviews(ctx context.Context, token string, repository string, pullNumber int) ([]githubPullReview, error) {
+	reviews := []githubPullReview{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pageReviews []githubPullReview
+		path := fmt.Sprintf("repos/%s/pulls/%d/reviews?per_page=100&page=%d", repository, pullNumber, page)
+		if err := c.get(ctx, token, path, &pageReviews); err != nil {
+			return nil, err
+		}
+		reviews = append(reviews, pageReviews...)
+		if len(pageReviews) < 100 {
+			break
+		}
+	}
+	return reviews, nil
+}
+
+func (c *GitHubConnector) fetchPullReviewComments(ctx context.Context, token string, repository string, pullNumber int) ([]githubPullReviewComment, error) {
+	comments := []githubPullReviewComment{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pageComments []githubPullReviewComment
+		path := fmt.Sprintf("repos/%s/pulls/%d/comments?per_page=100&page=%d", repository, pullNumber, page)
+		if err := c.get(ctx, token, path, &pageComments); err != nil {
+			return nil, err
+		}
+		comments = append(comments, pageComments...)
+		if len(pageComments) < 100 {
+			break
+		}
+	}
+	return comments, nil
 }
 
 func (c *GitHubConnector) fetchCheckRuns(ctx context.Context, token string, repository string, ref string) ([]githubCheckRun, error) {
@@ -215,6 +303,11 @@ type githubUser struct {
 	Login string `json:"login"`
 }
 
+type githubRepository struct {
+	FullName string `json:"full_name"`
+	Archived bool   `json:"archived"`
+}
+
 type githubPullRequest struct {
 	ID                 int64        `json:"id"`
 	Number             int          `json:"number"`
@@ -222,6 +315,7 @@ type githubPullRequest struct {
 	Title              string       `json:"title"`
 	HTMLURL            string       `json:"html_url"`
 	User               githubUser   `json:"user"`
+	CreatedAt          time.Time    `json:"created_at"`
 	UpdatedAt          time.Time    `json:"updated_at"`
 	MergedAt           *time.Time   `json:"merged_at"`
 	RequestedReviewers []githubUser `json:"requested_reviewers"`
@@ -230,20 +324,42 @@ type githubPullRequest struct {
 	} `json:"head"`
 }
 
-func (p githubPullRequest) toRecord(repository string) domain.ExternalRecord {
+type githubPullReview struct {
+	ID          int64      `json:"id"`
+	State       string     `json:"state"`
+	User        githubUser `json:"user"`
+	SubmittedAt time.Time  `json:"submitted_at"`
+}
+
+type githubPullReviewComment struct {
+	ID        int64      `json:"id"`
+	User      githubUser `json:"user"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+func (p githubPullRequest) toRecord(repository string, reviews []githubPullReview, reviewComments []githubPullReviewComment) domain.ExternalRecord {
 	eventType := "pull_request.opened"
 	priority := "medium"
 	summary := "A pull request changed and may need attention."
 	occurredAt := p.UpdatedAt
+	reviewers := githubReviewers(reviews)
+	timeToFirstReviewHours := githubTimeToFirstReviewHours(p.CreatedAt, reviews)
+	leadTimeHours := 0.0
 
 	if p.MergedAt != nil {
 		eventType = "pull_request.merged"
 		summary = "A pull request was merged into the codebase."
 		occurredAt = *p.MergedAt
-	} else if len(p.RequestedReviewers) > 0 {
+		if !p.CreatedAt.IsZero() {
+			leadTimeHours = p.MergedAt.Sub(p.CreatedAt).Hours()
+		}
+	} else if len(p.RequestedReviewers) > 0 || len(reviews) == 0 {
 		eventType = "review.requested"
 		priority = "high"
 		summary = "A pull request is waiting for review."
+	} else if len(reviews) > 0 {
+		eventType = "pull_request.reviewed"
+		summary = "A pull request received review activity."
 	}
 
 	externalID := fmt.Sprintf("github:%s:pr:%d:%s:%s", repository, p.Number, eventType, occurredAt.Format(time.RFC3339))
@@ -261,6 +377,14 @@ func (p githubPullRequest) toRecord(repository string) domain.ExternalRecord {
 			"number":     p.Number,
 			"state":      p.State,
 			"url":        p.HTMLURL,
+			"metrics": map[string]any{
+				"reviewCount":            len(reviews),
+				"reviewCommentCount":     len(reviewComments),
+				"reviewerCount":          len(reviewers),
+				"reviewers":              reviewers,
+				"leadTimeHours":          leadTimeHours,
+				"timeToFirstReviewHours": timeToFirstReviewHours,
+			},
 		},
 	}
 }
@@ -384,6 +508,48 @@ func parseRepositories(value string) []string {
 		repositories = append(repositories, repository)
 	}
 	return repositories
+}
+
+func positiveIntOrDefault(value string, fallback int) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func githubReviewers(reviews []githubPullReview) []string {
+	seen := map[string]bool{}
+	reviewers := []string{}
+	for _, review := range reviews {
+		if review.User.Login == "" || seen[review.User.Login] {
+			continue
+		}
+		seen[review.User.Login] = true
+		reviewers = append(reviewers, review.User.Login)
+	}
+	return reviewers
+}
+
+func githubTimeToFirstReviewHours(createdAt time.Time, reviews []githubPullReview) float64 {
+	if createdAt.IsZero() || len(reviews) == 0 {
+		return 0
+	}
+
+	var firstReview *time.Time
+	for _, review := range reviews {
+		if review.SubmittedAt.IsZero() {
+			continue
+		}
+		submittedAt := review.SubmittedAt
+		if firstReview == nil || submittedAt.Before(*firstReview) {
+			firstReview = &submittedAt
+		}
+	}
+	if firstReview == nil {
+		return 0
+	}
+	return firstReview.Sub(createdAt).Hours()
 }
 
 func latestRecordCursor(records []domain.ExternalRecord) *string {
