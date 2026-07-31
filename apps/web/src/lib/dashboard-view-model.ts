@@ -34,6 +34,14 @@ const emptyMetrics = {
   decisionsFound: 0,
 };
 
+function listOrEmpty<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function numberOrZero(value: number | null | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 export function emptyDashboard(): DashboardPayload {
   return {
     workspaceId: "offline",
@@ -58,6 +66,48 @@ export function emptyDashboard(): DashboardPayload {
     },
     events: [],
     sourceHealth: [],
+  };
+}
+
+export function normalizeDashboardPayload(payload?: DashboardPayload | null): DashboardPayload {
+  const fallback = emptyDashboard();
+  if (!payload) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...payload,
+    metrics: {
+      ...fallback.metrics,
+      ...(payload.metrics ?? {}),
+      connectedSources: numberOrZero(payload.metrics?.connectedSources),
+      waitingReview: numberOrZero(payload.metrics?.waitingReview),
+      crossToolBlockers: numberOrZero(payload.metrics?.crossToolBlockers),
+      decisionsFound: numberOrZero(payload.metrics?.decisionsFound),
+    },
+    today: {
+      ...fallback.today,
+      ...(payload.today ?? {}),
+      prsWaitingForReview: listOrEmpty(payload.today?.prsWaitingForReview),
+      blockedPrs: listOrEmpty(payload.today?.blockedPrs),
+      failedChecks: listOrEmpty(payload.today?.failedChecks),
+      assignedIssues: listOrEmpty(payload.today?.assignedIssues),
+      recentImportantChanges: listOrEmpty(payload.today?.recentImportantChanges),
+    },
+    focus: listOrEmpty(payload.focus),
+    weeklySummary: {
+      ...fallback.weeklySummary,
+      ...(payload.weeklySummary ?? {}),
+      completedWork: listOrEmpty(payload.weeklySummary?.completedWork),
+      mergedPrs: listOrEmpty(payload.weeklySummary?.mergedPrs),
+      closedIssues: listOrEmpty(payload.weeklySummary?.closedIssues),
+      activeWork: listOrEmpty(payload.weeklySummary?.activeWork),
+      risks: listOrEmpty(payload.weeklySummary?.risks),
+      blockers: listOrEmpty(payload.weeklySummary?.blockers),
+    },
+    events: listOrEmpty(payload.events),
+    sourceHealth: listOrEmpty(payload.sourceHealth),
   };
 }
 

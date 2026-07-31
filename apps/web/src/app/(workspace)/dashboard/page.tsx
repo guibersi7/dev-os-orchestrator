@@ -10,15 +10,15 @@ import { getDashboardState } from "@/lib/api-client";
 import {
   buildIssueQueue,
   buildReviewQueue,
-  emptyDashboard,
   latestSyncLabel,
+  normalizeDashboardPayload,
   sourceEventCounts,
   sourceHealthByService,
 } from "@/lib/dashboard-view-model";
 
 export default async function DashboardPage() {
   const dashboardState = await getDashboardState();
-  const dashboard = dashboardState.data?.dashboard ?? emptyDashboard();
+  const dashboard = normalizeDashboardPayload(dashboardState.data?.dashboard);
   const reviewQueue = buildReviewQueue(dashboard.today.prsWaitingForReview.length ? dashboard.today.prsWaitingForReview : dashboard.events);
   const issueQueue = buildIssueQueue(dashboard.today.assignedIssues.length ? dashboard.today.assignedIssues : dashboard.events);
   const weeklySummary = dashboard.weeklySummary;
