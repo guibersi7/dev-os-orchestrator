@@ -7,7 +7,7 @@
 ## Decomposição do trabalho
 
 O trabalho foi decomposto em três specs, nesta ordem:
-- **A — Robustez das conexões** (pré-requisito; ainda a ser detalhado): deixar Linear, Slack, Jira, Trello, Notion e Calendar 100% (sync confiável, erros tratados).
+- **A — Robustez das conexões** (pré-requisito): `2026-08-01-robustez-das-conexoes-design.md` — deixar as 7 integrações confiáveis a ponto de produção (refresh automático, retry/backoff, sucesso parcial, saúde visível).
 - **B — Login + fluxo + dashboard por ação** (este documento).
 - **C — Contexto Unificado (Work Threads):** `2026-08-01-contexto-unificado-work-threads-design.md`.
 
