@@ -26,7 +26,7 @@ func ProviderFor(service domain.Service) (Provider, bool) {
 			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 			AuthURL:      envOrDefault("GITHUB_AUTH_URL", "https://github.com/login/oauth/authorize"),
 			TokenURL:     envOrDefault("GITHUB_TOKEN_URL", "https://github.com/login/oauth/access_token"),
-			Scopes:       splitScopes(os.Getenv("GITHUB_OAUTH_SCOPES"), []string{"repo", "read:user", "read:org"}),
+			Scopes:       splitScopes(os.Getenv("GITHUB_OAUTH_SCOPES"), nil),
 		},
 		domain.ServiceSlack: {
 			Service:      domain.ServiceSlack,
