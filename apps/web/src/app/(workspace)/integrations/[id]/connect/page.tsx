@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,11 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
     redirect("/settings");
   }
 
-  const oauthState = await startOAuthConnection(integration.id);
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+  const callbackUrl = `${protocol}://${host}/api/integrations/${integration.id}/callback`;
+  const oauthState = await startOAuthConnection(integration.id, callbackUrl);
   const data = oauthState.data;
 
   if (data?.authorizationUrl) {
@@ -26,14 +31,14 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link href="/settings" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-brand-primary">
+      <Link href="/settings" className="inline-flex items-center gap-2 text-sm text-[#6A7489] hover:text-brand-primary">
         <ArrowLeft className="h-4 w-4" />
         Back to settings
       </Link>
 
       <Card className="p-6">
         <div className="flex items-start gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-md bg-brand-primary text-white">
+          <span className="flex h-12 w-12 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
             <Icon className="h-6 w-6" />
           </span>
           <div>
@@ -41,11 +46,11 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
               {data?.status?.replaceAll("_", " ") ?? "Connection unavailable"}
             </Badge>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight">Connect {integration.name}</h1>
-            <p className="mt-2 text-sm leading-6 text-zinc-600">{integration.scope}</p>
+            <p className="mt-2 text-sm leading-6 text-[#9AA4BA]">{integration.scope}</p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+        <div className="mt-6 rounded-md border border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
           <div className="flex gap-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
@@ -56,7 +61,7 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
               {data?.missing?.length ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {data.missing.map((env) => (
-                    <code key={env} className="rounded-md bg-white px-2 py-1 text-xs text-amber-950">
+                    <code key={env} className="rounded-md bg-[#121826] px-2 py-1 text-xs text-[#F6C66A]">
                       {env}
                     </code>
                   ))}

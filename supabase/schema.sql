@@ -1,5 +1,14 @@
 create extension if not exists "pgcrypto";
 
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  email text,
+  name text,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -8,9 +17,20 @@ create table if not exists public.workspaces (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.workspace_members (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  role text not null default 'member',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint workspace_members_role_check check (role in ('owner', 'admin', 'member')),
+  unique (workspace_id, user_id)
+);
+
 create table if not exists public.user_configs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
+  user_id uuid not null references public.users(id) on delete cascade,
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   dashboard_preferences jsonb not null default '{}'::jsonb,
   notification_preferences jsonb not null default '{}'::jsonb,
@@ -34,14 +54,21 @@ create table if not exists public.integration_configs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint integration_configs_service_check check (service in ('github', 'slack', 'linear', 'jira', 'trello', 'notion', 'calendar')),
-  constraint integration_configs_status_check check (status in ('connected', 'available', 'error', 'needs_auth', 'syncing')),
+  constraint integration_configs_status_check check (status in ('connected', 'available', 'error', 'needs_auth', 'needs_selection', 'selected', 'syncing')),
   unique (workspace_id, service)
 );
+
+alter table public.integration_configs
+  drop constraint if exists integration_configs_status_check;
+
+alter table public.integration_configs
+  add constraint integration_configs_status_check
+  check (status in ('connected', 'available', 'error', 'needs_auth', 'needs_selection', 'selected', 'syncing'));
 
 create table if not exists public.integration_tokens (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  user_id uuid not null,
+  user_id uuid not null references public.users(id) on delete cascade,
   service text not null,
   provider_account_id text not null default 'default',
   encrypted_access_token text not null,
@@ -91,7 +118,7 @@ create table if not exists public.work_events (
 create table if not exists public.dashboard_snapshots (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  user_id uuid not null,
+  user_id uuid not null references public.users(id) on delete cascade,
   payload jsonb not null,
   generated_at timestamptz not null default now()
 );
@@ -123,6 +150,12 @@ create unique index if not exists work_events_workspace_external_id_idx
 
 create index if not exists integration_tokens_workspace_user_service_idx
   on public.integration_tokens (workspace_id, user_id, service);
+
+create index if not exists workspace_members_user_idx
+  on public.workspace_members (user_id, workspace_id);
+
+create index if not exists workspace_members_workspace_idx
+  on public.workspace_members (workspace_id, user_id);
 
 create index if not exists dashboard_snapshots_workspace_generated_idx
   on public.dashboard_snapshots (workspace_id, generated_at desc);

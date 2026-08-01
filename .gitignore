@@ -7,3 +7,6 @@ dist
 !.env.example
 npm-debug.log*
 .DS_Store
+
+# Go build artifact from `go build ./cmd/api` run inside apps/api
+apps/api/api

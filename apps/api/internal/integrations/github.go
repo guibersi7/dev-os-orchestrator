@@ -238,13 +238,74 @@ func (c *GitHubConnector) Sync(ctx context.Context, gatewayContext domain.Gatewa
 }
 
 func (c *GitHubConnector) fetchRepositories(ctx context.Context, token string) ([]string, error) {
+	if c.organization != "" {
+		return c.fetchOrganizationRepositories(ctx, token)
+	}
+
+	installations, err := c.fetchInstallations(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	repositories := []string{}
+	for _, installation := range installations {
+		installationRepositories, err := c.fetchInstallationRepositories(ctx, token, installation.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, repository := range installationRepositories {
+			if repository.FullName == "" || repository.Archived || seen[repository.FullName] {
+				continue
+			}
+			seen[repository.FullName] = true
+			repositories = append(repositories, repository.FullName)
+		}
+	}
+
+	if len(repositories) == 0 {
+		return nil, errGitHubRepositoriesNotConfigured
+	}
+	return repositories, nil
+}
+
+func (c *GitHubConnector) fetchInstallations(ctx context.Context, token string) ([]githubInstallation, error) {
+	installations := []githubInstallation{}
+	for page := 1; page <= c.maxPages; page++ {
+		var response githubInstallationsResponse
+		path := fmt.Sprintf("user/installations?per_page=100&page=%d", page)
+		if err := c.get(ctx, token, path, &response); err != nil {
+			return nil, err
+		}
+		installations = append(installations, response.Installations...)
+		if len(response.Installations) < 100 {
+			break
+		}
+	}
+	return installations, nil
+}
+
+func (c *GitHubConnector) fetchInstallationRepositories(ctx context.Context, token string, installationID int64) ([]githubRepository, error) {
+	repositories := []githubRepository{}
+	for page := 1; page <= c.maxPages; page++ {
+		var response githubInstallationReposResponse
+		path := fmt.Sprintf("user/installations/%d/repositories?per_page=100&page=%d", installationID, page)
+		if err := c.get(ctx, token, path, &response); err != nil {
+			return nil, err
+		}
+		repositories = append(repositories, response.Repositories...)
+		if len(response.Repositories) < 100 {
+			break
+		}
+	}
+	return repositories, nil
+}
+
+func (c *GitHubConnector) fetchOrganizationRepositories(ctx context.Context, token string) ([]string, error) {
 	repositories := []string{}
 	for page := 1; page <= c.maxPages; page++ {
 		var pageRepositories []githubRepository
-		path := fmt.Sprintf("user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&direction=desc&per_page=100&page=%d", page)
-		if c.organization != "" {
-			path = fmt.Sprintf("orgs/%s/repos?type=all&sort=pushed&direction=desc&per_page=100&page=%d", url.PathEscape(c.organization), page)
-		}
+		path := fmt.Sprintf("orgs/%s/repos?type=all&sort=pushed&direction=desc&per_page=100&page=%d", url.PathEscape(c.organization), page)
 		if err := c.get(ctx, token, path, &pageRepositories); err != nil {
 			return nil, err
 		}
@@ -373,6 +434,18 @@ type githubUser struct {
 type githubRepository struct {
 	FullName string `json:"full_name"`
 	Archived bool   `json:"archived"`
+}
+
+type githubInstallationsResponse struct {
+	Installations []githubInstallation `json:"installations"`
+}
+
+type githubInstallation struct {
+	ID int64 `json:"id"`
+}
+
+type githubInstallationReposResponse struct {
+	Repositories []githubRepository `json:"repositories"`
 }
 
 type githubPullRequest struct {

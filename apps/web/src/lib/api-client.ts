@@ -1,5 +1,23 @@
 export type Service = "github" | "slack" | "linear" | "jira" | "trello" | "notion" | "calendar";
 
+export type Workspace = {
+  id: string;
+  name: string;
+  slug: string;
+  role?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspacesPayload = {
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
+  workspaceCount: number;
+  isolationStrategy: "workspace_id" | string;
+  integrationScope: "per_workspace" | string;
+  crossWorkspaceData: boolean;
+};
+
 export type WorkEvent = {
   id: string;
   externalId?: string;
@@ -33,6 +51,8 @@ export type ConnectionStatus = {
   providerConfigured: boolean;
   hasToken: boolean;
   hasRefreshToken: boolean;
+  selectionStatus: string;
+  selectedResourceCount: number;
   providerAccountId?: string;
   expiresAt?: string | null;
   scopes: string[];
@@ -41,6 +61,30 @@ export type ConnectionStatus = {
   lastSyncRecordsScanned: number;
   lastSyncEventsCreated: number;
   updatedAt?: string | null;
+};
+
+export type SelectableResource = {
+  id: string;
+  type: string;
+  name: string;
+  externalUrl?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type ResourceSelection = {
+  service: Service;
+  status: string;
+  resources: SelectableResource[];
+  selectedAt: string;
+  selectedBy: string;
+  resourceIds: string[];
+};
+
+export type SelectableResourcesPayload = {
+  service: Service;
+  status: string;
+  resources: SelectableResource[];
+  selectedResourceIds: string[];
 };
 
 export type OAuthStartResponse = {
@@ -214,6 +258,24 @@ export function getDashboardState() {
   return captureGatewayState(() => requestGateway<{ gateway: string; dashboard: DashboardPayload }>("/v1/dashboard"));
 }
 
+export function getWorkspacesState() {
+  return captureGatewayState(() => requestGateway<WorkspacesPayload>("/v1/workspaces"));
+}
+
+export function createWorkspace(name: string, slug?: string) {
+  return captureGatewayState(() =>
+    requestGateway<{
+      workspace: Workspace;
+      isolationStrategy: string;
+      integrationScope: string;
+      crossWorkspaceData: boolean;
+    }>("/v1/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ name, slug }),
+    }),
+  );
+}
+
 export function getConfigState() {
   return captureGatewayState(() => requestGateway<{ config: UserConfig }>("/v1/config"));
 }
@@ -230,10 +292,37 @@ export function disconnectConnection(service: Service) {
   );
 }
 
-export function startOAuthConnection(service: Service) {
-  const redirectUri = `${API_BASE_URL}/v1/oauth/${service}/callback`;
+export function getSelectableResourcesState(service: Service) {
   return captureGatewayState(() =>
-    requestGateway<OAuthStartResponse>(`/v1/oauth/${service}/start?redirectUri=${encodeURIComponent(redirectUri)}`),
+    requestGateway<SelectableResourcesPayload>(`/v1/connections/${service}/resources`),
+  );
+}
+
+export function saveResourceSelection(service: Service, resources: SelectableResource[]) {
+  return captureGatewayState(() =>
+    requestGateway<{ selection: ResourceSelection }>(`/v1/connections/${service}/selection`, {
+      method: "PUT",
+      body: JSON.stringify({ resources }),
+    }),
+  );
+}
+
+export function startOAuthConnection(service: Service, redirectUri?: string) {
+  const callbackUri = redirectUri ?? `${API_BASE_URL}/v1/oauth/${service}/callback`;
+  return captureGatewayState(() =>
+    requestGateway<OAuthStartResponse>(`/v1/oauth/${service}/start?redirectUri=${encodeURIComponent(callbackUri)}`),
+  );
+}
+
+export function completeOAuthConnection(service: Service, code: string, state: string) {
+  return captureGatewayState(() =>
+    requestGateway<{
+      service: Service;
+      status: string;
+      providerAccountId: string;
+      expiresAt?: string | null;
+      scopes: string[];
+    }>(`/v1/oauth/${service}/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`),
   );
 }
 

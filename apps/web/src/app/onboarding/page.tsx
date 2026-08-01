@@ -8,7 +8,7 @@ import { type ConnectionStatus, getConnectionsState } from "@/lib/api-client";
 import { syncConnectionAction } from "@/app/(workspace)/settings/actions";
 
 const steps = [
-  ["Connect GitHub", "Authorize Developer OS using the GitHub OAuth screen."],
+  ["Connect GitHub", "Authorize Standup using the GitHub OAuth screen."],
   ["Sync engineering data", "We list repositories, recent PRs, reviews, comments, issues, and failed checks."],
   ["Open dashboard", "Your first dashboard is generated from normalized WorkEvents."],
 ];
@@ -44,21 +44,21 @@ export default async function OnboardingPage({
   const failedService = params?.service === "github" ? "GitHub" : params?.service;
 
   return (
-    <main className="min-h-screen bg-[#f7fbff] px-4 py-8 text-brand-ink sm:px-6">
+    <main className="min-h-screen bg-[#080C15] px-4 py-8 text-brand-ink sm:px-6">
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 border-b border-brand-border pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link href="/" className="inline-flex items-center gap-3 text-sm font-semibold">
-              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-primary text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
                 <Workflow className="h-5 w-5" />
               </span>
-              Developer OS
+              Standup
             </Link>
             <h1 className="mt-8 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
               Start with GitHub. Get to your dashboard in a few clicks.
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-600">
-              Connect your GitHub account with OAuth, sync recent engineering activity, and open Developer OS with real PR, review, issue, and check context.
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#9AA4BA]">
+              Connect your GitHub account with OAuth, sync recent engineering activity, and open Standup with real PR, review, issue, and check context.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -78,12 +78,12 @@ export default async function OnboardingPage({
         </header>
 
         {connectionsState.error ? (
-          <Card className="mt-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <Card className="mt-6 border-[#4A3A18] bg-[#241F14] p-4 text-sm text-[#F6C66A]">
             The API Gateway is not reachable yet. You can still review the onboarding flow, but connection status will load after the gateway starts.
           </Card>
         ) : null}
         {connectionError ? (
-          <Card className="mt-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <Card className="mt-6 border-[#4A3A18] bg-[#241F14] p-4 text-sm text-[#F6C66A]">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
@@ -98,7 +98,7 @@ export default async function OnboardingPage({
                 {missingEnv.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {missingEnv.map((env) => (
-                      <code key={env} className="rounded-md bg-white px-2 py-1 text-xs text-amber-950">
+                      <code key={env} className="rounded-md bg-[#121826] px-2 py-1 text-xs text-[#F6C66A]">
                         {env}
                       </code>
                     ))}
@@ -117,7 +117,7 @@ export default async function OnboardingPage({
               </span>
               <div>
                 <h2 className="text-base font-semibold">Fast setup</h2>
-                <p className="text-sm text-zinc-500">OAuth user authorization in a few clicks.</p>
+                <p className="text-sm text-[#6A7489]">OAuth user authorization in a few clicks.</p>
               </div>
             </div>
 
@@ -127,10 +127,10 @@ export default async function OnboardingPage({
 
                 return (
                   <div key={title} className="flex gap-3">
-                    <CheckCircle2 className={done ? "mt-0.5 h-4 w-4 text-emerald-600" : "mt-0.5 h-4 w-4 text-zinc-300"} />
+                    <CheckCircle2 className={done ? "mt-0.5 h-4 w-4 text-[#6EE7B7]" : "mt-0.5 h-4 w-4 text-[#6A7489]"} />
                     <div>
                       <p className="text-sm font-medium">{title}</p>
-                      <p className="mt-1 text-xs leading-5 text-zinc-500">{body}</p>
+                      <p className="mt-1 text-xs leading-5 text-[#6A7489]">{body}</p>
                     </div>
                   </div>
                 );
@@ -139,17 +139,17 @@ export default async function OnboardingPage({
           </Card>
 
           <Card className="overflow-hidden p-0">
-            <div className="border-b border-brand-border bg-white p-6">
+            <div className="border-b border-brand-border bg-[#121826] p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex gap-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary text-white">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
                     <GitPullRequest className="h-6 w-6" />
                   </span>
                   <div>
                     <Badge tone={statusTone(githubStatus)}>{githubStatus.replaceAll("_", " ")}</Badge>
                     <h2 className="mt-4 text-2xl font-semibold tracking-tight">Connect GitHub</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-                      Authorize Developer OS on GitHub. After OAuth, we use your user token to read accessible repositories and build your first dashboard.
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[#9AA4BA]">
+                      Authorize Standup on GitHub. After OAuth, we use your user token to read accessible repositories and build your first dashboard.
                     </p>
                   </div>
                 </div>
@@ -174,15 +174,15 @@ export default async function OnboardingPage({
             <div className="grid gap-0 divide-y divide-brand-border bg-brand-muted/40 md:grid-cols-3 md:divide-x md:divide-y-0">
               <div className="p-5">
                 <p className="text-sm font-semibold">Repositories</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">List repos from your GitHub account or configured organization.</p>
+                <p className="mt-2 text-sm leading-6 text-[#6A7489]">List repos from your GitHub account or configured organization.</p>
               </div>
               <div className="p-5">
                 <p className="text-sm font-semibold">Pull requests</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">Paginate recent PRs, reviews, comments, and failed checks.</p>
+                <p className="mt-2 text-sm leading-6 text-[#6A7489]">Paginate recent PRs, reviews, comments, and failed checks.</p>
               </div>
               <div className="p-5">
                 <p className="text-sm font-semibold">Dashboard metrics</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">Generate review time, reviewers, lead time, and blocker signals.</p>
+                <p className="mt-2 text-sm leading-6 text-[#6A7489]">Generate review time, reviewers, lead time, and blocker signals.</p>
               </div>
             </div>
           </Card>
@@ -192,7 +192,7 @@ export default async function OnboardingPage({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-semibold">Add more context later</h2>
-              <p className="mt-2 text-sm text-zinc-500">After GitHub is working, connect planning, docs, chat, and calendar with the same OAuth pattern.</p>
+              <p className="mt-2 text-sm text-[#6A7489]">After GitHub is working, connect planning, docs, chat, and calendar with the same OAuth pattern.</p>
             </div>
             <Link href="/settings">
               <Button variant="secondary">Open all integrations</Button>
@@ -208,7 +208,7 @@ export default async function OnboardingPage({
                 <Link
                   key={integration.id}
                   href={`/api/integrations/${integration.id}/connect`}
-                  className="rounded-md border border-brand-border bg-white p-4 transition-colors hover:border-brand-primary"
+                  className="rounded-md border border-brand-border bg-[#121826] p-4 transition-colors hover:border-brand-primary"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex gap-3">
@@ -217,12 +217,12 @@ export default async function OnboardingPage({
                       </span>
                       <div>
                         <p className="text-sm font-semibold">{integration.name}</p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-500">{integration.scope}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#6A7489]">{integration.scope}</p>
                       </div>
                     </div>
                     <Badge tone={statusTone(status)}>{status.replaceAll("_", " ")}</Badge>
                   </div>
-                  <p className="mt-3 text-xs font-medium text-zinc-500">OAuth user connection</p>
+                  <p className="mt-3 text-xs font-medium text-[#6A7489]">OAuth user connection</p>
                 </Link>
               );
             })}

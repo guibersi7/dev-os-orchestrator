@@ -11,15 +11,15 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#f7fbff] text-brand-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-brand-border bg-white px-4 py-5 lg:block">
+    <div className="min-h-screen bg-[#080C15] text-brand-ink">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-brand-border bg-[#121826] px-4 py-5 lg:block">
         <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-primary text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
             <GitPullRequest className="h-5 w-5" />
           </span>
           <span>
-            <span className="block text-sm font-semibold">Developer OS</span>
-            <span className="block text-xs text-zinc-500">Acme Engineering</span>
+            <span className="block text-sm font-semibold">Standup</span>
+            <span className="block text-xs text-[#6A7489]">Acme Engineering</span>
           </span>
         </Link>
         <nav className="mt-8 space-y-1">
@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex h-10 items-center gap-3 rounded-md px-3 text-sm text-zinc-600 transition-colors hover:bg-brand-muted hover:text-brand-ink",
+                "flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#9AA4BA] transition-colors hover:bg-brand-muted hover:text-brand-ink",
                 item.href === "/dashboard" && "bg-brand-surface text-brand-ink",
               )}
             >
@@ -39,11 +39,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 border-b border-brand-border bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-brand-border bg-[#0B0F1A]/90 backdrop-blur">
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">GitHub first</p>
-              <p className="text-sm font-medium text-zinc-950">Today’s engineering context</p>
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#6A7489]">GitHub first</p>
+              <p className="text-sm font-medium text-[#E9EDF7]">Today’s engineering context</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" aria-label="Notifications">

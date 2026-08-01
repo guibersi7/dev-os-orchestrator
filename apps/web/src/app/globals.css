@@ -1,20 +1,99 @@
 @import "tailwindcss";
 
 :root {
-  --quantum-blue: #2457ff;
-  --ice-glass: #dff7ff;
+  --standup-accent: #1d9c4c;
+  --standup-accent-hover: #23b85a;
+  --standup-accent-text: #4fd98c;
+  --standup-accent-surface: #0e2418;
+  --standup-accent-border: #1c4a31;
+  --standup-accent-soft: rgba(29, 156, 76, 0.34);
+  --quantum-blue: var(--standup-accent);
+  --quantum-blue-hover: var(--standup-accent-hover);
+  --quantum-blue-text: var(--standup-accent-text);
+  --quantum-blue-soft: var(--standup-accent-soft);
+  --ice-glass: var(--standup-accent-surface);
+  --ice-text: var(--standup-accent-text);
+  --bg-base: #080c15;
+  --bg-alt: #0b0f1a;
+  --surface: #121826;
+  --surface-2: #101623;
+  --surface-3: #0e1420;
+  --tile: #1a2130;
+  --line: #212938;
+  --line-soft: #1c2432;
+  --line-softer: #1b2230;
+  --ring-inner: #161c2b;
+  --ring-middle: #141a28;
+  --ring-outer: #121724;
+  --ink-900: #e9edf7;
+  --ink-600: #9aa4ba;
+  --ink-500: #9aa4ba;
+  --ink-450: #79839b;
+  --ink-400: #6a7489;
+  --ink-300: #6a7489;
+  --line-300: #2a3345;
+  --line-200: var(--line);
+  --line-150: var(--line);
+  --line-100: var(--line);
+  --line-50: var(--line);
+  --surface-0: var(--bg-base);
+  --surface-50: var(--bg-alt);
+  --surface-100: var(--bg-alt);
+  --surface-200: var(--tile);
+  --card-surface: var(--surface);
+  --app-bg: var(--bg-base);
+  --danger-600: #ff6b8a;
+  --danger-text: #ff9caf;
+  --danger-50: #22141c;
+  --danger-border: #4a2230;
+  --warn-text: #f6c66a;
+  --warn-50: #241f14;
   --brand-primary: var(--quantum-blue);
-  --brand-primary-hover: #1c46d6;
+  --brand-primary-hover: var(--quantum-blue-hover);
   --brand-surface: var(--ice-glass);
-  --brand-muted: #eefbff;
-  --brand-border: #bdeeff;
-  --brand-ink: #06131f;
-  --background: #fbfdff;
+  --brand-muted: var(--surface-100);
+  --brand-border: var(--line-200);
+  --brand-ink: var(--ink-900);
+  --background: var(--surface-0);
   --foreground: var(--brand-ink);
-  --ring: var(--brand-primary);
+  --card: var(--card-surface);
+  --card-foreground: var(--brand-ink);
+  --popover: var(--card-surface);
+  --popover-foreground: var(--brand-ink);
+  --primary: var(--brand-primary);
+  --primary-foreground: #e9edf7;
+  --secondary: var(--surface-200);
+  --secondary-foreground: var(--brand-ink);
+  --muted: var(--surface-200);
+  --muted-foreground: var(--ink-500);
+  --accent: var(--surface-200);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--danger-600);
+  --destructive-foreground: #ffffff;
+  --border: var(--brand-border);
+  --input: var(--brand-border);
+  --ring: rgba(29, 156, 76, 0.5);
+  --radius: 0.5rem;
 }
 
 @theme inline {
+  --color-standup-accent: var(--standup-accent);
+  --color-standup-accent-hover: var(--standup-accent-hover);
+  --color-standup-accent-text: var(--standup-accent-text);
+  --color-standup-accent-surface: var(--standup-accent-surface);
+  --color-standup-accent-border: var(--standup-accent-border);
+  --color-bg-base: var(--bg-base);
+  --color-bg-alt: var(--bg-alt);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-tile: var(--tile);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-softer: var(--line-softer);
+  --color-ring-inner: var(--ring-inner);
+  --color-ring-middle: var(--ring-middle);
+  --color-ring-outer: var(--ring-outer);
   --color-quantum-blue: var(--quantum-blue);
   --color-ice-glass: var(--ice-glass);
   --color-brand-primary: var(--brand-primary);
@@ -23,6 +102,29 @@
   --color-brand-muted: var(--brand-muted);
   --color-brand-border: var(--brand-border);
   --color-brand-ink: var(--brand-ink);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 * {
@@ -33,11 +135,112 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+}
+
+::selection {
+  background: var(--ice-glass);
+}
+
+.font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+@keyframes dos-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes dos-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.orbit-section[data-orbit-active="true"] .orbit-spoke,
+.orbit-section[data-orbit-active="true"] .orbit-pill-inner {
+  animation-play-state: running;
+}
+
+.orbit-spoke {
+  animation: orbit-spoke var(--orbit-period) linear infinite;
+  animation-play-state: paused;
+  transform: rotate(var(--orbit-start));
+}
+
+.orbit-pill-frame {
+  transform: translate(-50%, -50%) translateY(calc(var(--orbit-radius) * -1));
+}
+
+.orbit-pill-inner {
+  animation: orbit-counter var(--orbit-period) linear infinite;
+  animation-play-state: paused;
+  transform: rotate(var(--orbit-counter-start));
+}
+
+@keyframes orbit-spoke {
+  from {
+    transform: rotate(var(--orbit-start));
+  }
+  to {
+    transform: rotate(var(--orbit-end));
+  }
+}
+
+@keyframes orbit-counter {
+  from {
+    transform: rotate(var(--orbit-counter-start));
+  }
+  to {
+    transform: rotate(var(--orbit-counter-end));
+  }
+}
+
+.animate-dos-rise {
+  animation: dos-rise 0.42s ease both;
+}
+
+.animate-dos-pulse {
+  animation: dos-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .orbit-spoke,
+  .orbit-pill-inner {
+    animation: none !important;
+  }
 }

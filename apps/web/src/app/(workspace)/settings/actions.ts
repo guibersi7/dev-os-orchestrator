@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { disconnectConnection, type Service, syncIntegration } from "@/lib/api-client";
+import { disconnectConnection, saveResourceSelection, type SelectableResource, type Service, syncIntegration } from "@/lib/api-client";
 
 function serviceFromForm(formData: FormData): Service {
   return formData.get("service") as Service;
@@ -21,4 +21,17 @@ export async function disconnectConnectionAction(formData: FormData) {
   revalidatePath("/settings");
   revalidatePath("/dashboard");
   revalidatePath(`/integrations/${service}`);
+}
+
+export async function saveResourceSelectionAction(formData: FormData) {
+  const service = serviceFromForm(formData);
+  const selectedValues = formData.getAll("resources").map(String);
+  const resources = selectedValues.map((value) => JSON.parse(value) as SelectableResource);
+
+  await saveResourceSelection(service, resources);
+  await syncIntegration(service);
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath(`/integrations/${service}`);
+  revalidatePath(`/integrations/${service}/resources`);
 }
