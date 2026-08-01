@@ -2,6 +2,14 @@
 
 **Data:** 2026-08-01
 **Status:** Aprovado para planejamento
+**Ordem:** Spec B
+
+## Decomposição do trabalho
+
+O trabalho foi decomposto em três specs, nesta ordem:
+- **A — Robustez das conexões** (pré-requisito; ainda a ser detalhado): deixar Linear, Slack, Jira, Trello, Notion e Calendar 100% (sync confiável, erros tratados).
+- **B — Login + fluxo + dashboard por ação** (este documento).
+- **C — Contexto Unificado (Work Threads):** `2026-08-01-contexto-unificado-work-threads-design.md`.
 
 ## Objetivo
 
