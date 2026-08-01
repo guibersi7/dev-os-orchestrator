@@ -240,7 +240,7 @@ export const workEvents: WorkEvent[] = [
     id: "evt-4",
     type: "linear.issue.updated",
     title: "Large repository sync moved into Current cycle",
-    source: "Linear · Developer OS",
+    source: "Linear · Standup",
     actor: "Triage",
     occurredAt: "2h ago",
     priority: "high",

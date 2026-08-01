@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#080C15"/>
+  <rect x="80" y="80" width="1040" height="470" rx="36" fill="#0B0F1A" stroke="#212938"/>
+  <g transform="translate(96 112) scale(4)">
+    <rect width="24" height="24" rx="7" fill="#1D9C4C"/>
+    <rect x="6" y="6" width="12" height="3.2" rx="1.6" fill="#EEF3FF"/>
+    <rect x="6" y="10.4" width="9.5" height="3.2" rx="1.6" fill="#EEF3FF" opacity=".62"/>
+    <rect x="6" y="14.8" width="6.8" height="3.2" rx="1.6" fill="#EEF3FF" opacity=".34"/>
+  </g>
+  <text x="96" y="286" fill="#E9EDF7" font-family="Arial, sans-serif" font-size="86" font-weight="700" letter-spacing="-3">Standup</text>
+  <text x="96" y="366" fill="#9AA4BA" font-family="Arial, sans-serif" font-size="42">Open Standup. Understand what matters.</text>
+  <text x="96" y="428" fill="#4FD98C" font-family="Arial, sans-serif" font-size="42">Start building.</text>
+</svg>

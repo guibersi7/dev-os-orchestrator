@@ -13,13 +13,13 @@ export default async function IssueDetailPage({ params }: { params: Promise<{ id
       <div>
         <Badge tone={issue.priority === "P1" ? "amber" : "neutral"}>{issue.priority}</Badge>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">{issue.title}</h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-[#6A7489]">
           {issue.repository} #{issue.number} · assigned to {issue.assignee}
         </p>
       </div>
       <Card className="p-5">
         <h2 className="text-base font-semibold">Work event context</h2>
-        <p className="mt-3 text-sm leading-6 text-zinc-600">
+        <p className="mt-3 text-sm leading-6 text-[#9AA4BA]">
           This issue is prioritized because it affects initial synchronization, the first durable GitHub integration workflow in the MVP.
           Related PRs, failed jobs, and comments will be attached here as normalized events.
         </p>

@@ -10,7 +10,7 @@ export const linearConnector = createConnector({
   connectUrl: "/api/auth/linear/start",
   fetchRecentRecords: async () => [
     mockRecord("linear-devos-884", "Large repository sync moved into Current cycle", "Triage", {
-      team: "Developer OS",
+      team: "Standup",
       issue: "DEVOS-884",
       status: "In Progress",
     }),

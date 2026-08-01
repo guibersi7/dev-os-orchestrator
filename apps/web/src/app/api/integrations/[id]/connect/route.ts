@@ -14,7 +14,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.redirect(appUrl(request, "/onboarding?connectionError=unknown_service"));
   }
 
-  const oauthState = await startOAuthConnection(integration.id);
+  const callbackUrl = appUrl(request, `/api/integrations/${integration.id}/callback`).toString();
+  const oauthState = await startOAuthConnection(integration.id, callbackUrl);
   const authorizationUrl = oauthState.data?.authorizationUrl;
 
   if (authorizationUrl) {
