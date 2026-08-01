@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -33,10 +34,20 @@ func TestGitHubSyncDiscoversAuthenticatedUserRepositories(t *testing.T) {
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/user/repos":
-			writeJSON(t, w, []map[string]any{
-				{"full_name": "owner/repo", "archived": false},
-				{"full_name": "owner/archived", "archived": true},
+		case "/user/installations":
+			writeJSON(t, w, map[string]any{
+				"total_count": 1,
+				"installations": []map[string]any{
+					{"id": 42},
+				},
+			})
+		case "/user/installations/42/repositories":
+			writeJSON(t, w, map[string]any{
+				"total_count": 2,
+				"repositories": []map[string]any{
+					{"full_name": "owner/repo", "archived": false},
+					{"full_name": "owner/archived", "archived": true},
+				},
 			})
 		case "/repos/owner/repo/pulls":
 			writeJSON(t, w, []map[string]any{})
@@ -194,6 +205,57 @@ func TestGitHubSyncFetchesAndNormalizesRepositoryEvents(t *testing.T) {
 
 	if result.NextCursor == nil {
 		t.Fatal("expected next cursor")
+	}
+}
+
+func TestGitHubFetchRepositoriesFlattensInstallations(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/user/installations":
+			writeJSON(t, w, map[string]any{
+				"total_count": 2,
+				"installations": []map[string]any{
+					{"id": 1},
+					{"id": 2},
+				},
+			})
+		case "/user/installations/1/repositories":
+			writeJSON(t, w, map[string]any{
+				"total_count": 2,
+				"repositories": []map[string]any{
+					{"full_name": "acme/api", "archived": false},
+					{"full_name": "acme/legacy", "archived": true},
+				},
+			})
+		case "/user/installations/2/repositories":
+			writeJSON(t, w, map[string]any{
+				"total_count": 2,
+				"repositories": []map[string]any{
+					{"full_name": "acme/api", "archived": false},
+					{"full_name": "personal/site", "archived": false},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &GitHubConnector{
+		info:       NewGitHubConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		maxPages:   1,
+	}
+
+	repositories, err := connector.fetchRepositories(context.Background(), "token")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"acme/api", "personal/site"}
+	if !reflect.DeepEqual(repositories, want) {
+		t.Fatalf("expected %v, got %v", want, repositories)
 	}
 }
 
