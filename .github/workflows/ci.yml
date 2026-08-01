@@ -21,10 +21,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # Use `npm install` (not `npm ci`) so the Linux runner resolves
-        # platform-specific native binaries (e.g. lightningcss-linux-x64-gnu)
-        # that the macOS-generated lockfile does not record. Matches Vercel.
-        run: npm install
+        # The committed lockfile was generated on macOS and omits the Linux
+        # native binaries (lightningcss/oxide). npm won't reinstate optional
+        # deps missing from an existing lockfile (npm/cli#4828), so remove it
+        # and let the Linux runner resolve platform binaries fresh, as Vercel does.
+        run: rm -f package-lock.json && npm install
 
       - name: Lint
         run: npm run lint:web
