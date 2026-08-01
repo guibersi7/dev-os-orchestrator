@@ -21,7 +21,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Use `npm install` (not `npm ci`) so the Linux runner resolves
+        # platform-specific native binaries (e.g. lightningcss-linux-x64-gnu)
+        # that the macOS-generated lockfile does not record. Matches Vercel.
+        run: npm install
 
       - name: Lint
         run: npm run lint:web
