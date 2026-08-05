@@ -102,22 +102,45 @@ export async function ensureUserProfile(user: User, fallbackProfile?: SignupProf
     });
 
   const supabase = createAdminSupabaseClient();
+  const baseUserProfile = {
+    id: user.id,
+    email,
+    name: profile?.fullName || clean(metadata.name) || clean(metadata.full_name) || email,
+    avatar_url: clean(metadata.avatar_url) || null,
+    updated_at: new Date().toISOString(),
+  };
+
   const { error } = await supabase.from("users").upsert(
     {
-      id: user.id,
-      email,
-      name: profile?.fullName || clean(metadata.name) || clean(metadata.full_name) || email,
-      avatar_url: clean(metadata.avatar_url) || null,
+      ...baseUserProfile,
       phone: profile?.phone || null,
       birth_date: profile?.birthDate || null,
       profession: profile?.profession || null,
       company: profile?.company || null,
-      updated_at: new Date().toISOString(),
     },
     { onConflict: "id" },
   );
 
+  if (error && isMissingProfileColumnError(error)) {
+    const { error: fallbackError } = await supabase.from("users").upsert(baseUserProfile, { onConflict: "id" });
+
+    if (fallbackError) {
+      throw fallbackError;
+    }
+
+    return;
+  }
+
   if (error) {
     throw error;
   }
+}
+
+function isMissingProfileColumnError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const message = "message" in error ? String(error.message ?? "") : "";
+  return message.includes("Could not find") && message.includes("column") && message.includes("users");
 }
