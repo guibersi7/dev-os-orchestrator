@@ -17,7 +17,15 @@ function getActionErrorMessage(state: AuthActionState) {
   return null;
 }
 
-export function LoginForm({ redirectTo, isAuthConfigured }: { redirectTo: string; isAuthConfigured: boolean }) {
+export function LoginForm({
+  redirectTo,
+  isAuthConfigured,
+  defaultEmail = "",
+}: {
+  redirectTo: string;
+  isAuthConfigured: boolean;
+  defaultEmail?: string;
+}) {
   const [googleState, googleAction, googlePending] = useActionState(signInWithGoogleAction, initialState);
   const [emailState, emailAction, emailPending] = useActionState(sendEmailOtpAction, initialState);
   const googleError = getActionErrorMessage(googleState);
@@ -47,7 +55,7 @@ export function LoginForm({ redirectTo, isAuthConfigured }: { redirectTo: string
         <label className="block text-sm font-medium" htmlFor="email">
           Email
         </label>
-        <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required />
+        <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" defaultValue={defaultEmail} required />
         <Button type="submit" className="h-11 w-full" disabled={emailPending || !isAuthConfigured}>
           <Mail className="h-4 w-4" />
           Send login code

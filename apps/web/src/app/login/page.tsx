@@ -9,10 +9,11 @@ import { LoginForm } from "@/app/login/login-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string; error?: string }>;
+  searchParams: Promise<{ redirect?: string; error?: string; email?: string; notice?: string }>;
 }) {
   const params = await searchParams;
   const redirectTo = sanitizeAuthRedirect(params.redirect);
+  const email = String(params.email ?? "").trim().toLowerCase();
   const user = await getCurrentUser();
   const isAuthConfigured = isSupabaseAuthConfigured();
 
@@ -38,13 +39,18 @@ export default async function LoginPage({
               Unable to finish login. Try again.
             </p>
           ) : null}
+          {params.notice === "signup_created" ? (
+            <p className="mt-4 rounded-md border border-[#1E4A32] bg-[#132419] p-3 text-sm text-[#6BE59D]">
+              Account created. Send a new login code to continue.
+            </p>
+          ) : null}
           {!isAuthConfigured ? (
             <p className="mt-4 rounded-md border border-[#4A3A18] bg-[#241F14] p-3 text-sm text-[#F6C66A]">
               Supabase Auth is missing. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
             </p>
           ) : null}
           <div className="mt-6">
-            <LoginForm redirectTo={redirectTo} isAuthConfigured={isAuthConfigured} />
+            <LoginForm redirectTo={redirectTo} isAuthConfigured={isAuthConfigured} defaultEmail={email} />
           </div>
         </Card>
       </div>

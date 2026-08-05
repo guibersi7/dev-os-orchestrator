@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/config";
 import {
   ensureUserProfile,
+  getAuthUserByEmail,
   getUserProfileByEmail,
   normalizeEmail,
   validateSignupLike,
@@ -118,6 +119,10 @@ function getAuthErrorMessage(error: unknown, fallback = genericAuthErrorMessage)
   return fallback;
 }
 
+function getAuthErrorCode(error: unknown) {
+  return error && typeof error === "object" && "code" in error ? String(error.code ?? "") : "";
+}
+
 function logAuthActionError(step: string, error: unknown, context?: Record<string, string | number | boolean | undefined>) {
   if (!error || typeof error !== "object") {
     console.error("auth_action_failed", { step, message: String(error), ...context });
@@ -132,6 +137,10 @@ function logAuthActionError(step: string, error: unknown, context?: Record<strin
     code: "code" in error ? error.code : undefined,
     message: "message" in error ? error.message : undefined,
   });
+}
+
+function isConfirmedAuthUser(user: { email_confirmed_at?: string | null; confirmed_at?: string | null; last_sign_in_at?: string | null }) {
+  return Boolean(user.email_confirmed_at || user.confirmed_at || user.last_sign_in_at);
 }
 
 export async function signInWithGoogleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -278,6 +287,25 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
 
   if (error) {
     logAuthActionError("verify_email_otp", error, { mode, tokenLength: token.length, type: "email" });
+    if (mode === "signup" && getAuthErrorCode(error) === "otp_expired") {
+      let reconciledConfirmedSignup = false;
+      try {
+        const authUser = await getAuthUserByEmail(email);
+        if (authUser && isConfirmedAuthUser(authUser)) {
+          await ensureUserProfile(authUser, await readPendingSignup(email));
+          await clearPendingSignup();
+          reconciledConfirmedSignup = true;
+        }
+      } catch (profileError) {
+        logAuthActionError("signup_reconcile_profile", profileError);
+        return { error: getAuthErrorMessage(profileError, "Unable to create your profile.") };
+      }
+
+      if (reconciledConfirmedSignup) {
+        redirect(`/login?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirectTo)}&notice=signup_created`);
+      }
+    }
+
     return { error: getAuthErrorMessage(error, "This code has expired or is invalid. Request a new code and try again.") };
   }
 

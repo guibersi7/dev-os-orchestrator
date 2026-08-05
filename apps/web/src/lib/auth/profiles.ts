@@ -55,6 +55,34 @@ export async function getUserProfileByEmail(email: string) {
   return data;
 }
 
+export async function getAuthUserByEmail(email: string): Promise<User | null> {
+  if (!isSupabaseAdminConfigured()) {
+    throw new Error("Supabase admin access is not configured.");
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const supabase = createAdminSupabaseClient();
+
+  for (let page = 1; page <= 5; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+
+    if (error) {
+      throw error;
+    }
+
+    const user = data.users.find((candidate) => normalizeEmail(candidate.email) === normalizedEmail);
+    if (user) {
+      return user;
+    }
+
+    if (!data.nextPage) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 export async function ensureUserProfile(user: User, fallbackProfile?: SignupProfile | null) {
   if (!isSupabaseAdminConfigured()) {
     throw new Error("Supabase admin access is not configured.");

@@ -19,6 +19,8 @@ The UI verifies the code with the `input-otp` input. The server verifies the doc
 
 OTP emails are sent with a non-PKCE Supabase client so the 6-digit code can be verified directly with `verifyOtp({ email, token, type: "email" })`. The normal SSR client is still used for verification so the resulting session is persisted to cookies.
 
+If Supabase has already confirmed the Auth user during signup but the manual OTP verification returns `otp_expired`, the server reconciles that state by creating the missing `public.users` profile and sends the user back to login for a fresh login OTP.
+
 ## Required Environment
 
 `SUPABASE_SERVICE_ROLE_KEY` is required on the server to check whether an email is registered and to create the `public.users` profile after signup verification.
