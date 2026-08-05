@@ -30,7 +30,7 @@ export default async function LoginPage({
           <p className="text-sm text-muted-foreground">Welcome back</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in without a password</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Use Google or receive a one-time code by email. New emails create an account automatically.
+            Use Google or receive a one-time code by email. New emails must register first.
           </p>
           {params.error ? (
             <p className="mt-4 rounded-md border border-[#4A2230] bg-[#22141C] p-3 text-sm text-[#FF9CAF]">

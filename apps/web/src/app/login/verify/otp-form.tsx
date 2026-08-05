@@ -23,7 +23,7 @@ function OtpSlot({ char, isActive, hasFakeCaret }: SlotProps) {
   );
 }
 
-export function OtpForm({ email, redirectTo }: { email: string; redirectTo: string }) {
+export function OtpForm({ email, redirectTo, mode }: { email: string; redirectTo: string; mode: "login" | "signup" }) {
   const [otp, setOtp] = useState("");
   const [state, action, pending] = useActionState(verifyEmailOtpAction, initialState);
 
@@ -31,6 +31,7 @@ export function OtpForm({ email, redirectTo }: { email: string; redirectTo: stri
     <form action={action} className="space-y-5">
       <input type="hidden" name="email" value={email} />
       <input type="hidden" name="redirect" value={redirectTo} />
+      <input type="hidden" name="mode" value={mode} />
       <input type="hidden" name="otp" value={otp} />
       <OTPInput
         value={otp}

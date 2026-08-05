@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { ArrowRight, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,9 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         </Button>
         {emailState.error ? <p className="text-sm text-[#FF9CAF]">{emailState.error}</p> : null}
       </form>
+      <Link href={`/signup?redirect=${encodeURIComponent(redirectTo)}`} className="block text-center text-sm text-[var(--standup-accent-text)]">
+        Create an account
+      </Link>
     </div>
   );
 }

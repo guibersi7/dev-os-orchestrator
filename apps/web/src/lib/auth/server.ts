@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import type { User } from "@supabase/supabase-js";
-import { getSupabaseAuthConfig, isSupabaseAuthConfigured } from "@/lib/auth/config";
+import { createClient, type User } from "@supabase/supabase-js";
+import { getSupabaseAdminConfig, getSupabaseAuthConfig, isSupabaseAuthConfigured } from "@/lib/auth/config";
 
 const FALLBACK_USER_ID = process.env.NEXT_PUBLIC_USER_ID ?? "00000000-0000-4000-8000-000000000002";
 
@@ -23,6 +23,17 @@ export async function createServerSupabaseClient() {
           // Server Components cannot always set cookies. Middleware refreshes sessions.
         }
       },
+    },
+  });
+}
+
+export function createAdminSupabaseClient() {
+  const { url, serviceRoleKey } = getSupabaseAdminConfig();
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   });
 }
