@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/auth/server";
+import { createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
   isSupabaseAdminConfigured,
@@ -99,11 +99,6 @@ async function readPendingSignup(email: string): Promise<SignupProfile | null> {
 async function clearPendingSignup() {
   const cookieStore = await cookies();
   cookieStore.delete(pendingSignupCookie);
-}
-
-function isAuthUserAlreadyRegistered(error: { message?: string; status?: number }) {
-  const message = error.message?.toLowerCase() ?? "";
-  return error.status === 422 || message.includes("already registered") || message.includes("already exists");
 }
 
 function getAuthErrorMessage(error: unknown, fallback = genericAuthErrorMessage) {
@@ -273,30 +268,19 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   }
 
   const origin = await getRequestOrigin();
-  const adminSupabase = createAdminSupabaseClient();
-  const { error: createUserError } = await adminSupabase.auth.admin.createUser({
-    email: profile.email,
-    email_confirm: true,
-    user_metadata: {
-      full_name: profile.fullName,
-      phone: profile.phone,
-      birth_date: profile.birthDate,
-      profession: profile.profession,
-      company: profile.company,
-    },
-  });
-
-  if (createUserError && !isAuthUserAlreadyRegistered(createUserError)) {
-    logAuthActionError("signup_create_auth_user", createUserError);
-    return { error: getAuthErrorMessage(createUserError, "Unable to create the authentication user.") };
-  }
-
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: profile.email,
     options: {
-      shouldCreateUser: false,
+      shouldCreateUser: true,
       emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
+      data: {
+        full_name: profile.fullName,
+        phone: profile.phone,
+        birth_date: profile.birthDate,
+        profession: profile.profession,
+        company: profile.company,
+      },
     },
   });
 
