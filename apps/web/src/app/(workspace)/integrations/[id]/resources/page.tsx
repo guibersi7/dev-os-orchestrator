@@ -54,7 +54,7 @@ export default async function IntegrationResourcesPage({
             </div>
           </div>
           <Button asChild variant="secondary">
-            <Link href={`/api/integrations/${integration.id}/connect`}>Reconnect</Link>
+            <a href={`/api/integrations/${integration.id}/connect`}>Reconnect</a>
           </Button>
         </div>
       </Card>
@@ -68,7 +68,7 @@ export default async function IntegrationResourcesPage({
             OAuth needs to complete before we can list selectable resources.
           </p>
           <Button asChild className="mt-5">
-            <Link href={`/api/integrations/${integration.id}/connect`}>Connect {integration.name}</Link>
+            <a href={`/api/integrations/${integration.id}/connect`}>Connect {integration.name}</a>
           </Button>
         </Card>
       ) : null}

@@ -63,10 +63,10 @@ export default async function OnboardingPage({
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <Button asChild>
-              <Link href="/api/integrations/github/connect">
+              <a href="/api/integrations/github/connect">
                 <GitPullRequest className="h-4 w-4" />
                 Connect GitHub
-              </Link>
+              </a>
             </Button>
             <Button asChild variant="secondary">
               <Link href="/dashboard">
@@ -105,10 +105,10 @@ export default async function OnboardingPage({
                   </div>
                 ) : null}
                 <Button asChild size="sm" className="mt-4">
-                  <Link href="/api/integrations/github/connect">
+                  <a href="/api/integrations/github/connect">
                     Retry GitHub
                     <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  </a>
                 </Button>
               </div>
             </div>
@@ -161,10 +161,10 @@ export default async function OnboardingPage({
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
                   <Button asChild>
-                    <Link href="/api/integrations/github/connect">
+                    <a href="/api/integrations/github/connect">
                       {githubConnected ? "Reconnect GitHub" : "Connect GitHub"}
                       <ArrowRight className="h-4 w-4" />
-                    </Link>
+                    </a>
                   </Button>
                   <form action={syncConnectionAction}>
                     <input type="hidden" name="service" value="github" />
@@ -211,7 +211,7 @@ export default async function OnboardingPage({
               const Icon = integration.icon;
 
               return (
-                <Link
+                <a
                   key={integration.id}
                   href={`/api/integrations/${integration.id}/connect`}
                   className="rounded-md border border-brand-border bg-[#121826] p-4 transition-colors hover:border-brand-primary"
@@ -229,7 +229,7 @@ export default async function OnboardingPage({
                     <Badge tone={statusTone(status)}>{status.replaceAll("_", " ")}</Badge>
                   </div>
                   <p className="mt-3 text-xs font-medium text-[#6A7489]">OAuth user connection</p>
-                </Link>
+                </a>
               );
             })}
           </div>

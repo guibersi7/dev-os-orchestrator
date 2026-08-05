@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,10 +29,10 @@ export function IntegrationEmptyState({
       <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
       {service ? (
         <Button asChild className="mt-6">
-          <Link href={`/api/integrations/${service}/connect`}>
+          <a href={`/api/integrations/${service}/connect`}>
             {actionLabel}
             <ArrowUpRight className="h-4 w-4" />
-          </Link>
+          </a>
         </Button>
       ) : null}
     </Card>
