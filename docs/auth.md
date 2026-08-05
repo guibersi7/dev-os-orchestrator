@@ -9,7 +9,8 @@ Login by email is only allowed when the email already exists in `public.users`. 
 Supabase sends the email. Configure the Supabase template so the message shows the 6-digit code:
 
 - Supabase Dashboard > Authentication > Email Templates.
-- Update the OTP/Magic Link template body to include `{{ .Token }}`.
+- Update the `Magic Link / OTP` template body to include `{{ .Token }}`.
+- The signup flow creates the Supabase Auth user server-side first, then sends this same `Magic Link / OTP` email with `shouldCreateUser: false`.
 - Keep the confirmation URL as `{{ .ConfirmationURL }}` if you also keep a link in the email.
 - Set `NEXT_PUBLIC_APP_URL` to the deployed app origin so `{{ .ConfirmationURL }}` points to `/auth/callback` instead of an invalid or blank URL.
 

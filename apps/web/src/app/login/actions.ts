@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/auth/server";
+import { createAdminSupabaseClient, createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
   isSupabaseAdminConfigured,
@@ -99,6 +99,10 @@ async function clearPendingSignup() {
   cookieStore.delete(pendingSignupCookie);
 }
 
+function isAuthUserAlreadyRegistered(error: { message?: string; status?: number }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return error.status === 422 || message.includes("already registered") || message.includes("already exists");
+}
 
 export async function signInWithGoogleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   if (!isSupabaseAuthConfigured()) {
@@ -192,19 +196,29 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   }
 
   const origin = await getRequestOrigin();
+  const adminSupabase = createAdminSupabaseClient();
+  const { error: createUserError } = await adminSupabase.auth.admin.createUser({
+    email: profile.email,
+    email_confirm: true,
+    user_metadata: {
+      full_name: profile.fullName,
+      phone: profile.phone,
+      birth_date: profile.birthDate,
+      profession: profile.profession,
+      company: profile.company,
+    },
+  });
+
+  if (createUserError && !isAuthUserAlreadyRegistered(createUserError)) {
+    return { error: createUserError.message };
+  }
+
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: profile.email,
     options: {
-      shouldCreateUser: true,
+      shouldCreateUser: false,
       emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
-      data: {
-        full_name: profile.fullName,
-        phone: profile.phone,
-        birth_date: profile.birthDate,
-        profession: profile.profession,
-        company: profile.company,
-      },
     },
   });
 
@@ -235,7 +249,7 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   const { data, error } = await supabase.auth.verifyOtp({
     email,
     token,
-    type: mode === "signup" ? "signup" : "email",
+    type: "email",
   });
 
   if (error) {
