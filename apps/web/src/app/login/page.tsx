@@ -14,6 +14,7 @@ export default async function LoginPage({
   const params = await searchParams;
   const redirectTo = sanitizeAuthRedirect(params.redirect);
   const user = await getCurrentUser();
+  const isAuthConfigured = isSupabaseAuthConfigured();
 
   if (user) {
     redirect(redirectTo);
@@ -37,13 +38,13 @@ export default async function LoginPage({
               Unable to finish login. Try again.
             </p>
           ) : null}
-          {!isSupabaseAuthConfigured() ? (
+          {!isAuthConfigured ? (
             <p className="mt-4 rounded-md border border-[#4A3A18] bg-[#241F14] p-3 text-sm text-[#F6C66A]">
               Supabase Auth is missing. Configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
             </p>
           ) : null}
           <div className="mt-6">
-            <LoginForm redirectTo={redirectTo} />
+            <LoginForm redirectTo={redirectTo} isAuthConfigured={isAuthConfigured} />
           </div>
         </Card>
       </div>

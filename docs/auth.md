@@ -19,3 +19,12 @@ The UI verifies the code with the `input-otp` input. Signup verification writes 
 ## Required Environment
 
 `SUPABASE_SERVICE_ROLE_KEY` is required on the server to check whether an email is registered and to create the `public.users` profile after signup verification.
+
+These variables must exist in the Vercel project that serves the web app:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_APP_URL`
+
+If any Supabase variable is missing, the login and signup forms stay disabled and no OTP email can be sent.

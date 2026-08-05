@@ -9,21 +9,31 @@ import { sendEmailOtpAction, signInWithGoogleAction, type AuthActionState } from
 
 const initialState: AuthActionState = {};
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+function getActionErrorMessage(state: AuthActionState) {
+  if (typeof state.error === "string" && state.error.trim()) {
+    return state.error;
+  }
+
+  return null;
+}
+
+export function LoginForm({ redirectTo, isAuthConfigured }: { redirectTo: string; isAuthConfigured: boolean }) {
   const [googleState, googleAction, googlePending] = useActionState(signInWithGoogleAction, initialState);
   const [emailState, emailAction, emailPending] = useActionState(sendEmailOtpAction, initialState);
+  const googleError = getActionErrorMessage(googleState);
+  const emailError = getActionErrorMessage(emailState);
 
   return (
     <div className="space-y-4">
       <form action={googleAction}>
         <input type="hidden" name="redirect" value={redirectTo} />
-        <Button type="submit" variant="outline" className="h-11 w-full" disabled={googlePending}>
+        <Button type="submit" variant="outline" className="h-11 w-full" disabled={googlePending || !isAuthConfigured}>
           <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-white text-xs font-bold text-[#1A2130]">
             G
           </span>
           Continue with Google
         </Button>
-        {googleState.error ? <p className="mt-2 text-sm text-[#FF9CAF]">{googleState.error}</p> : null}
+        {googleError ? <p className="mt-2 text-sm text-[#FF9CAF]">{googleError}</p> : null}
       </form>
 
       <div className="flex items-center gap-3">
@@ -38,12 +48,13 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           Email
         </label>
         <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required />
-        <Button type="submit" className="h-11 w-full" disabled={emailPending}>
+        <Button type="submit" className="h-11 w-full" disabled={emailPending || !isAuthConfigured}>
           <Mail className="h-4 w-4" />
           Send login code
           <ArrowRight className="h-4 w-4" />
         </Button>
-        {emailState.error ? <p className="text-sm text-[#FF9CAF]">{emailState.error}</p> : null}
+        {!isAuthConfigured ? <p className="text-sm text-[#FF9CAF]">Supabase Auth is not configured for this deployment.</p> : null}
+        {emailError ? <p className="text-sm text-[#FF9CAF]">{emailError}</p> : null}
       </form>
       <Link href={`/signup?redirect=${encodeURIComponent(redirectTo)}`} className="block text-center text-sm text-[var(--standup-accent-text)]">
         Create an account

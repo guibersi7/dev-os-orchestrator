@@ -9,8 +9,17 @@ import { Input } from "@/components/ui/input";
 
 const initialState: AuthActionState = {};
 
-export function SignupForm({ email, redirectTo }: { email: string; redirectTo: string }) {
+function getActionErrorMessage(state: AuthActionState) {
+  if (typeof state.error === "string" && state.error.trim()) {
+    return state.error;
+  }
+
+  return null;
+}
+
+export function SignupForm({ email, redirectTo, isAuthConfigured }: { email: string; redirectTo: string; isAuthConfigured: boolean }) {
   const [state, action, pending] = useActionState(signUpWithEmailOtpAction, initialState);
+  const errorMessage = getActionErrorMessage(state);
 
   return (
     <form action={action} className="space-y-4">
@@ -55,12 +64,13 @@ export function SignupForm({ email, redirectTo }: { email: string; redirectTo: s
           <Input id="company" name="company" autoComplete="organization" placeholder="Company name" required />
         </div>
       </div>
-      <Button type="submit" className="h-11 w-full" disabled={pending}>
+      <Button type="submit" className="h-11 w-full" disabled={pending || !isAuthConfigured}>
         <MailPlus className="h-4 w-4" />
         Create account
         <ArrowRight className="h-4 w-4" />
       </Button>
-      {state.error ? <p className="text-sm text-[#FF9CAF]">{state.error}</p> : null}
+      {!isAuthConfigured ? <p className="text-sm text-[#FF9CAF]">Supabase Auth is not configured for this deployment.</p> : null}
+      {errorMessage ? <p className="text-sm text-[#FF9CAF]">{errorMessage}</p> : null}
       <Link href={`/login?redirect=${encodeURIComponent(redirectTo)}`} className="block text-center text-sm text-[var(--standup-accent-text)]">
         Already have an account?
       </Link>
