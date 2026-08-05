@@ -36,7 +36,7 @@ export default async function VerifyOtpPage({
           <p className="text-sm text-muted-foreground">Check your email</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Enter the {mode === "signup" ? "signup" : "login"} code</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Use the secure link or 6-digit code we sent to <span className="font-medium text-foreground">{email}</span>.
+            We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.
           </p>
           <div className="mt-6">
             <OtpForm email={email} redirectTo={redirectTo} mode={mode} />

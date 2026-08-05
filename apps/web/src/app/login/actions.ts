@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { createOtpSupabaseClient, createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
-  getAuthConfirmUrl,
   isSupabaseAdminConfigured,
   isSupabaseAuthConfigured,
   sanitizeAuthRedirect,
@@ -140,6 +139,10 @@ function logAuthActionError(step: string, error: unknown, context?: Record<strin
   });
 }
 
+function logAuthActionInfo(step: string, context?: Record<string, string | number | boolean | undefined>) {
+  console.info("auth_action_info", { step, ...context });
+}
+
 function isConfirmedAuthUser(user: { email_confirmed_at?: string | null; confirmed_at?: string | null; last_sign_in_at?: string | null }) {
   return Boolean(user.email_confirmed_at || user.confirmed_at || user.last_sign_in_at);
 }
@@ -200,7 +203,7 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: getAuthConfirmUrl(origin, redirectTo, "login"),
+      emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
     },
   });
 
@@ -208,6 +211,8 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
     logAuthActionError("login_send_otp", error);
     return { error: getAuthErrorMessage(error) };
   }
+
+  logAuthActionInfo("login_send_otp", { mode: "login", redirectTo });
 
   redirect(`/login/verify?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirectTo)}&mode=login`);
 }
@@ -244,7 +249,7 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
     email: profile.email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: getAuthConfirmUrl(origin, redirectTo, "signup"),
+      emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
       data: {
         full_name: profile.fullName,
         phone: profile.phone,
@@ -261,6 +266,7 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   }
 
   await savePendingSignup(profile);
+  logAuthActionInfo("signup_send_otp", { mode: "signup", redirectTo });
 
   redirect(`/login/verify?email=${encodeURIComponent(profile.email)}&redirect=${encodeURIComponent(redirectTo)}&mode=signup`);
 }

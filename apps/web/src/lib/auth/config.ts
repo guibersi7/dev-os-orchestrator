@@ -38,11 +38,6 @@ export function getAuthCallbackUrl(origin: string, redirectTo: string) {
   return `${appOrigin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`;
 }
 
-export function getAuthConfirmUrl(origin: string, redirectTo: string, mode: "login" | "signup") {
-  const appOrigin = APP_URL || origin;
-  return `${appOrigin}/auth/confirm?redirect=${encodeURIComponent(redirectTo)}&mode=${mode}`;
-}
-
 export function sanitizeAuthRedirect(value: FormDataEntryValue | string | null | undefined) {
   const fallback = "/dashboard";
   const redirectTo = typeof value === "string" ? value : "";
@@ -51,7 +46,7 @@ export function sanitizeAuthRedirect(value: FormDataEntryValue | string | null |
     return fallback;
   }
 
-  if (redirectTo.startsWith("/login") || redirectTo.startsWith("/auth/callback") || redirectTo.startsWith("/auth/confirm")) {
+  if (redirectTo.startsWith("/login") || redirectTo.startsWith("/auth/callback")) {
     return fallback;
   }
 
