@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createOtpSupabaseClient, createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
+  getAuthConfirmUrl,
   isSupabaseAdminConfigured,
   isSupabaseAuthConfigured,
   sanitizeAuthRedirect,
@@ -199,7 +200,7 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
+      emailRedirectTo: getAuthConfirmUrl(origin, redirectTo, "login"),
     },
   });
 
@@ -243,7 +244,7 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
     email: profile.email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: getAuthCallbackUrl(origin, redirectTo),
+      emailRedirectTo: getAuthConfirmUrl(origin, redirectTo, "signup"),
       data: {
         full_name: profile.fullName,
         phone: profile.phone,
