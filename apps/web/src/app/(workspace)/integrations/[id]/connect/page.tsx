@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 import { startOAuthConnection } from "@/lib/api-client";
+import { getPublicAppUrlFromHeaders } from "@/lib/app-url";
 
 export default async function ConnectIntegrationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,9 +18,10 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
   }
 
   const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-  const callbackUrl = `${protocol}://${host}/api/integrations/${integration.id}/callback`;
+  const callbackUrl = getPublicAppUrlFromHeaders(
+    `/api/integrations/${integration.id}/callback`,
+    requestHeaders,
+  ).toString();
   const oauthState = await startOAuthConnection(integration.id, callbackUrl);
   const data = oauthState.data;
 

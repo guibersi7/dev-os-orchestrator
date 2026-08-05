@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 import { startOAuthConnection } from "@/lib/api-client";
-
-function appUrl(request: Request, path: string) {
-  return new URL(path, request.url);
-}
+import { getPublicAppUrl } from "@/lib/app-url";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const integration = getIntegrationCatalogItem(id);
 
   if (!integration) {
-    return NextResponse.redirect(appUrl(request, "/onboarding?connectionError=unknown_service"));
+    return NextResponse.redirect(getPublicAppUrl("/onboarding?connectionError=unknown_service", request.url));
   }
 
-  const callbackUrl = appUrl(request, `/api/integrations/${integration.id}/callback`).toString();
+  const callbackUrl = getPublicAppUrl(`/api/integrations/${integration.id}/callback`, request.url).toString();
   const oauthState = await startOAuthConnection(integration.id, callbackUrl);
   const authorizationUrl = oauthState.data?.authorizationUrl;
 
@@ -24,9 +21,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const missing = oauthState.data?.missing?.join(",") ?? "";
   const error = oauthState.data?.status === "needs_config" ? "needs_config" : "oauth_start_failed";
-  const nextUrl = appUrl(
-    request,
+  const nextUrl = getPublicAppUrl(
     `/onboarding?connectionError=${error}&service=${integration.id}&missing=${encodeURIComponent(missing)}`,
+    request.url,
   );
 
   return NextResponse.redirect(nextUrl);

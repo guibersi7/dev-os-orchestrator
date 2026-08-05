@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 import { completeOAuthConnection } from "@/lib/api-client";
-
-function appUrl(request: Request, path: string) {
-  return new URL(path, request.url);
-}
+import { getPublicAppUrl } from "@/lib/app-url";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const integration = getIntegrationCatalogItem(id);
 
   if (!integration) {
-    return NextResponse.redirect(appUrl(request, "/onboarding?connectionError=unknown_service"));
+    return NextResponse.redirect(getPublicAppUrl("/onboarding?connectionError=unknown_service", request.url));
   }
 
   const url = new URL(request.url);
@@ -21,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (providerError || !code || !state) {
     return NextResponse.redirect(
-      appUrl(request, `/onboarding?connectionError=oauth_callback_failed&service=${integration.id}`),
+      getPublicAppUrl(`/onboarding?connectionError=oauth_callback_failed&service=${integration.id}`, request.url),
     );
   }
 
@@ -29,9 +26,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (callbackState.error || callbackState.data?.status !== "connected") {
     return NextResponse.redirect(
-      appUrl(request, `/onboarding?connectionError=oauth_callback_failed&service=${integration.id}`),
+      getPublicAppUrl(`/onboarding?connectionError=oauth_callback_failed&service=${integration.id}`, request.url),
     );
   }
 
-  return NextResponse.redirect(appUrl(request, `/integrations/${integration.id}/resources?connected=1`));
+  return NextResponse.redirect(getPublicAppUrl(`/integrations/${integration.id}/resources?connected=1`, request.url));
 }

@@ -17,6 +17,7 @@ Developer OS should get a new workspace to real engineering context as quickly a
    - User clicks `Connect` for a service.
    - Frontend opens `/api/integrations/{service}/connect`.
    - The route handler calls `GET /v1/oauth/{service}/start` server-side.
+   - The route handler builds provider callback URLs from `NEXT_PUBLIC_APP_URL` when configured, so production OAuth uses the canonical public domain.
    - If provider env vars are present, the user is redirected to the provider OAuth URL.
    - If provider env vars are missing, the user returns to onboarding with the missing server-side env vars.
 
@@ -52,6 +53,7 @@ Developer OS should get a new workspace to real engineering context as quickly a
 GitHub is the first provider that should behave like a real production integration.
 
 - OAuth must use the GitHub app/client configured in the API Gateway.
+- The GitHub App callback URL must exactly match the production callback URL, currently `https://www.standupmorning.com/api/integrations/github/callback`.
 - The connector uses the authenticated user's access token.
 - Repository discovery uses the selected static repositories when configured, otherwise it lists repositories accessible to the user.
 - Organization discovery is enabled by configuring `GITHUB_ORGANIZATION` or `GITHUB_ORG`.
