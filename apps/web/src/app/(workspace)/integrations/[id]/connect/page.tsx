@@ -75,15 +75,15 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/settings">
-            <Button variant="secondary">Return to Connection Center</Button>
-          </Link>
-          <Link href={`/integrations/${integration.id}`}>
-            <Button variant="ghost">
+          <Button asChild variant="secondary">
+            <Link href="/settings">Return to Connection Center</Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href={`/integrations/${integration.id}`}>
               View connector details
               <ExternalLink className="h-4 w-4" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </Card>
     </div>

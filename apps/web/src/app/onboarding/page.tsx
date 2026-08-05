@@ -62,18 +62,18 @@ export default async function OnboardingPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link href="/api/integrations/github/connect">
-              <Button>
+            <Button asChild>
+              <Link href="/api/integrations/github/connect">
                 <GitPullRequest className="h-4 w-4" />
                 Connect GitHub
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button variant="secondary">
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/dashboard">
                 Open dashboard
                 <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </header>
 
@@ -90,10 +90,10 @@ export default async function OnboardingPage({
                 <p className="font-medium">
                   {connectionError === "needs_config"
                     ? `${failedService ?? "Provider"} OAuth is not configured yet.`
-                    : "Unable to start OAuth."}
+                    : "The previous OAuth attempt did not start."}
                 </p>
                 <p className="mt-1">
-                  The Connect GitHub button now starts OAuth directly. Configure the gateway env vars and retry.
+                  Retry the connection. If GitHub opens, this message is only from the previous failed URL.
                 </p>
                 {missingEnv.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -104,6 +104,12 @@ export default async function OnboardingPage({
                     ))}
                   </div>
                 ) : null}
+                <Button asChild size="sm" className="mt-4">
+                  <Link href="/api/integrations/github/connect">
+                    Retry GitHub
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
           </Card>
@@ -154,12 +160,12 @@ export default async function OnboardingPage({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Link href="/api/integrations/github/connect">
-                    <Button>
+                  <Button asChild>
+                    <Link href="/api/integrations/github/connect">
                       {githubConnected ? "Reconnect GitHub" : "Connect GitHub"}
                       <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   <form action={syncConnectionAction}>
                     <input type="hidden" name="service" value="github" />
                     <Button variant="secondary" disabled={!githubConnected}>
@@ -194,9 +200,9 @@ export default async function OnboardingPage({
               <h2 className="text-base font-semibold">Add more context later</h2>
               <p className="mt-2 text-sm text-[#6A7489]">After GitHub is working, connect planning, docs, chat, and calendar with the same OAuth pattern.</p>
             </div>
-            <Link href="/settings">
-              <Button variant="secondary">Open all integrations</Button>
-            </Link>
+            <Button asChild variant="secondary">
+              <Link href="/settings">Open all integrations</Link>
+            </Button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {nextServices.map((integration) => {
