@@ -14,7 +14,7 @@ Supabase sends the email. Configure the Supabase template so the message shows t
 - Keep the confirmation URL as `{{ .ConfirmationURL }}` if you also keep a link in the email.
 - Set `NEXT_PUBLIC_APP_URL` to the deployed app origin so `{{ .ConfirmationURL }}` points to `/auth/callback` instead of an invalid or blank URL.
 
-The UI verifies the code with the `input-otp` input. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
+The UI verifies the code with the `input-otp` input. The server first verifies the documented numeric OTP type (`email`) and falls back to `signup`/`magiclink` when Supabase returns an invalid/expired token response, which covers projects whose email templates or user state emit one of the older email OTP types. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
 
 ## Required Environment
 
