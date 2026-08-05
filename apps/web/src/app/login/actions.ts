@@ -278,8 +278,8 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
     return { error: "Enter the 6-digit code we sent to your email." };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.verifyOtp({
+  const otpSupabase = createOtpSupabaseClient();
+  const { data, error } = await otpSupabase.auth.verifyOtp({
     email,
     token,
     type: "email",
@@ -310,6 +310,19 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   }
 
   console.info("auth_action_succeeded", { step: "verify_email_otp", mode, type: "email" });
+
+  if (data.session) {
+    const supabase = await createServerSupabaseClient();
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+
+    if (sessionError) {
+      logAuthActionError("verify_email_otp_set_session", sessionError, { mode });
+      return { error: getAuthErrorMessage(sessionError, "Unable to create your session.") };
+    }
+  }
 
   if (mode === "signup" && data?.user) {
     try {

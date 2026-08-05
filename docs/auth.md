@@ -17,7 +17,7 @@ Supabase sends the email. Configure the Supabase template so the message shows t
 
 The UI verifies the code with the `input-otp` input. The server verifies the documented numeric OTP type (`email`) for `signInWithOtp`. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
 
-OTP emails are sent with a non-PKCE Supabase client so the 6-digit code can be verified directly with `verifyOtp({ email, token, type: "email" })`. The normal SSR client is still used for verification so the resulting session is persisted to cookies.
+OTP emails are sent and verified with a non-PKCE Supabase client so the 6-digit code can be verified directly with `verifyOtp({ email, token, type: "email" })`. When verification returns a session, the normal SSR client persists that session to cookies.
 
 If Supabase has already confirmed the Auth user during signup but the manual OTP verification returns `otp_expired`, the server reconciles that state by creating the missing `public.users` profile and sends the user back to login for a fresh login OTP.
 
