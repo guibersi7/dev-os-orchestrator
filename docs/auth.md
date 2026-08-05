@@ -10,12 +10,12 @@ Supabase sends the email. Configure the Supabase template so the message shows t
 
 - Supabase Dashboard > Authentication > Email Templates.
 - Update the `Magic Link / OTP` template body to include `{{ .Token }}`.
+- Remove `{{ .ConfirmationURL }}` from the OTP email body. Some email clients and security scanners prefetch links; if they open the Supabase confirmation URL, the token is consumed before the user types the code.
 - If the signup email uses the `Confirm signup` template, update that template too. The manual OTP input must show `{{ .Token }}`; `{{ .TokenHash }}` is only for links that verify with `token_hash`.
 - The signup flow sends this same `Magic Link / OTP` email with `shouldCreateUser: true`; the application profile is created only after the user verifies the code.
-- Keep the confirmation URL as `{{ .ConfirmationURL }}` if you also keep a link in the email.
 - Set `NEXT_PUBLIC_APP_URL` to the deployed app origin so `{{ .ConfirmationURL }}` points to `/auth/callback` instead of an invalid or blank URL.
 
-The UI verifies the code with the `input-otp` input. The server first verifies the documented numeric OTP type (`email`) and falls back to `signup`/`magiclink` when Supabase returns an invalid/expired token response, which covers projects whose email templates or user state emit one of the older email OTP types. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
+The UI verifies the code with the `input-otp` input. The server verifies the documented numeric OTP type (`email`) for `signInWithOtp`. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
 
 ## Required Environment
 

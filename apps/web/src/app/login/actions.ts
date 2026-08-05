@@ -3,7 +3,6 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
@@ -119,15 +118,6 @@ function getAuthErrorMessage(error: unknown, fallback = genericAuthErrorMessage)
   return fallback;
 }
 
-function getAuthErrorCode(error: unknown) {
-  return error && typeof error === "object" && "code" in error ? String(error.code ?? "") : "";
-}
-
-function isOtpInvalidOrExpired(error: unknown) {
-  const message = error && typeof error === "object" && "message" in error ? String(error.message ?? "").toLowerCase() : "";
-  return getAuthErrorCode(error) === "otp_expired" || message.includes("expired") || message.includes("invalid");
-}
-
 function logAuthActionError(step: string, error: unknown, context?: Record<string, string | number | boolean | undefined>) {
   if (!error || typeof error !== "object") {
     console.error("auth_action_failed", { step, message: String(error), ...context });
@@ -142,35 +132,6 @@ function logAuthActionError(step: string, error: unknown, context?: Record<strin
     code: "code" in error ? error.code : undefined,
     message: "message" in error ? error.message : undefined,
   });
-}
-
-async function verifyEmailOtpWithFallback(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  params: { email: string; token: string; mode: "login" | "signup" },
-) {
-  const types: EmailOtpType[] = params.mode === "signup" ? ["signup", "email", "magiclink"] : ["email", "magiclink"];
-  let lastError: unknown = null;
-
-  for (const type of types) {
-    const result = await supabase.auth.verifyOtp({
-      email: params.email,
-      token: params.token,
-      type,
-    });
-
-    if (!result.error) {
-      return { data: result.data, error: null, type };
-    }
-
-    lastError = result.error;
-    logAuthActionError("verify_email_otp_attempt", result.error, { mode: params.mode, type });
-
-    if (!isOtpInvalidOrExpired(result.error)) {
-      break;
-    }
-  }
-
-  return { data: null, error: lastError, type: undefined };
 }
 
 export async function signInWithGoogleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -309,14 +270,18 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data, error, type } = await verifyEmailOtpWithFallback(supabase, { email, token, mode });
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "email",
+  });
 
   if (error) {
-    logAuthActionError("verify_email_otp", error, { mode, tokenLength: token.length });
+    logAuthActionError("verify_email_otp", error, { mode, tokenLength: token.length, type: "email" });
     return { error: getAuthErrorMessage(error, "This code has expired or is invalid. Request a new code and try again.") };
   }
 
-  console.info("auth_action_succeeded", { step: "verify_email_otp", mode, type });
+  console.info("auth_action_succeeded", { step: "verify_email_otp", mode, type: "email" });
 
   if (mode === "signup" && data?.user) {
     try {
