@@ -41,7 +41,7 @@ export default function LandingPage() {
             Docs
           </Link>
           <Button asChild variant="outline" size="sm">
-            <Link href="/setup">Sign in</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </nav>
       </header>
@@ -64,7 +64,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="/setup">
+              <Link href="/login">
                 Show me what needs me today
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -128,7 +128,7 @@ export default function LandingPage() {
           <p className="mt-4 text-[16px] leading-[1.6] text-[#9AA4BA]">Understand what matters. Then start building.</p>
           <div className="mt-8 flex justify-center gap-3">
             <Button asChild size="lg">
-              <Link href="/setup">Start setup</Link>
+              <Link href="/login">Start setup</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
               <Link href="/today">Preview today</Link>
