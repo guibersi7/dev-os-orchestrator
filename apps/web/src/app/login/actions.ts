@@ -26,6 +26,9 @@ export type AuthActionState = {
 
 const pendingSignupCookie = "standup_pending_signup";
 const genericAuthErrorMessage = "Unable to send the code right now. Check the authentication email provider configuration.";
+const supportedEmailOtpVerifyTypes = ["email", "magiclink", "signup"] as const;
+
+type EmailOtpVerifyType = (typeof supportedEmailOtpVerifyTypes)[number];
 
 async function getRequestOrigin() {
   const headerStore = await headers();
@@ -121,6 +124,27 @@ function getAuthErrorMessage(error: unknown, fallback = genericAuthErrorMessage)
 
 function getAuthErrorCode(error: unknown) {
   return error && typeof error === "object" && "code" in error ? String(error.code ?? "") : "";
+}
+
+function getEmailOtpVerifyType(mode: "login" | "signup"): EmailOtpVerifyType {
+  const modeSpecificValue =
+    mode === "login" ? process.env.SUPABASE_LOGIN_OTP_VERIFY_TYPE : process.env.SUPABASE_SIGNUP_OTP_VERIFY_TYPE;
+  const configuredValue = modeSpecificValue ?? process.env.SUPABASE_EMAIL_OTP_VERIFY_TYPE;
+  const normalizedValue = configuredValue?.trim().toLowerCase();
+
+  if (supportedEmailOtpVerifyTypes.includes(normalizedValue as EmailOtpVerifyType)) {
+    return normalizedValue as EmailOtpVerifyType;
+  }
+
+  if (normalizedValue) {
+    console.warn("auth_action_invalid_config", {
+      step: "email_otp_verify_type",
+      mode,
+      configuredValue: normalizedValue,
+    });
+  }
+
+  return "email";
 }
 
 function logAuthActionError(step: string, error: unknown, context?: Record<string, string | number | boolean | undefined>) {
@@ -280,6 +304,7 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   const token = String(formData.get("otp") ?? "").replace(/\D/g, "");
   const redirectTo = sanitizeAuthRedirect(formData.get("redirect"));
   const mode = formData.get("mode") === "signup" ? "signup" : "login";
+  const verifyType = getEmailOtpVerifyType(mode);
 
   if (!email || token.length < 6) {
     return { error: "Enter the 6-digit code we sent to your email." };
@@ -289,11 +314,11 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   const { data, error } = await otpSupabase.auth.verifyOtp({
     email,
     token,
-    type: "email",
+    type: verifyType,
   });
 
   if (error) {
-    logAuthActionError("verify_email_otp", error, { mode, tokenLength: token.length, type: "email" });
+    logAuthActionError("verify_email_otp", error, { mode, tokenLength: token.length, type: verifyType });
     if (mode === "signup" && getAuthErrorCode(error) === "otp_expired") {
       let reconciledConfirmedSignup = false;
       try {
@@ -316,7 +341,7 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
     return { error: getAuthErrorMessage(error, "This code has expired or is invalid. Request a new code and try again.") };
   }
 
-  console.info("auth_action_succeeded", { step: "verify_email_otp", mode, type: "email" });
+  console.info("auth_action_succeeded", { step: "verify_email_otp", mode, type: verifyType });
 
   if (data.session) {
     const supabase = await createServerSupabaseClient();
