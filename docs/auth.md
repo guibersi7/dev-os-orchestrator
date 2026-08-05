@@ -10,6 +10,7 @@ Supabase sends the email. Configure the Supabase template so the message shows t
 
 - Supabase Dashboard > Authentication > Email Templates.
 - Update the `Magic Link / OTP` template body to include `{{ .Token }}`.
+- If the signup email uses the `Confirm signup` template, update that template too. The manual OTP input must show `{{ .Token }}`; `{{ .TokenHash }}` is only for links that verify with `token_hash`.
 - The signup flow sends this same `Magic Link / OTP` email with `shouldCreateUser: true`; the application profile is created only after the user verifies the code.
 - Keep the confirmation URL as `{{ .ConfirmationURL }}` if you also keep a link in the email.
 - Set `NEXT_PUBLIC_APP_URL` to the deployed app origin so `{{ .ConfirmationURL }}` points to `/auth/callback` instead of an invalid or blank URL.

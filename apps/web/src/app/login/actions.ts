@@ -148,7 +148,7 @@ async function verifyEmailOtpWithFallback(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   params: { email: string; token: string; mode: "login" | "signup" },
 ) {
-  const types: EmailOtpType[] = params.mode === "signup" ? ["email", "signup", "magiclink"] : ["email", "magiclink"];
+  const types: EmailOtpType[] = params.mode === "signup" ? ["signup", "email", "magiclink"] : ["email", "magiclink"];
   let lastError: unknown = null;
 
   for (const type of types) {
