@@ -17,6 +17,8 @@ Supabase sends the email. Configure the Supabase template so the message shows t
 
 The UI verifies the code with the `input-otp` input. The server verifies the documented numeric OTP type (`email`) for `signInWithOtp`. Signup verification writes the profile to `public.users` with the Supabase Auth user id.
 
+OTP emails are sent with a non-PKCE Supabase client so the 6-digit code can be verified directly with `verifyOtp({ email, token, type: "email" })`. The normal SSR client is still used for verification so the resulting session is persisted to cookies.
+
 ## Required Environment
 
 `SUPABASE_SERVICE_ROLE_KEY` is required on the server to check whether an email is registered and to create the `public.users` profile after signup verification.

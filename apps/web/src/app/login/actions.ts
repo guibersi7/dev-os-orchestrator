@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/auth/server";
+import { createOtpSupabaseClient, createServerSupabaseClient } from "@/lib/auth/server";
 import {
   getAuthCallbackUrl,
   isSupabaseAdminConfigured,
@@ -185,7 +185,7 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
   }
 
   const origin = await getRequestOrigin();
-  const supabase = await createServerSupabaseClient();
+  const supabase = createOtpSupabaseClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
@@ -229,7 +229,7 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   }
 
   const origin = await getRequestOrigin();
-  const supabase = await createServerSupabaseClient();
+  const supabase = createOtpSupabaseClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: profile.email,
     options: {

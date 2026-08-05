@@ -38,6 +38,19 @@ export function createAdminSupabaseClient() {
   });
 }
 
+export function createOtpSupabaseClient() {
+  const { url, publishableKey } = getSupabaseAuthConfig();
+
+  return createClient(url, publishableKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      flowType: "implicit",
+      persistSession: false,
+    },
+  });
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   if (!isSupabaseAuthConfigured()) {
     return null;
