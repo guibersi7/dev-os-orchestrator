@@ -24,6 +24,7 @@ export type AuthActionState = {
 };
 
 const pendingSignupCookie = "standup_pending_signup";
+const genericAuthErrorMessage = "Unable to send the code right now. Check the authentication email provider configuration.";
 
 async function getRequestOrigin() {
   const headerStore = await headers();
@@ -104,6 +105,39 @@ function isAuthUserAlreadyRegistered(error: { message?: string; status?: number 
   return error.status === 422 || message.includes("already registered") || message.includes("already exists");
 }
 
+function getAuthErrorMessage(error: unknown, fallback = genericAuthErrorMessage) {
+  if (!error || typeof error !== "object") {
+    return fallback;
+  }
+
+  const candidate = "message" in error ? String(error.message ?? "").trim() : "";
+  if (candidate && candidate !== "{}") {
+    return candidate;
+  }
+
+  const description = "error_description" in error ? String(error.error_description ?? "").trim() : "";
+  if (description && description !== "{}") {
+    return description;
+  }
+
+  return fallback;
+}
+
+function logAuthActionError(step: string, error: unknown) {
+  if (!error || typeof error !== "object") {
+    console.error("auth_action_failed", { step, message: String(error) });
+    return;
+  }
+
+  console.error("auth_action_failed", {
+    step,
+    name: "name" in error ? error.name : undefined,
+    status: "status" in error ? error.status : undefined,
+    code: "code" in error ? error.code : undefined,
+    message: "message" in error ? error.message : undefined,
+  });
+}
+
 export async function signInWithGoogleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   if (!isSupabaseAuthConfigured()) {
     return { error: "Supabase Auth is not configured." };
@@ -146,7 +180,8 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
   try {
     existingProfile = await getUserProfileByEmail(email);
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to check this email." };
+    logAuthActionError("login_profile_lookup", error);
+    return { error: getAuthErrorMessage(error, "Unable to check this email.") };
   }
 
   if (!existingProfile) {
@@ -164,7 +199,8 @@ export async function sendEmailOtpAction(_previousState: AuthActionState, formDa
   });
 
   if (error) {
-    return { error: error.message };
+    logAuthActionError("login_send_otp", error);
+    return { error: getAuthErrorMessage(error) };
   }
 
   redirect(`/login/verify?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirectTo)}&mode=login`);
@@ -192,7 +228,8 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
       return { error: "This email is already registered. Go back and sign in." };
     }
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to check this email." };
+    logAuthActionError("signup_profile_lookup", error);
+    return { error: getAuthErrorMessage(error, "Unable to check this email.") };
   }
 
   const origin = await getRequestOrigin();
@@ -210,7 +247,8 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   });
 
   if (createUserError && !isAuthUserAlreadyRegistered(createUserError)) {
-    return { error: createUserError.message };
+    logAuthActionError("signup_create_auth_user", createUserError);
+    return { error: getAuthErrorMessage(createUserError, "Unable to create the authentication user.") };
   }
 
   const supabase = await createServerSupabaseClient();
@@ -223,7 +261,8 @@ export async function signUpWithEmailOtpAction(_previousState: AuthActionState, 
   });
 
   if (error) {
-    return { error: error.message };
+    logAuthActionError("signup_send_otp", error);
+    return { error: getAuthErrorMessage(error) };
   }
 
   await savePendingSignup(profile);
@@ -253,7 +292,8 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   });
 
   if (error) {
-    return { error: error.message };
+    logAuthActionError("verify_email_otp", error);
+    return { error: getAuthErrorMessage(error, "Unable to verify this code.") };
   }
 
   if (mode === "signup" && data.user) {
@@ -261,7 +301,8 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
       await ensureUserProfile(data.user, await readPendingSignup(email));
       await clearPendingSignup();
     } catch (error) {
-      return { error: error instanceof Error ? error.message : "Unable to create your profile." };
+      logAuthActionError("signup_create_profile", error);
+      return { error: getAuthErrorMessage(error, "Unable to create your profile.") };
     }
   }
 
