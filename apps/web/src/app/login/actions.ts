@@ -27,6 +27,8 @@ export type AuthActionState = {
 const pendingSignupCookie = "standup_pending_signup";
 const genericAuthErrorMessage = "Unable to send the code right now. Check the authentication email provider configuration.";
 const supportedEmailOtpVerifyTypes = ["email", "magiclink", "signup"] as const;
+const emailOtpMinLength = 6;
+const emailOtpMaxLength = 10;
 
 type EmailOtpVerifyType = (typeof supportedEmailOtpVerifyTypes)[number];
 
@@ -306,8 +308,8 @@ export async function verifyEmailOtpAction(_previousState: AuthActionState, form
   const mode = formData.get("mode") === "signup" ? "signup" : "login";
   const verifyType = getEmailOtpVerifyType(mode);
 
-  if (!email || token.length < 6) {
-    return { error: "Enter the 6-digit code we sent to your email." };
+  if (!email || token.length < emailOtpMinLength || token.length > emailOtpMaxLength) {
+    return { error: "Enter the complete code we sent to your email." };
   }
 
   const otpSupabase = createOtpSupabaseClient();

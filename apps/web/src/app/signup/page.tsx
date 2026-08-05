@@ -32,7 +32,7 @@ export default async function SignupPage({
           <p className="text-sm text-muted-foreground">Create your account</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Register before signing in</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            We will send a 6-digit code to confirm your email and finish setup.
+            We will send an access code to confirm your email and finish setup.
           </p>
           {!isAuthConfigured ? (
             <p className="mt-4 rounded-md border border-[#4A3A18] bg-[#241F14] p-3 text-sm text-[#F6C66A]">

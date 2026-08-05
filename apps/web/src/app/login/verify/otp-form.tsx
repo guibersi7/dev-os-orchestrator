@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { type AuthActionState, verifyEmailOtpAction } from "@/app/login/actions";
 
 const initialState: AuthActionState = {};
+const otpMinLength = 6;
+const otpMaxLength = 10;
 
 function OtpSlot({ char, isActive, hasFakeCaret }: SlotProps) {
   return (
@@ -36,12 +38,12 @@ export function OtpForm({ email, redirectTo, mode }: { email: string; redirectTo
       <OTPInput
         value={otp}
         onChange={setOtp}
-        maxLength={6}
+        maxLength={otpMaxLength}
         pattern={REGEXP_ONLY_DIGITS}
         autoFocus
         inputMode="numeric"
         autoComplete="one-time-code"
-        containerClassName="flex justify-center gap-2"
+        containerClassName="flex flex-wrap justify-center gap-2"
         render={({ slots }) => (
           <>
             {slots.map((slot, index) => (
@@ -50,7 +52,7 @@ export function OtpForm({ email, redirectTo, mode }: { email: string; redirectTo
           </>
         )}
       />
-      <Button type="submit" className="h-11 w-full" disabled={pending || otp.length < 6}>
+      <Button type="submit" className="h-11 w-full" disabled={pending || otp.length < otpMinLength}>
         Verify code
         <ArrowRight className="h-4 w-4" />
       </Button>
