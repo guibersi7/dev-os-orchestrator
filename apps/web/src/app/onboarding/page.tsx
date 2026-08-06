@@ -30,7 +30,7 @@ function connectionByService(connections: ConnectionStatus[] | undefined) {
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string }>;
+  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string; reason?: string }>;
 }) {
   const params = await searchParams;
   const connectionsState = await getConnectionsState();
@@ -42,6 +42,16 @@ export default async function OnboardingPage({
   const missingEnv = params?.missing?.split(",").filter(Boolean) ?? [];
   const connectionError = params?.connectionError;
   const failedService = params?.service === "github" ? "GitHub" : params?.service;
+  const connectionErrorTitle =
+    connectionError === "needs_config"
+      ? `${failedService ?? "Provider"} OAuth is not configured yet.`
+      : connectionError === "oauth_callback_failed"
+        ? `${failedService ?? "Provider"} authorization could not be completed.`
+        : "The previous OAuth attempt did not start.";
+  const connectionErrorMessage =
+    connectionError === "oauth_callback_failed"
+      ? "GitHub returned to Standup, but the gateway could not finish the token exchange. Retry after checking the gateway logs."
+      : "Retry the connection. If GitHub opens, this message is only from the previous failed URL.";
 
   return (
     <main className="min-h-screen bg-[#080C15] px-4 py-8 text-brand-ink sm:px-6">
@@ -87,14 +97,8 @@ export default async function OnboardingPage({
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <p className="font-medium">
-                  {connectionError === "needs_config"
-                    ? `${failedService ?? "Provider"} OAuth is not configured yet.`
-                    : "The previous OAuth attempt did not start."}
-                </p>
-                <p className="mt-1">
-                  Retry the connection. If GitHub opens, this message is only from the previous failed URL.
-                </p>
+                <p className="font-medium">{connectionErrorTitle}</p>
+                <p className="mt-1">{connectionErrorMessage}</p>
                 {missingEnv.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {missingEnv.map((env) => (
