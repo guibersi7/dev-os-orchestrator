@@ -438,7 +438,7 @@ OAuth env vars:
 
 - `OAUTH_STATE_SECRET`
 - `TOKEN_SEALING_KEY`
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_OAUTH_SCOPES`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`
 - `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_OAUTH_SCOPES`
 - `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_OAUTH_SCOPES`
 - `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_OAUTH_SCOPES`
@@ -448,10 +448,11 @@ OAuth env vars:
 
 GitHub sync behavior:
 
-- Uses the connected user's GitHub OAuth access token.
+- Uses the connected user's GitHub App OAuth access token to discover accessible app installations.
+- When `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` are set, repository, pull request, issue, review, and check reads use GitHub App installation tokens.
 - If `GITHUB_REPOSITORIES` is set, sync is limited to that comma-separated `owner/repo` list.
-- If `GITHUB_REPOSITORIES` is not set, the connector lists repositories accessible to the authenticated user through `/user/repos`.
-- If `GITHUB_ORGANIZATION` or `GITHUB_ORG` is set, repository discovery uses that organization through `/orgs/{org}/repos`.
+- If `GITHUB_REPOSITORIES` is not set, the connector lists repositories accessible to the authenticated user's GitHub App installations.
+- If `GITHUB_ORGANIZATION` or `GITHUB_ORG` is set, repository discovery is filtered to that organization.
 - For each repository, the connector paginates recent pull requests and issues.
 - For each pull request, the connector fetches reviews, review comments, and failed check runs.
 - Pull request WorkEvents include raw metrics such as review count, review comment count, reviewer count, lead time hours, and time to first review hours.

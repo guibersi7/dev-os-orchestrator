@@ -2,7 +2,14 @@ package integrations
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,12 +23,14 @@ import (
 )
 
 type GitHubConnector struct {
-	info         domain.ConnectorInfo
-	client       *http.Client
-	apiBaseURL   string
-	repositories []string
-	organization string
-	maxPages     int
+	info          domain.ConnectorInfo
+	client        *http.Client
+	apiBaseURL    string
+	repositories  []string
+	organization  string
+	appID         string
+	appPrivateKey string
+	maxPages      int
 }
 
 func NewGitHubConnector() Connector {
@@ -34,11 +43,13 @@ func NewGitHubConnector() Connector {
 			Capabilities: []string{"oauth", "webhooks", "initial_sync", "semantic_context"},
 			Objects:      []string{"pull_requests", "issues", "commits", "reviews", "checks", "releases"},
 		},
-		client:       &http.Client{Timeout: 15 * time.Second},
-		apiBaseURL:   envOrDefault("GITHUB_API_BASE_URL", "https://api.github.com"),
-		repositories: parseRepositories(os.Getenv("GITHUB_REPOSITORIES")),
-		organization: envOrDefault("GITHUB_ORGANIZATION", os.Getenv("GITHUB_ORG")),
-		maxPages:     positiveIntOrDefault(os.Getenv("GITHUB_SYNC_MAX_PAGES"), 3),
+		client:        &http.Client{Timeout: 15 * time.Second},
+		apiBaseURL:    envOrDefault("GITHUB_API_BASE_URL", "https://api.github.com"),
+		repositories:  parseRepositories(os.Getenv("GITHUB_REPOSITORIES")),
+		organization:  envOrDefault("GITHUB_ORGANIZATION", os.Getenv("GITHUB_ORG")),
+		appID:         strings.TrimSpace(os.Getenv("GITHUB_APP_ID")),
+		appPrivateKey: githubAppPrivateKeyFromEnv(),
+		maxPages:      positiveIntOrDefault(os.Getenv("GITHUB_SYNC_MAX_PAGES"), 3),
 	}
 }
 
@@ -52,13 +63,9 @@ func (c *GitHubConnector) FetchRecentRecords(ctx context.Context, _ domain.Gatew
 		return nil, errGitHubNeedsAuth
 	}
 
-	repositories := c.repositories
-	if len(repositories) == 0 {
-		discovered, err := c.fetchRepositories(ctx, accessToken)
-		if err != nil {
-			return nil, err
-		}
-		repositories = discovered
+	repositories, err := c.repositoryAccess(ctx, accessToken, c.repositories)
+	if err != nil {
+		return nil, err
 	}
 
 	return c.fetchRecentRecordsForRepositories(ctx, accessToken, repositories)
@@ -70,7 +77,7 @@ func (c *GitHubConnector) ListSelectableResources(ctx context.Context, _ domain.
 		return nil, errGitHubNeedsAuth
 	}
 
-	repositories, err := c.fetchRepositories(ctx, accessToken)
+	repositories, err := c.repositoryAccess(ctx, accessToken, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +85,13 @@ func (c *GitHubConnector) ListSelectableResources(ctx context.Context, _ domain.
 	resources := make([]domain.SelectableResource, 0, len(repositories))
 	for _, repository := range repositories {
 		resources = append(resources, domain.SelectableResource{
-			ID:          repository,
+			ID:          repository.FullName,
 			Type:        "repository",
-			Name:        repository,
-			ExternalURL: "https://github.com/" + repository,
+			Name:        repository.FullName,
+			ExternalURL: "https://github.com/" + repository.FullName,
 			Metadata: map[string]any{
-				"fullName": repository,
+				"fullName":       repository.FullName,
+				"installationId": repository.InstallationID,
 			},
 		})
 	}
@@ -100,13 +108,18 @@ func (c *GitHubConnector) SyncSelected(ctx context.Context, gatewayContext domai
 		}, nil
 	}
 
-	repositories := selectedGitHubRepositories(selection)
-	if len(repositories) == 0 {
+	selectedRepositories := selectedGitHubRepositories(selection)
+	if len(selectedRepositories) == 0 {
 		return domain.SyncResult{
 			Service: domain.ServiceGitHub,
 			Status:  "needs_selection",
 			Events:  []domain.WorkEvent{},
 		}, nil
+	}
+
+	repositories, err := c.repositoryAccess(ctx, accessToken, selectedRepositories)
+	if err != nil {
+		return domain.SyncResult{}, err
 	}
 
 	records, err := c.fetchRecentRecordsForRepositories(ctx, accessToken, repositories)
@@ -127,36 +140,41 @@ func (c *GitHubConnector) SyncSelected(ctx context.Context, gatewayContext domai
 	}, nil
 }
 
-func (c *GitHubConnector) fetchRecentRecordsForRepositories(ctx context.Context, accessToken string, repositories []string) ([]domain.ExternalRecord, error) {
+func (c *GitHubConnector) fetchRecentRecordsForRepositories(ctx context.Context, fallbackToken string, repositories []githubRepositoryAccess) ([]domain.ExternalRecord, error) {
 	records := []domain.ExternalRecord{}
 	for _, repository := range repositories {
-		pulls, err := c.fetchPullRequests(ctx, accessToken, repository)
+		accessToken := repository.AccessToken
+		if accessToken == "" {
+			accessToken = fallbackToken
+		}
+
+		pulls, err := c.fetchPullRequests(ctx, accessToken, repository.FullName)
 		if err != nil {
 			return nil, err
 		}
 		for _, pull := range pulls {
-			reviews, err := c.fetchPullReviews(ctx, accessToken, repository, pull.Number)
+			reviews, err := c.fetchPullReviews(ctx, accessToken, repository.FullName, pull.Number)
 			if err != nil {
 				return nil, err
 			}
-			reviewComments, err := c.fetchPullReviewComments(ctx, accessToken, repository, pull.Number)
+			reviewComments, err := c.fetchPullReviewComments(ctx, accessToken, repository.FullName, pull.Number)
 			if err != nil {
 				return nil, err
 			}
-			records = append(records, pull.toRecord(repository, reviews, reviewComments))
+			records = append(records, pull.toRecord(repository.FullName, reviews, reviewComments))
 
-			checkRuns, err := c.fetchCheckRuns(ctx, accessToken, repository, pull.Head.SHA)
+			checkRuns, err := c.fetchCheckRuns(ctx, accessToken, repository.FullName, pull.Head.SHA)
 			if err != nil {
 				return nil, err
 			}
 			for _, checkRun := range checkRuns {
 				if checkRun.isFailed() {
-					records = append(records, checkRun.toRecord(repository, pull.Number))
+					records = append(records, checkRun.toRecord(repository.FullName, pull.Number))
 				}
 			}
 		}
 
-		issues, err := c.fetchIssues(ctx, accessToken, repository)
+		issues, err := c.fetchIssues(ctx, accessToken, repository.FullName)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +182,7 @@ func (c *GitHubConnector) fetchRecentRecordsForRepositories(ctx context.Context,
 			if issue.PullRequest != nil {
 				continue
 			}
-			records = append(records, issue.toRecord(repository))
+			records = append(records, issue.toRecord(repository.FullName))
 		}
 	}
 
@@ -250,7 +268,7 @@ func (c *GitHubConnector) fetchRepositories(ctx context.Context, token string) (
 	seen := map[string]bool{}
 	repositories := []string{}
 	for _, installation := range installations {
-		installationRepositories, err := c.fetchInstallationRepositories(ctx, token, installation.ID)
+		installationRepositories, err := c.fetchUserInstallationRepositories(ctx, token, installation.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -269,6 +287,76 @@ func (c *GitHubConnector) fetchRepositories(ctx context.Context, token string) (
 	return repositories, nil
 }
 
+func (c *GitHubConnector) repositoryAccess(ctx context.Context, userToken string, selected []string) ([]githubRepositoryAccess, error) {
+	if c.githubAppConfigured() {
+		return c.githubAppRepositoryAccess(ctx, userToken, selected)
+	}
+
+	repositories := selected
+	if len(repositories) == 0 {
+		discovered, err := c.fetchRepositories(ctx, userToken)
+		if err != nil {
+			return nil, err
+		}
+		repositories = discovered
+	}
+
+	access := make([]githubRepositoryAccess, 0, len(repositories))
+	for _, repository := range repositories {
+		access = append(access, githubRepositoryAccess{FullName: repository, AccessToken: userToken})
+	}
+	return access, nil
+}
+
+func (c *GitHubConnector) githubAppRepositoryAccess(ctx context.Context, userToken string, selected []string) ([]githubRepositoryAccess, error) {
+	installations, err := c.fetchInstallations(ctx, userToken)
+	if err != nil {
+		return nil, err
+	}
+
+	selectedSet := map[string]bool{}
+	for _, repository := range selected {
+		selectedSet[repository] = true
+	}
+
+	seen := map[string]bool{}
+	access := []githubRepositoryAccess{}
+	for _, installation := range installations {
+		installationToken, err := c.createInstallationToken(ctx, installation.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		repositories, err := c.fetchInstallationRepositories(ctx, installationToken)
+		if err != nil {
+			return nil, err
+		}
+		for _, repository := range repositories {
+			if repository.FullName == "" || repository.Archived || seen[repository.FullName] {
+				continue
+			}
+			if c.organization != "" && !strings.HasPrefix(repository.FullName, c.organization+"/") {
+				continue
+			}
+			if len(selectedSet) > 0 && !selectedSet[repository.FullName] {
+				continue
+			}
+
+			seen[repository.FullName] = true
+			access = append(access, githubRepositoryAccess{
+				FullName:       repository.FullName,
+				InstallationID: installation.ID,
+				AccessToken:    installationToken,
+			})
+		}
+	}
+
+	if len(access) == 0 {
+		return nil, errGitHubRepositoriesNotConfigured
+	}
+	return access, nil
+}
+
 func (c *GitHubConnector) fetchInstallations(ctx context.Context, token string) ([]githubInstallation, error) {
 	installations := []githubInstallation{}
 	for page := 1; page <= c.maxPages; page++ {
@@ -285,7 +373,7 @@ func (c *GitHubConnector) fetchInstallations(ctx context.Context, token string) 
 	return installations, nil
 }
 
-func (c *GitHubConnector) fetchInstallationRepositories(ctx context.Context, token string, installationID int64) ([]githubRepository, error) {
+func (c *GitHubConnector) fetchUserInstallationRepositories(ctx context.Context, token string, installationID int64) ([]githubRepository, error) {
 	repositories := []githubRepository{}
 	for page := 1; page <= c.maxPages; page++ {
 		var response githubInstallationReposResponse
@@ -299,6 +387,41 @@ func (c *GitHubConnector) fetchInstallationRepositories(ctx context.Context, tok
 		}
 	}
 	return repositories, nil
+}
+
+func (c *GitHubConnector) fetchInstallationRepositories(ctx context.Context, token string) ([]githubRepository, error) {
+	repositories := []githubRepository{}
+	for page := 1; page <= c.maxPages; page++ {
+		var response githubInstallationReposResponse
+		path := fmt.Sprintf("installation/repositories?per_page=100&page=%d", page)
+		if err := c.get(ctx, token, path, &response); err != nil {
+			return nil, err
+		}
+		repositories = append(repositories, response.Repositories...)
+		if len(response.Repositories) < 100 {
+			break
+		}
+	}
+	return repositories, nil
+}
+
+func (c *GitHubConnector) createInstallationToken(ctx context.Context, installationID int64) (string, error) {
+	jwt, err := c.githubAppJWT()
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	path := fmt.Sprintf("app/installations/%d/access_tokens", installationID)
+	if err := c.post(ctx, jwt, path, nil, &response); err != nil {
+		return "", err
+	}
+	if response.Token == "" {
+		return "", errors.New("github app installation token response did not include token")
+	}
+	return response.Token, nil
 }
 
 func (c *GitHubConnector) fetchOrganizationRepositories(ctx context.Context, token string) ([]string, error) {
@@ -427,6 +550,105 @@ func (c *GitHubConnector) get(ctx context.Context, token string, path string, ou
 	return json.NewDecoder(resp.Body).Decode(output)
 }
 
+func (c *GitHubConnector) post(ctx context.Context, token string, path string, input any, output any) error {
+	var body strings.Reader
+	if input != nil {
+		payload, err := json.Marshal(input)
+		if err != nil {
+			return err
+		}
+		body = *strings.NewReader(string(payload))
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.apiBaseURL, "/")+"/"+path, &body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("accept", "application/vnd.github+json")
+	req.Header.Set("authorization", "Bearer "+token)
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("x-github-api-version", "2022-11-28")
+	req.Header.Set("user-agent", "developer-os-api")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("github api request failed: %s", resp.Status)
+	}
+
+	if output == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(output)
+}
+
+func (c *GitHubConnector) githubAppConfigured() bool {
+	return c.appID != "" && strings.TrimSpace(c.appPrivateKey) != ""
+}
+
+func (c *GitHubConnector) githubAppJWT() (string, error) {
+	privateKey, err := parseGitHubAppPrivateKey(c.appPrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now().UTC()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
+	payloadBytes, err := json.Marshal(map[string]any{
+		"iat": now.Add(-60 * time.Second).Unix(),
+		"exp": now.Add(9 * time.Minute).Unix(),
+		"iss": c.appID,
+	})
+	if err != nil {
+		return "", err
+	}
+	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
+	unsigned := header + "." + payload
+	sum := sha256.Sum256([]byte(unsigned))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, sum[:])
+	if err != nil {
+		return "", err
+	}
+
+	return unsigned + "." + base64.RawURLEncoding.EncodeToString(signature), nil
+}
+
+func parseGitHubAppPrivateKey(value string) (*rsa.PrivateKey, error) {
+	key := strings.TrimSpace(strings.ReplaceAll(value, `\n`, "\n"))
+	if key == "" {
+		return nil, errors.New("github app private key is required")
+	}
+	if !strings.Contains(key, "BEGIN") {
+		decoded, err := base64.StdEncoding.DecodeString(key)
+		if err != nil {
+			return nil, errors.New("github app private key must be PEM or base64-encoded PEM")
+		}
+		key = string(decoded)
+	}
+
+	block, _ := pem.Decode([]byte(key))
+	if block == nil {
+		return nil, errors.New("github app private key PEM could not be decoded")
+	}
+	if parsed, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return parsed, nil
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("github app private key must be RSA")
+	}
+	return privateKey, nil
+}
+
 type githubUser struct {
 	Login string `json:"login"`
 }
@@ -434,6 +656,12 @@ type githubUser struct {
 type githubRepository struct {
 	FullName string `json:"full_name"`
 	Archived bool   `json:"archived"`
+}
+
+type githubRepositoryAccess struct {
+	FullName       string
+	InstallationID int64
+	AccessToken    string
 }
 
 type githubInstallationsResponse struct {
@@ -635,6 +863,16 @@ func githubAccessToken(token *domain.ProviderToken) string {
 	}
 
 	return strings.TrimSpace(os.Getenv("GITHUB_ACCESS_TOKEN"))
+}
+
+func githubAppPrivateKeyFromEnv() string {
+	if value := strings.TrimSpace(os.Getenv("GITHUB_APP_PRIVATE_KEY")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("GITHUB_APP_PRIVATE_KEY_BASE64")); value != "" {
+		return value
+	}
+	return ""
 }
 
 func selectedGitHubRepositories(selection domain.ResourceSelection) []string {

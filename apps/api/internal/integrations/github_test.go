@@ -2,10 +2,15 @@ package integrations
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -259,10 +264,76 @@ func TestGitHubFetchRepositoriesFlattensInstallations(t *testing.T) {
 	}
 }
 
+func TestGitHubAppListResourcesUsesInstallationToken(t *testing.T) {
+	privateKey := testGitHubAppPrivateKey(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/user/installations":
+			if r.Header.Get("authorization") != "Bearer user-token" {
+				t.Fatalf("expected user token for installations, got %q", r.Header.Get("authorization"))
+			}
+			writeJSON(t, w, map[string]any{
+				"installations": []map[string]any{{"id": 42}},
+			})
+		case "/app/installations/42/access_tokens":
+			auth := r.Header.Get("authorization")
+			if !strings.HasPrefix(auth, "Bearer ") || auth == "Bearer user-token" {
+				t.Fatalf("expected GitHub App JWT for installation token, got %q", auth)
+			}
+			writeJSON(t, w, map[string]any{"token": "installation-token"})
+		case "/installation/repositories":
+			if r.Header.Get("authorization") != "Bearer installation-token" {
+				t.Fatalf("expected installation token for repositories, got %q", r.Header.Get("authorization"))
+			}
+			writeJSON(t, w, map[string]any{
+				"repositories": []map[string]any{
+					{"full_name": "owner/repo", "archived": false},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &GitHubConnector{
+		info:          NewGitHubConnector().Info(),
+		client:        server.Client(),
+		apiBaseURL:    server.URL,
+		appID:         "12345",
+		appPrivateKey: privateKey,
+		maxPages:      1,
+	}
+
+	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "user-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resources) != 1 || resources[0].ID != "owner/repo" {
+		t.Fatalf("expected owner/repo resource, got %#v", resources)
+	}
+	if resources[0].Metadata["installationId"] != int64(42) {
+		t.Fatalf("expected installation metadata, got %#v", resources[0].Metadata)
+	}
+}
+
 func writeJSON(t *testing.T, w http.ResponseWriter, payload any) {
 	t.Helper()
 	w.Header().Set("content-type", "application/json")
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func testGitHubAppPrivateKey(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}))
 }
