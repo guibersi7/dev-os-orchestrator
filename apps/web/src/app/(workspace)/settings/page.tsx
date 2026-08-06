@@ -107,9 +107,9 @@ export default async function SettingsPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button asChild size="sm" variant={connected ? "secondary" : "default"}>
-                    <Link href={`/api/integrations/${integration.id}/connect`}>
+                    <a href={`/api/integrations/${integration.id}/connect`}>
                       {connected ? "Reconnect" : "Connect"}
-                    </Link>
+                    </a>
                   </Button>
                   <form action={syncConnectionAction}>
                     <input type="hidden" name="service" value={integration.id} />

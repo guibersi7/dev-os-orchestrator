@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 import { startOAuthConnection } from "@/lib/api-client";
+import { getPublicAppUrlFromHeaders } from "@/lib/app-url";
 
 export default async function ConnectIntegrationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,9 +18,10 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
   }
 
   const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-  const callbackUrl = `${protocol}://${host}/api/integrations/${integration.id}/callback`;
+  const callbackUrl = getPublicAppUrlFromHeaders(
+    `/api/integrations/${integration.id}/callback`,
+    requestHeaders,
+  ).toString();
   const oauthState = await startOAuthConnection(integration.id, callbackUrl);
   const data = oauthState.data;
 
@@ -73,15 +75,15 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/settings">
-            <Button variant="secondary">Return to Connection Center</Button>
-          </Link>
-          <Link href={`/integrations/${integration.id}`}>
-            <Button variant="ghost">
+          <Button asChild variant="secondary">
+            <Link href="/settings">Return to Connection Center</Link>
+          </Button>
+          <Button asChild variant="ghost">
+            <Link href={`/integrations/${integration.id}`}>
               View connector details
               <ExternalLink className="h-4 w-4" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </Card>
     </div>

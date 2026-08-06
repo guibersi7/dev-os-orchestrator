@@ -1,3 +1,5 @@
+import { getGatewayUserId } from "@/lib/auth/server";
+
 export type Service = "github" | "slack" | "linear" | "jira" | "trello" | "notion" | "calendar";
 
 export type Workspace = {
@@ -189,7 +191,6 @@ type APIEnvelope<T> = {
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const WORKSPACE_ID = process.env.NEXT_PUBLIC_WORKSPACE_ID ?? "00000000-0000-4000-8000-000000000001";
-const USER_ID = process.env.NEXT_PUBLIC_USER_ID ?? "00000000-0000-4000-8000-000000000002";
 
 class GatewayError extends Error {
   constructor(
@@ -203,10 +204,11 @@ class GatewayError extends Error {
 }
 
 async function requestGateway<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const userId = await getGatewayUserId();
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   headers.set("x-workspace-id", WORKSPACE_ID);
-  headers.set("x-user-id", USER_ID);
+  headers.set("x-user-id", userId);
   headers.set("x-request-id", `web_${Date.now().toString(36)}`);
 
   if (process.env.API_GATEWAY_SECRET) {

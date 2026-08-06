@@ -30,7 +30,7 @@ function connectionByService(connections: ConnectionStatus[] | undefined) {
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string }>;
+  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string; reason?: string }>;
 }) {
   const params = await searchParams;
   const connectionsState = await getConnectionsState();
@@ -42,6 +42,16 @@ export default async function OnboardingPage({
   const missingEnv = params?.missing?.split(",").filter(Boolean) ?? [];
   const connectionError = params?.connectionError;
   const failedService = params?.service === "github" ? "GitHub" : params?.service;
+  const connectionErrorTitle =
+    connectionError === "needs_config"
+      ? `${failedService ?? "Provider"} OAuth is not configured yet.`
+      : connectionError === "oauth_callback_failed"
+        ? `${failedService ?? "Provider"} authorization could not be completed.`
+        : "The previous OAuth attempt did not start.";
+  const connectionErrorMessage =
+    connectionError === "oauth_callback_failed"
+      ? "GitHub returned to Standup, but the gateway could not finish the token exchange. Retry after checking the gateway logs."
+      : "Retry the connection. If GitHub opens, this message is only from the previous failed URL.";
 
   return (
     <main className="min-h-screen bg-[#080C15] px-4 py-8 text-brand-ink sm:px-6">
@@ -62,18 +72,18 @@ export default async function OnboardingPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link href="/api/integrations/github/connect">
-              <Button>
+            <Button asChild>
+              <a href="/api/integrations/github/connect">
                 <GitPullRequest className="h-4 w-4" />
                 Connect GitHub
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button variant="secondary">
+              </a>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/dashboard">
                 Open dashboard
                 <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </header>
 
@@ -87,14 +97,8 @@ export default async function OnboardingPage({
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <p className="font-medium">
-                  {connectionError === "needs_config"
-                    ? `${failedService ?? "Provider"} OAuth is not configured yet.`
-                    : "Unable to start OAuth."}
-                </p>
-                <p className="mt-1">
-                  The Connect GitHub button now starts OAuth directly. Configure the gateway env vars and retry.
-                </p>
+                <p className="font-medium">{connectionErrorTitle}</p>
+                <p className="mt-1">{connectionErrorMessage}</p>
                 {missingEnv.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {missingEnv.map((env) => (
@@ -104,6 +108,12 @@ export default async function OnboardingPage({
                     ))}
                   </div>
                 ) : null}
+                <Button asChild size="sm" className="mt-4">
+                  <a href="/api/integrations/github/connect">
+                    Retry GitHub
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                </Button>
               </div>
             </div>
           </Card>
@@ -154,12 +164,12 @@ export default async function OnboardingPage({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Link href="/api/integrations/github/connect">
-                    <Button>
+                  <Button asChild>
+                    <a href="/api/integrations/github/connect">
                       {githubConnected ? "Reconnect GitHub" : "Connect GitHub"}
                       <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                    </a>
+                  </Button>
                   <form action={syncConnectionAction}>
                     <input type="hidden" name="service" value="github" />
                     <Button variant="secondary" disabled={!githubConnected}>
@@ -194,9 +204,9 @@ export default async function OnboardingPage({
               <h2 className="text-base font-semibold">Add more context later</h2>
               <p className="mt-2 text-sm text-[#6A7489]">After GitHub is working, connect planning, docs, chat, and calendar with the same OAuth pattern.</p>
             </div>
-            <Link href="/settings">
-              <Button variant="secondary">Open all integrations</Button>
-            </Link>
+            <Button asChild variant="secondary">
+              <Link href="/settings">Open all integrations</Link>
+            </Button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {nextServices.map((integration) => {
@@ -205,7 +215,7 @@ export default async function OnboardingPage({
               const Icon = integration.icon;
 
               return (
-                <Link
+                <a
                   key={integration.id}
                   href={`/api/integrations/${integration.id}/connect`}
                   className="rounded-md border border-brand-border bg-[#121826] p-4 transition-colors hover:border-brand-primary"
@@ -223,7 +233,7 @@ export default async function OnboardingPage({
                     <Badge tone={statusTone(status)}>{status.replaceAll("_", " ")}</Badge>
                   </div>
                   <p className="mt-3 text-xs font-medium text-[#6A7489]">OAuth user connection</p>
-                </Link>
+                </a>
               );
             })}
           </div>

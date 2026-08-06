@@ -161,6 +161,9 @@ func RefreshToken(ctx context.Context, client *http.Client, provider Provider, r
 
 func responseScopes(scope string, fallback []string) []string {
 	if strings.TrimSpace(scope) == "" {
+		if fallback == nil {
+			return []string{}
+		}
 		return fallback
 	}
 

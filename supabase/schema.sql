@@ -5,9 +5,23 @@ create table if not exists public.users (
   email text,
   name text,
   avatar_url text,
+  phone text,
+  birth_date date,
+  profession text,
+  company text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.users
+  add column if not exists phone text,
+  add column if not exists birth_date date,
+  add column if not exists profession text,
+  add column if not exists company text;
+
+create unique index if not exists users_email_lower_idx
+  on public.users (lower(email))
+  where email is not null;
 
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),

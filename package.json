@@ -14,5 +14,9 @@
     "lint": "npm run lint:web",
     "lint:web": "npm run lint --workspace @devos/web",
     "test:api": "cd apps/api && go test ./..."
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",
+    "lightningcss-linux-x64-gnu": "^1.32.0"
   }
 }

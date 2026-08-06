@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Bell, GitPullRequest, LayoutDashboard, MessageSquareText, Settings } from "lucide-react";
+import { Bell, GitPullRequest, LayoutDashboard, LogOut, MessageSquareText, Settings } from "lucide-react";
+import { signOutAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/lib/auth/server";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -9,7 +11,10 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
+  const userLabel = user?.email ?? "Signed in";
+
   return (
     <div className="min-h-screen bg-[#080C15] text-brand-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-brand-border bg-[#121826] px-4 py-5 lg:block">
@@ -19,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span>
             <span className="block text-sm font-semibold">Standup</span>
-            <span className="block text-xs text-[#6A7489]">Acme Engineering</span>
+            <span className="block max-w-[170px] truncate text-xs text-[#6A7489]">{userLabel}</span>
           </span>
         </Link>
         <nav className="mt-8 space-y-1">
@@ -52,6 +57,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button variant="secondary" size="sm">
                 Sync now
               </Button>
+              <form action={signOutAction}>
+                <Button variant="ghost" size="icon" aria-label="Sign out">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </form>
             </div>
           </div>
         </header>

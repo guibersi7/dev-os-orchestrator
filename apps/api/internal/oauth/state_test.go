@@ -46,3 +46,13 @@ func TestStateRejectsWrongSecret(t *testing.T) {
 		t.Fatal("expected invalid state signature")
 	}
 }
+
+func TestResponseScopesReturnsEmptySliceWhenProviderAndFallbackAreEmpty(t *testing.T) {
+	scopes := responseScopes("", nil)
+	if scopes == nil {
+		t.Fatal("expected empty slice, got nil")
+	}
+	if len(scopes) != 0 {
+		t.Fatalf("expected no scopes, got %v", scopes)
+	}
+}

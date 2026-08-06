@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Check } from "lucide-react";
 import { SetupShell } from "@/components/setup/setup-shell";
 import { Button } from "@/components/ui/button";
@@ -67,7 +66,7 @@ export default function SetupConnectPage() {
             </div>
             <div className="text-right">
               <Button asChild>
-                <Link href={`/api/integrations/github/connect?queue=${defaultConnectedIds.join(",")}&i=0`}>Authorize {selectedCount} tools</Link>
+                <a href={`/api/integrations/github/connect?queue=${defaultConnectedIds.join(",")}&i=0`}>Authorize {selectedCount} tools</a>
               </Button>
               <p className="mt-2 max-w-[300px] text-[12.5px] text-[#6A7489]">You will authorize them one after another. Each one takes about 20 seconds.</p>
             </div>

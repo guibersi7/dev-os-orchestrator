@@ -38,8 +38,8 @@ and PR/issue fetching are **unchanged**.
 Create a **GitHub App** (Settings → Developer settings → GitHub Apps → New):
 
 - **Name:** `standup-<unique suffix>`
-- **Homepage URL:** `https://standup-snowy.vercel.app`
-- **Callback URL:** `https://standup-snowy.vercel.app/api/integrations/github/callback`
+- **Homepage URL:** `https://www.standupmorning.com`
+- **Callback URL:** `https://www.standupmorning.com/api/integrations/github/callback`
 - ✅ **Request user authorization (OAuth) during installation**
 - ❌ **Expire user authorization tokens** (disabled)
 - **Webhook:** *Active* unchecked (not used yet)

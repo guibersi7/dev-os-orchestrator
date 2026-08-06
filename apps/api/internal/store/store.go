@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -671,7 +672,7 @@ func (s *SupabaseStore) UpsertToken(ctx context.Context, gatewayCtx domain.Gatew
 		"encrypted_access_token":  seal(token.AccessToken),
 		"encrypted_refresh_token": nullable(seal(token.RefreshToken)),
 		"expires_at":              nullable(token.ExpiresAt),
-		"scopes":                  token.Scopes,
+		"scopes":                  normalizedScopes(token.Scopes),
 		"updated_at":              time.Now().UTC(),
 	}
 
@@ -962,7 +963,12 @@ func (s *SupabaseStore) rest(ctx context.Context, method string, path string, in
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return errors.New(resp.Status)
+		details, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		message := strings.TrimSpace(string(details))
+		if message == "" {
+			return errors.New(resp.Status)
+		}
+		return fmt.Errorf("%s: %s", resp.Status, message)
 	}
 
 	if output == nil {
@@ -999,6 +1005,13 @@ func seal(token string) string {
 	}
 
 	return "sealed:" + base64.StdEncoding.EncodeToString([]byte(token))
+}
+
+func normalizedScopes(scopes []string) []string {
+	if scopes == nil {
+		return []string{}
+	}
+	return scopes
 }
 
 func unseal(value string) string {
