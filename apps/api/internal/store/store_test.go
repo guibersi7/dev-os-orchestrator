@@ -108,6 +108,16 @@ func TestMemoryStoreScopesTokensByWorkspaceUserAndService(t *testing.T) {
 	}
 }
 
+func TestNormalizedScopesConvertsNilToEmptySlice(t *testing.T) {
+	scopes := normalizedScopes(nil)
+	if scopes == nil {
+		t.Fatal("expected empty slice, got nil")
+	}
+	if len(scopes) != 0 {
+		t.Fatalf("expected no scopes, got %v", scopes)
+	}
+}
+
 func TestMemoryStoreDeduplicatesDocumentChunksByServiceAndExternalID(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
