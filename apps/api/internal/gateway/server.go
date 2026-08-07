@@ -317,7 +317,7 @@ func (s *Server) saveResourceSelection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	selection, err := s.store.SaveResourceSelection(r.Context(), ctx, service, input.Resources)
+	selection, err := s.store.SaveResourceSelection(r.Context(), ctx, service, input.Resources, input.Settings)
 	if err != nil {
 		s.writeError(w, ctx, http.StatusInternalServerError, "selection_write_failed", err.Error(), map[string]any{"service": service})
 		return

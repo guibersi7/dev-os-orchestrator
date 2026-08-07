@@ -29,7 +29,7 @@ export function IntegrationEmptyState({
       <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
       {service ? (
         <Button asChild className="mt-6">
-          <a href={`/api/integrations/${service}/connect`}>
+          <a href={`/integrations/${service}/connect`}>
             {actionLabel}
             <ArrowUpRight className="h-4 w-4" />
           </a>

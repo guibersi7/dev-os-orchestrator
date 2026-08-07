@@ -56,8 +56,8 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 		writeSlackJSON(t, w, map[string]any{
 			"ok": true,
 			"channels": []map[string]any{
-				{"id": "C123", "name": "eng"},
-				{"id": "C999", "name": "release"},
+				{"id": "C123", "name": "eng", "is_private": false},
+				{"id": "G999", "name": "leadership", "is_private": true},
 			},
 		})
 	}))
@@ -77,8 +77,11 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
-	if resources[0].ID != "C123" || resources[0].Type != "channel" || resources[0].Name != "#eng" {
+	if resources[0].ID != "C123" || resources[0].Type != "public_channel" || resources[0].Name != "#eng" {
 		t.Fatalf("unexpected first resource: %#v", resources[0])
+	}
+	if resources[1].ID != "G999" || resources[1].Type != "private_channel" || resources[1].Name != "#leadership" {
+		t.Fatalf("unexpected second resource: %#v", resources[1])
 	}
 }
 

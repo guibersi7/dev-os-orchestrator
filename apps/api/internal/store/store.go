@@ -42,7 +42,7 @@ type Store interface {
 	ListConnectionStatuses(context.Context, domain.GatewayContext) ([]domain.ConnectionStatus, error)
 	DisconnectConnection(context.Context, domain.GatewayContext, domain.Service) (domain.ConnectionStatus, error)
 	GetResourceSelection(context.Context, domain.GatewayContext, domain.Service) (domain.ResourceSelection, error)
-	SaveResourceSelection(context.Context, domain.GatewayContext, domain.Service, []domain.SelectableResource) (domain.ResourceSelection, error)
+	SaveResourceSelection(context.Context, domain.GatewayContext, domain.Service, []domain.SelectableResource, map[string]any) (domain.ResourceSelection, error)
 }
 
 func NewFromEnv() Store {
@@ -283,12 +283,13 @@ func (s *MemoryStore) GetResourceSelection(_ context.Context, ctx domain.Gateway
 	return selection, nil
 }
 
-func (s *MemoryStore) SaveResourceSelection(_ context.Context, ctx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource) (domain.ResourceSelection, error) {
+func (s *MemoryStore) SaveResourceSelection(_ context.Context, ctx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource, settings map[string]any) (domain.ResourceSelection, error) {
 	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	selection := domain.ResourceSelection{
 		Service:     service,
 		Status:      "selected",
 		Resources:   resources,
+		Settings:    settings,
 		SelectedAt:  time.Now().UTC(),
 		SelectedBy:  ctx.UserID,
 		ResourceIDs: resourceIDs(resources),
@@ -895,13 +896,14 @@ func (s *SupabaseStore) GetResourceSelection(ctx context.Context, gatewayCtx dom
 		Service:     service,
 		Status:      "selected",
 		Resources:   resources,
+		Settings:    rows[0].Settings,
 		SelectedAt:  selectedAt,
 		SelectedBy:  gatewayCtx.UserID,
 		ResourceIDs: resourceIDs(resources),
 	}, nil
 }
 
-func (s *SupabaseStore) SaveResourceSelection(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource) (domain.ResourceSelection, error) {
+func (s *SupabaseStore) SaveResourceSelection(ctx context.Context, gatewayCtx domain.GatewayContext, service domain.Service, resources []domain.SelectableResource, extraSettings map[string]any) (domain.ResourceSelection, error) {
 	if err := s.ensureWorkspace(ctx, gatewayCtx); err != nil {
 		return domain.ResourceSelection{}, err
 	}
@@ -911,6 +913,12 @@ func (s *SupabaseStore) SaveResourceSelection(ctx context.Context, gatewayCtx do
 		"selectedResources": resources,
 		"selectedBy":        gatewayCtx.UserID,
 		"selectedAt":        selectedAt,
+	}
+	for key, value := range extraSettings {
+		if key == "selectedResources" || key == "selectedBy" || key == "selectedAt" {
+			continue
+		}
+		settings[key] = value
 	}
 	row := map[string]any{
 		"workspace_id": gatewayCtx.WorkspaceID,
@@ -928,6 +936,7 @@ func (s *SupabaseStore) SaveResourceSelection(ctx context.Context, gatewayCtx do
 		Service:     service,
 		Status:      "selected",
 		Resources:   resources,
+		Settings:    settings,
 		SelectedAt:  selectedAt,
 		SelectedBy:  gatewayCtx.UserID,
 		ResourceIDs: resourceIDs(resources),

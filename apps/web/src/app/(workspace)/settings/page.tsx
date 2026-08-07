@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ExternalLink, PlugZap, RefreshCw, Unplug } from "lucide-react";
+import { AlertTriangle, ArrowRight, ExternalLink, PlugZap, RefreshCw, Unplug } from "lucide-react";
 import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { integrationCatalog } from "@/features/integrations/catalog";
+import { getIntegrationCatalogItem, integrationCatalog } from "@/features/integrations/catalog";
 import { type ConnectionStatus, getConfigState, getConnectionsState } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/dashboard-view-model";
 import { disconnectConnectionAction, syncConnectionAction } from "./actions";
@@ -29,11 +29,30 @@ function connectionByService(connections: ConnectionStatus[] | undefined) {
   return new Map(connections?.map((connection) => [connection.service, connection]) ?? []);
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string }>;
+}) {
+  const params = await searchParams;
   const [configState, connectionsState] = await Promise.all([getConfigState(), getConnectionsState()]);
   const config = configState.data?.config;
   const connections = connectionByService(connectionsState.data?.connections);
   const visibleSources = new Set(config?.dashboardPreferences.visibleSources ?? []);
+  const failedIntegration = params?.service ? getIntegrationCatalogItem(params.service) : undefined;
+  const failedServiceName = failedIntegration?.name ?? params?.service ?? "Provider";
+  const missingEnv = params?.missing?.split(",").filter(Boolean) ?? [];
+  const connectionError = params?.connectionError;
+  const connectionErrorTitle =
+    connectionError === "unknown_service"
+      ? "This integration is not available."
+      : connectionError === "needs_config"
+        ? `${failedServiceName} OAuth is not configured yet.`
+        : `${failedServiceName} connection could not start.`;
+  const connectionErrorMessage =
+    connectionError === "needs_config"
+      ? `Add the missing ${failedServiceName} OAuth environment variables to the API Gateway environment and retry.`
+      : `Retry ${failedServiceName} from this page after checking the gateway response.`;
 
   return (
     <SpringReveal className="mx-auto max-w-6xl space-y-6">
@@ -46,6 +65,34 @@ export default async function SettingsPage() {
       ) : null}
       {connectionsState.error ? (
         <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">{connectionsState.error}</Card>
+      ) : null}
+      {connectionError ? (
+        <Card className="border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-1 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium">{connectionErrorTitle}</p>
+              <p className="mt-1">{connectionErrorMessage}</p>
+              {missingEnv.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {missingEnv.map((env) => (
+                    <code key={env} className="rounded-md bg-[#121826] px-2 py-1 text-xs text-[#F6C66A]">
+                      {env}
+                    </code>
+                  ))}
+                </div>
+              ) : null}
+              {failedIntegration ? (
+                <Button asChild size="sm" className="mt-4">
+                  <a href={`/integrations/${failedIntegration.id}/connect`}>
+                    Retry {failedIntegration.name}
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Card>
       ) : null}
 
       <Card className="p-5">
@@ -107,8 +154,8 @@ export default async function SettingsPage() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button asChild size="sm" variant={connected ? "secondary" : "default"}>
-                    <a href={`/api/integrations/${integration.id}/connect`}>
-                      {connected ? "Reconnect" : "Connect"}
+                    <a href={`/integrations/${integration.id}/connect`}>
+                      {connected ? `Reconnect ${integration.name}` : `Connect ${integration.name}`}
                     </a>
                   </Button>
                   <form action={syncConnectionAction}>

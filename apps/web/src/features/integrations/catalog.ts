@@ -17,6 +17,27 @@ export type IntegrationCatalogItem = {
   syncMode: string;
   objects: string[];
   icon: LucideIcon;
+  connect?: {
+    preConnectTitle: string;
+    preConnectDescription: string;
+    permissionBullets: string[];
+    continueLabel: string;
+  };
+  resources?: {
+    title: string;
+    description: string;
+    resourceSelectionLabel: string;
+    firstSyncLabel: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    setupQuestions: {
+      contextChannels: string;
+      privateChannels: string;
+      privateChannelsHelp: string;
+      extractionTypes: string;
+      syncWindow: string;
+    };
+  };
 };
 
 export const integrationCatalog: IntegrationCatalogItem[] = [
@@ -37,6 +58,34 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     syncMode: "incremental_polling",
     objects: ["channels", "messages", "threads", "decisions", "blockers"],
     icon: MessageSquareText,
+    connect: {
+      preConnectTitle: "Vamos conectar seu workspace Slack.",
+      preConnectDescription:
+        "Standup reads selected channels to detect decisions, blockers, and relevant threads. You will choose channels after authorizing Slack.",
+      permissionBullets: [
+        "Read selected Slack channels and threads.",
+        "Detect decisions, blockers, mentions, and threads with links.",
+        "Keep channel selection under your control before the first sync.",
+      ],
+      continueLabel: "Continue to Slack",
+    },
+    resources: {
+      title: "Choose Slack channels",
+      description: "Select the channels Standup should read for decisions, blockers, and relevant threads.",
+      resourceSelectionLabel: "Slack channels",
+      firstSyncLabel: "Start first sync",
+      emptyTitle: "No Slack channels are available",
+      emptyDescription:
+        "Standup could not find public or private channels for this token. Private channels only appear when the Slack app has permission and has been added to those channels.",
+      setupQuestions: {
+        contextChannels: "Quais canais devem virar contexto?",
+        privateChannels: "Incluir canais privados?",
+        privateChannelsHelp:
+          "Private channels appear only when Slack grants the required scope and the app has access to those channels.",
+        extractionTypes: "Que tipo de informação extrair?",
+        syncWindow: "A partir de quando sincronizar?",
+      },
+    },
   },
   {
     id: "linear",

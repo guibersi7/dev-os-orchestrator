@@ -27,8 +27,10 @@ export async function saveResourceSelectionAction(formData: FormData) {
   const service = serviceFromForm(formData);
   const selectedValues = formData.getAll("resources").map(String);
   const resources = selectedValues.map((value) => JSON.parse(value) as SelectableResource);
+  const settingsValue = formData.get("settings");
+  const settings = typeof settingsValue === "string" && settingsValue ? (JSON.parse(settingsValue) as Record<string, unknown>) : undefined;
 
-  await saveResourceSelection(service, resources);
+  await saveResourceSelection(service, resources, settings);
   await syncIntegration(service);
   revalidatePath("/settings");
   revalidatePath("/dashboard");
