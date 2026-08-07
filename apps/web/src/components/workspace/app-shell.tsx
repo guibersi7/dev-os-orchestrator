@@ -3,10 +3,9 @@ import { Bell, GitPullRequest, LayoutDashboard, MessageSquareText, Settings } fr
 import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/server";
-import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboards", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquareText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -17,52 +16,39 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#080C15] text-brand-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-brand-border bg-[#121826] px-4 py-5 lg:block">
-        <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
-            <GitPullRequest className="h-5 w-5" />
-          </span>
-          <span>
-            <span className="block text-sm font-semibold">Standup</span>
-            <span className="block max-w-[170px] truncate text-xs text-[#6A7489]">{userLabel}</span>
-          </span>
-        </Link>
-        <nav className="mt-8 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#9AA4BA] transition-colors hover:bg-brand-muted hover:text-brand-ink",
-                item.href === "/dashboard" && "bg-brand-surface text-brand-ink",
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+      <header className="sticky top-0 z-10 border-b border-brand-border bg-[#0B0F1A]/90 backdrop-blur">
+        <div className="mx-auto flex min-h-16 max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/dashboard" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
+              <GitPullRequest className="h-5 w-5" />
             </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 border-b border-brand-border bg-[#0B0F1A]/90 backdrop-blur">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#6A7489]">GitHub first</p>
-              <p className="text-sm font-medium text-[#E9EDF7]">Today’s engineering context</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" aria-label="Notifications">
-                <Bell className="h-4 w-4" />
-              </Button>
-              <Button variant="secondary" size="sm">
-                Sync now
-              </Button>
-              <HeaderAuthControl />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#E9EDF7]">Standup</p>
+              <p className="truncate text-xs text-[#6A7489]">{userLabel}</p>
             </div>
           </div>
-        </header>
-        <main className="px-4 py-6 sm:px-6">{children}</main>
-      </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <nav className="flex items-center gap-1 rounded-md border border-border bg-[#121826] p-1">
+              {navItems.map((item) => (
+                <Button key={item.href} asChild variant="ghost" size="sm" className="text-[#9AA4BA] hover:text-brand-ink">
+                  <Link href={item.href}>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                </Button>
+              ))}
+            </nav>
+            <Button variant="ghost" size="icon" aria-label="Notifications">
+              <Bell className="h-4 w-4" />
+            </Button>
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/settings">Sync</Link>
+            </Button>
+            <HeaderAuthControl />
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   );
 }
