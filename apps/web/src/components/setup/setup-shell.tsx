@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { cn } from "@/lib/utils";
 
 const steps = ["Workspace", "Connect", "Select", "Sync"];
@@ -33,7 +34,10 @@ export function SetupShell({ currentStep, children }: { currentStep: number; chi
             );
           })}
         </ol>
-        <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-[#6A7489]">Wave 1</span>
+        <div className="flex items-center gap-3">
+          <span className="hidden font-mono text-[11px] uppercase tracking-[0.08em] text-[#6A7489] sm:inline">Wave 1</span>
+          <HeaderAuthControl />
+        </div>
       </header>
       {children}
     </main>

@@ -7,7 +7,7 @@ import { signOutAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/auth-provider";
 
-export function LandingAuthControl() {
+export function HeaderAuthControl() {
   const { isAuthenticated, session } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -47,6 +47,7 @@ export function LandingAuthControl() {
         type="button"
         aria-label="Open account menu"
         aria-expanded={isOpen}
+        aria-haspopup="menu"
         className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-[#212938] bg-[#121826] text-sm font-semibold text-[var(--standup-accent-text)] transition-colors hover:border-[var(--standup-accent-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => setIsOpen((current) => !current)}
       >
@@ -59,13 +60,17 @@ export function LandingAuthControl() {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-11 z-20 w-52 rounded-md border border-[#212938] bg-[#121826] p-1 shadow-xl shadow-black/30">
+        <div
+          role="menu"
+          className="absolute right-0 top-11 z-20 w-52 rounded-md border border-[#212938] bg-[#121826] p-1 shadow-xl shadow-black/30"
+        >
           <div className="border-b border-[#212938] px-3 py-2">
             <p className="truncate text-sm font-semibold text-[#E9EDF7]">{user.name}</p>
             <p className="truncate text-xs text-[#6A7489]">{user.email}</p>
           </div>
           <Link
             href="/settings"
+            role="menuitem"
             className="mt-1 flex h-9 items-center gap-2 rounded-md px-3 text-sm text-[#9AA4BA] transition-colors hover:bg-[#1A2130] hover:text-[#E9EDF7]"
             onClick={() => setIsOpen(false)}
           >
@@ -75,6 +80,7 @@ export function LandingAuthControl() {
           <form action={signOutAction}>
             <button
               type="submit"
+              role="menuitem"
               className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm text-[#9AA4BA] transition-colors hover:bg-[#1A2130] hover:text-[#E9EDF7]"
               onClick={() => setIsOpen(false)}
             >

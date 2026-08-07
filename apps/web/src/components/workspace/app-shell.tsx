@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Bell, GitPullRequest, LayoutDashboard, LogOut, MessageSquareText, Settings } from "lucide-react";
-import { signOutAction } from "@/app/login/actions";
+import { Bell, GitPullRequest, LayoutDashboard, MessageSquareText, Settings } from "lucide-react";
+import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/server";
 import { cn } from "@/lib/utils";
@@ -57,11 +57,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               <Button variant="secondary" size="sm">
                 Sync now
               </Button>
-              <form action={signOutAction}>
-                <Button variant="ghost" size="icon" aria-label="Sign out">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </form>
+              <HeaderAuthControl />
             </div>
           </div>
         </header>

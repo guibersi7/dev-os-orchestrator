@@ -6,7 +6,7 @@ import { BrandMark } from "@/components/brand/brand-mark";
 import { OrbitSection } from "@/components/marketing/orbit-section";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LandingAuthControl } from "@/components/auth/landing-auth-control";
+import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { heroQueue, setupBeats, sources } from "@/features/wave-one/design-data";
 
 const excluded = [
@@ -41,7 +41,7 @@ export default function LandingPage() {
           <Link href="/setup" className="hidden px-3 py-2 text-[13px] text-[#9AA4BA] hover:text-[var(--standup-accent-text)] sm:inline-flex">
             Docs
           </Link>
-          <LandingAuthControl />
+          <HeaderAuthControl />
         </nav>
       </header>
 

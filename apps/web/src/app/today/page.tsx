@@ -3,6 +3,7 @@ import { MessageSquare, Search } from "lucide-react";
 import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { defaultConnectedIds, focusQueue, sources } from "@/features/wave-one/design-data";
@@ -80,10 +81,13 @@ export default function TodayPage() {
                 <h1 className="text-[30px] font-semibold leading-[1.15] tracking-[-0.03em]">Good morning, Guilherme</h1>
                 <p className="font-mono mt-2 text-[12px] text-[#6A7489]">tue 31 jul · synced 2m ago</p>
               </div>
-              <Button variant="outline" size="sm">
-                <MessageSquare className="h-4 w-4" />
-                Ask
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <MessageSquare className="h-4 w-4" />
+                  Ask
+                </Button>
+                <HeaderAuthControl />
+              </div>
             </div>
             <p className="text-balance mt-7 max-w-[850px] text-[26px] font-semibold leading-[1.18] tracking-[-0.03em]">
               Two people are blocked behind you. Your first free block is at 14:00 — <span className="text-[var(--standup-accent-text)]">clear the queue before your 11:30 sync.</span>

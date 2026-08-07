@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, GitPullRequest, RefreshCw, Shi
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { integrationCatalog } from "@/features/integrations/catalog";
 import { type ConnectionStatus, getConnectionsState } from "@/lib/api-client";
 import { syncConnectionAction } from "@/app/(workspace)/settings/actions";
@@ -84,6 +85,7 @@ export default async function OnboardingPage({
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
+            <HeaderAuthControl />
           </div>
         </header>
 
