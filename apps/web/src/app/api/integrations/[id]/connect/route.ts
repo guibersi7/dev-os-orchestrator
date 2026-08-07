@@ -8,7 +8,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const integration = getIntegrationCatalogItem(id);
 
   if (!integration) {
-    return NextResponse.redirect(getPublicAppUrl("/onboarding?connectionError=unknown_service", request.url));
+    return NextResponse.redirect(getPublicAppUrl("/settings?connectionError=unknown_service", request.url));
   }
 
   const callbackUrl = getPublicAppUrl(`/api/integrations/${integration.id}/callback`, request.url).toString();
@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const missing = oauthState.data?.missing?.join(",") ?? "";
   const error = oauthState.data?.status === "needs_config" ? "needs_config" : "oauth_start_failed";
   const nextUrl = getPublicAppUrl(
-    `/onboarding?connectionError=${error}&service=${integration.id}&missing=${encodeURIComponent(missing)}`,
+    `/settings?connectionError=${error}&service=${integration.id}&missing=${encodeURIComponent(missing)}`,
     request.url,
   );
 

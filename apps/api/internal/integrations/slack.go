@@ -70,13 +70,18 @@ func (c *SlackConnector) ListSelectableResources(ctx context.Context, _ domain.G
 		if channel.ID == "" || channel.Name == "" {
 			continue
 		}
+		resourceType := "public_channel"
+		if channel.IsPrivate {
+			resourceType = "private_channel"
+		}
 		resources = append(resources, domain.SelectableResource{
 			ID:   channel.ID,
-			Type: "channel",
+			Type: resourceType,
 			Name: "#" + channel.Name,
 			Metadata: map[string]any{
 				"channelId":   channel.ID,
 				"channelName": channel.Name,
+				"isPrivate":   channel.IsPrivate,
 			},
 		})
 	}
@@ -303,8 +308,9 @@ func (c *SlackConnector) get(ctx context.Context, token string, method string, v
 }
 
 type slackChannel struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	IsPrivate bool   `json:"is_private"`
 }
 
 type slackMessage struct {
@@ -437,7 +443,7 @@ func selectedSlackChannelIDs(selection domain.ResourceSelection) []string {
 	channelIDs := []string{}
 	seen := map[string]bool{}
 	for _, resource := range selection.Resources {
-		if resource.Type != "" && resource.Type != "channel" {
+		if resource.Type != "" && resource.Type != "channel" && resource.Type != "public_channel" && resource.Type != "private_channel" {
 			continue
 		}
 

@@ -79,6 +79,7 @@ export type ResourceSelection = {
   service: Service;
   status: string;
   resources: SelectableResource[];
+  settings?: Record<string, unknown>;
   selectedAt: string;
   selectedBy: string;
   resourceIds: string[];
@@ -315,11 +316,11 @@ export function getSelectableResourcesState(service: Service) {
   );
 }
 
-export function saveResourceSelection(service: Service, resources: SelectableResource[]) {
+export function saveResourceSelection(service: Service, resources: SelectableResource[], settings?: Record<string, unknown>) {
   return captureGatewayState(() =>
     requestGateway<{ selection: ResourceSelection }>(`/v1/connections/${service}/selection`, {
       method: "PUT",
-      body: JSON.stringify({ resources }),
+      body: JSON.stringify({ resources, settings }),
     }),
   );
 }

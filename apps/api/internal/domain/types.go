@@ -157,6 +157,7 @@ type ResourceSelection struct {
 	Service     Service              `json:"service"`
 	Status      string               `json:"status"`
 	Resources   []SelectableResource `json:"resources"`
+	Settings    map[string]any       `json:"settings,omitempty"`
 	SelectedAt  time.Time            `json:"selectedAt"`
 	SelectedBy  string               `json:"selectedBy"`
 	ResourceIDs []string             `json:"resourceIds"`
@@ -164,6 +165,7 @@ type ResourceSelection struct {
 
 type ResourceSelectionRequest struct {
 	Resources []SelectableResource `json:"resources"`
+	Settings  map[string]any       `json:"settings,omitempty"`
 }
 
 type DashboardPayload struct {

@@ -4,7 +4,7 @@ import { completeOAuthConnection } from "@/lib/api-client";
 import { getPublicAppUrl } from "@/lib/app-url";
 
 function callbackFailureUrl(request: Request, service: string, reason: string) {
-  const url = getPublicAppUrl("/onboarding", request.url);
+  const url = getPublicAppUrl("/settings", request.url);
   url.searchParams.set("connectionError", "oauth_callback_failed");
   url.searchParams.set("service", service);
   url.searchParams.set("reason", reason);
@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const integration = getIntegrationCatalogItem(id);
 
   if (!integration) {
-    return NextResponse.redirect(getPublicAppUrl("/onboarding?connectionError=unknown_service", request.url));
+    return NextResponse.redirect(getPublicAppUrl("/settings?connectionError=unknown_service", request.url));
   }
 
   const url = new URL(request.url);

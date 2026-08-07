@@ -1,20 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, GitPullRequest, RefreshCw, ShieldCheck, Workflow } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, PlugZap, RefreshCw, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { HeaderAuthControl } from "@/components/auth/header-auth-control";
-import { integrationCatalog } from "@/features/integrations/catalog";
+import { getIntegrationCatalogItem, integrationCatalog } from "@/features/integrations/catalog";
 import { type ConnectionStatus, getConnectionsState } from "@/lib/api-client";
+import { formatRelativeTime } from "@/lib/dashboard-view-model";
 import { syncConnectionAction } from "@/app/(workspace)/settings/actions";
-
-const steps = [
-  ["Connect GitHub", "Authorize Standup using the GitHub OAuth screen."],
-  ["Sync engineering data", "We list repositories, recent PRs, reviews, comments, issues, and failed checks."],
-  ["Open dashboard", "Your first dashboard is generated from normalized WorkEvents."],
-];
-
-const nextServices = integrationCatalog.filter((integration) => integration.id !== "github");
 
 function statusTone(status: string): "neutral" | "green" | "amber" | "red" | "blue" {
   if (status === "connected") return "green";
@@ -36,23 +29,31 @@ export default async function OnboardingPage({
   const params = await searchParams;
   const connectionsState = await getConnectionsState();
   const connections = connectionByService(connectionsState.data?.connections);
-  const githubConnection = connections.get("github");
-  const githubStatus = githubConnection?.status ?? "available";
-  const githubConnected = githubConnection?.hasToken ?? false;
-  const githubSynced = Boolean(githubConnection?.lastSyncedAt);
+  const connectedCount = integrationCatalog.filter((integration) => connections.get(integration.id)?.hasToken).length;
+  const configuredCount = integrationCatalog.filter((integration) => {
+    const connection = connections.get(integration.id);
+
+    return connection ? connection.providerConfigured : false;
+  }).length;
+  const syncedCount = integrationCatalog.filter((integration) => Boolean(connections.get(integration.id)?.lastSyncedAt)).length;
+  const failedIntegration = params?.service ? getIntegrationCatalogItem(params.service) : undefined;
+  const failedServiceName = failedIntegration?.name ?? params?.service ?? "Provider";
   const missingEnv = params?.missing?.split(",").filter(Boolean) ?? [];
   const connectionError = params?.connectionError;
-  const failedService = params?.service === "github" ? "GitHub" : params?.service;
   const connectionErrorTitle =
-    connectionError === "needs_config"
-      ? `${failedService ?? "Provider"} OAuth is not configured yet.`
-      : connectionError === "oauth_callback_failed"
-        ? `${failedService ?? "Provider"} authorization could not be completed.`
-        : "The previous OAuth attempt did not start.";
+    connectionError === "unknown_service"
+      ? "This integration is not available."
+      : connectionError === "needs_config"
+        ? `${failedServiceName} OAuth is not configured yet.`
+        : connectionError === "oauth_callback_failed"
+          ? `${failedServiceName} authorization could not be completed.`
+          : `${failedServiceName} connection could not start.`;
   const connectionErrorMessage =
-    connectionError === "oauth_callback_failed"
-      ? "GitHub returned to Standup, but the gateway could not finish the token exchange. Retry after checking the gateway logs."
-      : "Retry the connection. If GitHub opens, this message is only from the previous failed URL.";
+    connectionError === "needs_config"
+      ? `Add the missing ${failedServiceName} OAuth environment variables to the API Gateway environment and retry.`
+      : connectionError === "oauth_callback_failed"
+        ? "The provider returned to Standup, but the gateway could not finish the token exchange."
+        : `Retry ${failedServiceName} from this page after checking the gateway response.`;
 
   return (
     <main className="min-h-screen bg-[#080C15] px-4 py-8 text-brand-ink sm:px-6">
@@ -66,24 +67,21 @@ export default async function OnboardingPage({
               Standup
             </Link>
             <h1 className="mt-8 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              Start with GitHub. Get to your dashboard in a few clicks.
+              Connect your work tools in one place.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-[#9AA4BA]">
-              Connect your GitHub account with OAuth, sync recent engineering activity, and open Standup with real PR, review, issue, and check context.
+              Authorize engineering, planning, docs, chat, and calendar sources from a single connection center.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <Button asChild>
-              <a href="/api/integrations/github/connect">
-                <GitPullRequest className="h-4 w-4" />
-                Connect GitHub
-              </a>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/dashboard">
-                Open dashboard
+              <Link href="/settings">
+                Open Connection Center
                 <ArrowRight className="h-4 w-4" />
               </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/dashboard">Open dashboard</Link>
             </Button>
             <HeaderAuthControl />
           </div>
@@ -95,10 +93,10 @@ export default async function OnboardingPage({
           </Card>
         ) : null}
         {connectionError ? (
-          <Card className="mt-6 border-[#4A3A18] bg-[#241F14] p-4 text-sm text-[#F6C66A]">
+          <Card className="mt-6 border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
             <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
+              <AlertTriangle className="mt-1 h-4 w-4 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">{connectionErrorTitle}</p>
                 <p className="mt-1">{connectionErrorMessage}</p>
                 {missingEnv.length ? (
@@ -110,134 +108,126 @@ export default async function OnboardingPage({
                     ))}
                   </div>
                 ) : null}
-                <Button asChild size="sm" className="mt-4">
-                  <a href="/api/integrations/github/connect">
-                    Retry GitHub
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                </Button>
+                {failedIntegration ? (
+                  <Button asChild size="sm" className="mt-4">
+                    <a href={`/integrations/${failedIntegration.id}/connect`}>
+                      Retry {failedIntegration.name}
+                      <ArrowRight className="h-4 w-4" />
+                    </a>
+                  </Button>
+                ) : null}
               </div>
             </div>
           </Card>
         ) : null}
 
-        <section className="grid gap-6 py-8 lg:grid-cols-[380px_1fr]">
-          <Card className="p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-brand-surface text-brand-primary">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <div>
-                <h2 className="text-base font-semibold">Fast setup</h2>
-                <p className="text-sm text-[#6A7489]">OAuth user authorization in a few clicks.</p>
-              </div>
+        <section className="grid gap-4 py-8 sm:grid-cols-3">
+          {[
+            ["Connected", connectedCount],
+            ["Configured", configuredCount],
+            ["Synced", syncedCount],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-md border border-brand-border bg-[#121826] p-4">
+              <p className="text-sm text-[#9AA4BA]">{label}</p>
+              <p className="mt-2 text-3xl font-semibold">{value}</p>
             </div>
-
-            <div className="mt-6 space-y-4">
-              {steps.map(([title, body], index) => {
-                const done = (index === 0 && githubConnected) || (index === 1 && githubSynced) || (index === 2 && githubSynced);
-
-                return (
-                  <div key={title} className="flex gap-3">
-                    <CheckCircle2 className={done ? "mt-0.5 h-4 w-4 text-[#6EE7B7]" : "mt-0.5 h-4 w-4 text-[#6A7489]"} />
-                    <div>
-                      <p className="text-sm font-medium">{title}</p>
-                      <p className="mt-1 text-xs leading-5 text-[#6A7489]">{body}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-brand-border bg-[#121826] p-6">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex gap-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
-                    <GitPullRequest className="h-6 w-6" />
-                  </span>
-                  <div>
-                    <Badge tone={statusTone(githubStatus)}>{githubStatus.replaceAll("_", " ")}</Badge>
-                    <h2 className="mt-4 text-2xl font-semibold tracking-tight">Connect GitHub</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[#9AA4BA]">
-                      Authorize Standup on GitHub. After OAuth, we use your user token to read accessible repositories and build your first dashboard.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Button asChild>
-                    <a href="/api/integrations/github/connect">
-                      {githubConnected ? "Reconnect GitHub" : "Connect GitHub"}
-                      <ArrowRight className="h-4 w-4" />
-                    </a>
-                  </Button>
-                  <form action={syncConnectionAction}>
-                    <input type="hidden" name="service" value="github" />
-                    <Button variant="secondary" disabled={!githubConnected}>
-                      <RefreshCw className="h-4 w-4" />
-                      Sync GitHub
-                    </Button>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-0 divide-y divide-brand-border bg-brand-muted/40 md:grid-cols-3 md:divide-x md:divide-y-0">
-              <div className="p-5">
-                <p className="text-sm font-semibold">Repositories</p>
-                <p className="mt-2 text-sm leading-6 text-[#6A7489]">List repos from your GitHub account or configured organization.</p>
-              </div>
-              <div className="p-5">
-                <p className="text-sm font-semibold">Pull requests</p>
-                <p className="mt-2 text-sm leading-6 text-[#6A7489]">Paginate recent PRs, reviews, comments, and failed checks.</p>
-              </div>
-              <div className="p-5">
-                <p className="text-sm font-semibold">Dashboard metrics</p>
-                <p className="mt-2 text-sm leading-6 text-[#6A7489]">Generate review time, reviewers, lead time, and blocker signals.</p>
-              </div>
-            </div>
-          </Card>
+          ))}
         </section>
 
         <section className="border-t border-brand-border py-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Add more context later</h2>
-              <p className="mt-2 text-sm text-[#6A7489]">After GitHub is working, connect planning, docs, chat, and calendar with the same OAuth pattern.</p>
+              <div className="flex items-center gap-2">
+                <PlugZap className="h-4 w-4 text-brand-primary" />
+                <h2 className="text-base font-semibold">Connection Center</h2>
+              </div>
+              <p className="mt-2 text-sm text-[#9AA4BA]">
+                Connect, reconnect, and sync every integration from the same surface.
+              </p>
             </div>
-            <Button asChild variant="secondary">
-              <Link href="/settings">Open all integrations</Link>
-            </Button>
+            <Badge tone="blue">{integrationCatalog.length} services</Badge>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {nextServices.map((integration) => {
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {integrationCatalog.map((integration) => {
               const connection = connections.get(integration.id);
               const status = connection?.status ?? "available";
+              const connected = status === "connected" || status === "syncing";
               const Icon = integration.icon;
 
               return (
-                <a
-                  key={integration.id}
-                  href={`/api/integrations/${integration.id}/connect`}
-                  className="rounded-md border border-brand-border bg-[#121826] p-4 transition-colors hover:border-brand-primary"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-surface text-brand-primary">
-                        <Icon className="h-4 w-4" />
+                <Card key={integration.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-surface text-brand-primary">
+                        <Icon className="h-5 w-5" />
                       </span>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold">{integration.name}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#6A7489]">{integration.scope}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#9AA4BA]">{integration.scope}</p>
                       </div>
                     </div>
                     <Badge tone={statusTone(status)}>{status.replaceAll("_", " ")}</Badge>
                   </div>
-                  <p className="mt-3 text-xs font-medium text-[#6A7489]">OAuth user connection</p>
-                </a>
+
+                  <dl className="mt-4 grid gap-3 text-xs text-[#9AA4BA] sm:grid-cols-3">
+                    <div>
+                      <dt>Token</dt>
+                      <dd className="mt-1 font-medium text-brand-ink">{connection?.hasToken ? "Stored" : "Missing"}</dd>
+                    </div>
+                    <div>
+                      <dt>Provider</dt>
+                      <dd className="mt-1 font-medium text-brand-ink">{connection?.providerConfigured ? "Configured" : "Needs env"}</dd>
+                    </div>
+                    <div>
+                      <dt>Last sync</dt>
+                      <dd className="mt-1 font-medium text-brand-ink">{formatRelativeTime(connection?.lastSyncedAt)}</dd>
+                    </div>
+                  </dl>
+
+                  {connection?.lastSyncError ? (
+                    <p className="mt-3 rounded-md border border-[#4A2230] bg-[#22141C] p-3 text-xs leading-5 text-[#FF9CAF]">
+                      {connection.lastSyncError}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant={connected ? "secondary" : "default"}>
+                      <a href={`/integrations/${integration.id}/connect`}>
+                        {connected ? "Reconnect" : "Connect"} {integration.name}
+                      </a>
+                    </Button>
+                    <form action={syncConnectionAction}>
+                      <input type="hidden" name="service" value={integration.id} />
+                      <Button size="sm" variant="secondary" disabled={!connection?.hasToken}>
+                        <RefreshCw className="h-4 w-4" />
+                        Sync
+                      </Button>
+                    </form>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={`/integrations/${integration.id}`}>Details</Link>
+                    </Button>
+                  </div>
+                </Card>
               );
             })}
+          </div>
+        </section>
+
+        <section className="border-t border-brand-border py-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#6EE7B7]" />
+              <div>
+                <h2 className="text-base font-semibold">Dashboard unlocks as sources sync</h2>
+                <p className="mt-2 text-sm text-[#9AA4BA]">
+                  Standup normalizes connected sources into WorkEvents for reviews, blockers, decisions, and planning context.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="secondary">
+              <Link href="/dashboard">Open dashboard</Link>
+            </Button>
           </div>
         </section>
       </div>
