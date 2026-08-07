@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { getGatewayUserId } from "@/lib/auth/server";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace-session";
 
 export type Service = "github" | "slack" | "linear" | "jira" | "trello" | "notion" | "calendar";
 
@@ -192,6 +194,10 @@ type APIEnvelope<T> = {
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const WORKSPACE_ID = process.env.NEXT_PUBLIC_WORKSPACE_ID ?? "00000000-0000-4000-8000-000000000001";
 
+type GatewayRequestOptions = RequestInit & {
+  workspaceId?: string;
+};
+
 class GatewayError extends Error {
   constructor(
     message: string,
@@ -203,11 +209,17 @@ class GatewayError extends Error {
   }
 }
 
-async function requestGateway<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function getActiveWorkspaceId() {
+  const cookieStore = await cookies();
+  return cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? WORKSPACE_ID;
+}
+
+async function requestGateway<T>(path: string, init: GatewayRequestOptions = {}): Promise<T> {
   const userId = await getGatewayUserId();
+  const { workspaceId, ...requestInit } = init;
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
-  headers.set("x-workspace-id", WORKSPACE_ID);
+  headers.set("x-workspace-id", workspaceId ?? (await getActiveWorkspaceId()));
   headers.set("x-user-id", userId);
   headers.set("x-request-id", `web_${Date.now().toString(36)}`);
 
@@ -216,7 +228,7 @@ async function requestGateway<T>(path: string, init: RequestInit = {}): Promise<
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
+    ...requestInit,
     headers,
     cache: "no-store",
   });
@@ -256,15 +268,17 @@ async function captureGatewayState<T>(request: () => Promise<T>): Promise<Gatewa
   }
 }
 
-export function getDashboardState() {
-  return captureGatewayState(() => requestGateway<{ gateway: string; dashboard: DashboardPayload }>("/v1/dashboard"));
+export function getDashboardState(workspaceId?: string) {
+  return captureGatewayState(() =>
+    requestGateway<{ gateway: string; dashboard: DashboardPayload }>("/v1/dashboard", { workspaceId }),
+  );
 }
 
-export function getWorkspacesState() {
-  return captureGatewayState(() => requestGateway<WorkspacesPayload>("/v1/workspaces"));
+export function getWorkspacesState(workspaceId?: string) {
+  return captureGatewayState(() => requestGateway<WorkspacesPayload>("/v1/workspaces", { workspaceId }));
 }
 
-export function createWorkspace(name: string, slug?: string) {
+export function createWorkspace(name: string, slug?: string, workspaceId?: string) {
   return captureGatewayState(() =>
     requestGateway<{
       workspace: Workspace;
@@ -273,6 +287,7 @@ export function createWorkspace(name: string, slug?: string) {
       crossWorkspaceData: boolean;
     }>("/v1/workspaces", {
       method: "POST",
+      workspaceId,
       body: JSON.stringify({ name, slug }),
     }),
   );
