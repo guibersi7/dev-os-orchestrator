@@ -46,6 +46,7 @@ func TestSlackSyncReportsMissingChannelSelection(t *testing.T) {
 }
 
 func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
+	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/conversations.list" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -53,13 +54,33 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 		if r.URL.Query().Get("types") != "public_channel,private_channel" {
 			t.Fatalf("expected channel types query, got %s", r.URL.RawQuery)
 		}
-		writeSlackJSON(t, w, map[string]any{
-			"ok": true,
-			"channels": []map[string]any{
-				{"id": "C123", "name": "eng", "is_private": false},
-				{"id": "G999", "name": "leadership", "is_private": true},
-			},
-		})
+		requests++
+		switch requests {
+		case 1:
+			if r.URL.Query().Get("cursor") != "" {
+				t.Fatalf("expected first request without cursor, got %s", r.URL.RawQuery)
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C123", "name": "eng"},
+				},
+				"response_metadata": map[string]any{"next_cursor": "page-2"},
+			})
+		case 2:
+			if r.URL.Query().Get("cursor") != "page-2" {
+				t.Fatalf("expected second request cursor, got %s", r.URL.RawQuery)
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C999", "name": "release"},
+				},
+				"response_metadata": map[string]any{"next_cursor": ""},
+			})
+		default:
+			t.Fatalf("unexpected conversations.list request %d", requests)
+		}
 	}))
 	defer server.Close()
 
@@ -82,6 +103,12 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 	}
 	if resources[1].ID != "G999" || resources[1].Type != "private_channel" || resources[1].Name != "#leadership" {
 		t.Fatalf("unexpected second resource: %#v", resources[1])
+	}
+	if resources[1].ID != "C999" || resources[1].Type != "channel" || resources[1].Name != "#release" {
+		t.Fatalf("unexpected second resource: %#v", resources[1])
+	}
+	if requests != 2 {
+		t.Fatalf("expected 2 paginated requests, got %d", requests)
 	}
 }
 

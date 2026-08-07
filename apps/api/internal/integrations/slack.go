@@ -201,26 +201,42 @@ func (c *SlackConnector) Sync(ctx context.Context, gatewayContext domain.Gateway
 }
 
 func (c *SlackConnector) fetchChannels(ctx context.Context, token string) ([]slackChannel, error) {
-	var response struct {
-		OK               bool           `json:"ok"`
-		Error            string         `json:"error"`
-		Channels         []slackChannel `json:"channels"`
-		ResponseMetadata struct {
-			NextCursor string `json:"next_cursor"`
-		} `json:"response_metadata"`
+	channels := []slackChannel{}
+	cursor := ""
+
+	for {
+		var response struct {
+			OK               bool           `json:"ok"`
+			Error            string         `json:"error"`
+			Channels         []slackChannel `json:"channels"`
+			ResponseMetadata struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"response_metadata"`
+		}
+		values := url.Values{
+			"exclude_archived": []string{"true"},
+			"limit":            []string{"200"},
+			"types":            []string{"public_channel,private_channel"},
+		}
+		if cursor != "" {
+			values.Set("cursor", cursor)
+		}
+
+		if err := c.get(ctx, token, "conversations.list", values, &response); err != nil {
+			return nil, err
+		}
+		if !response.OK {
+			return nil, fmt.Errorf("slack conversations.list failed: %s", response.Error)
+		}
+
+		channels = append(channels, response.Channels...)
+		cursor = strings.TrimSpace(response.ResponseMetadata.NextCursor)
+		if cursor == "" {
+			break
+		}
 	}
-	values := url.Values{
-		"exclude_archived": []string{"true"},
-		"limit":            []string{"200"},
-		"types":            []string{"public_channel,private_channel"},
-	}
-	if err := c.get(ctx, token, "conversations.list", values, &response); err != nil {
-		return nil, err
-	}
-	if !response.OK {
-		return nil, fmt.Errorf("slack conversations.list failed: %s", response.Error)
-	}
-	return response.Channels, nil
+
+	return channels, nil
 }
 
 func (c *SlackConnector) fetchChannel(ctx context.Context, token string, channelID string) (slackChannel, error) {
