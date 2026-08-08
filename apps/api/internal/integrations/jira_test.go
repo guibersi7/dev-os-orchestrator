@@ -13,9 +13,11 @@ import (
 
 func TestJiraSyncReportsNeedsAuthWithoutToken(t *testing.T) {
 	connector := &JiraConnector{
-		info:    NewJiraConnector().Info(),
-		client:  http.DefaultClient,
-		baseURL: "https://jira.test",
+		info:       NewJiraConnector().Info(),
+		client:     http.DefaultClient,
+		baseURL:    "https://jira.test",
+		apiBaseURL: "https://api.atlassian.test",
+		cloudID:    "cloud-1",
 	}
 
 	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, nil)
@@ -28,9 +30,18 @@ func TestJiraSyncReportsNeedsAuthWithoutToken(t *testing.T) {
 }
 
 func TestJiraSyncReportsMissingSiteConfig(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oauth/token/accessible-resources" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		writeJiraJSON(t, w, []map[string]any{})
+	}))
+	defer server.Close()
+
 	connector := &JiraConnector{
-		info:   NewJiraConnector().Info(),
-		client: http.DefaultClient,
+		info:       NewJiraConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
 	}
 
 	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
@@ -47,7 +58,7 @@ func TestJiraListSelectableResourcesReturnsProjects(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/rest/api/3/project/search" {
+		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/project/search" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 
@@ -61,9 +72,11 @@ func TestJiraListSelectableResourcesReturnsProjects(t *testing.T) {
 	defer server.Close()
 
 	connector := &JiraConnector{
-		info:    NewJiraConnector().Info(),
-		client:  server.Client(),
-		baseURL: server.URL,
+		info:       NewJiraConnector().Info(),
+		client:     server.Client(),
+		baseURL:    "https://jira.test",
+		apiBaseURL: server.URL,
+		cloudID:    "cloud-1",
 	}
 
 	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
@@ -83,7 +96,7 @@ func TestJiraListSelectableResourcesPaginatesProjects(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
-		if r.URL.Path != "/rest/api/3/project/search" {
+		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/project/search" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 
@@ -111,9 +124,11 @@ func TestJiraListSelectableResourcesPaginatesProjects(t *testing.T) {
 	defer server.Close()
 
 	connector := &JiraConnector{
-		info:    NewJiraConnector().Info(),
-		client:  server.Client(),
-		baseURL: server.URL,
+		info:       NewJiraConnector().Info(),
+		client:     server.Client(),
+		baseURL:    "https://jira.test",
+		apiBaseURL: server.URL,
+		cloudID:    "cloud-1",
 	}
 
 	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
@@ -134,7 +149,7 @@ func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/rest/api/3/search/jql" {
+		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/search/jql" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		if r.Header.Get("authorization") != "Bearer token" {
@@ -211,7 +226,9 @@ func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 	connector := &JiraConnector{
 		info:        NewJiraConnector().Info(),
 		client:      server.Client(),
-		baseURL:     server.URL,
+		baseURL:     "https://jira.test",
+		apiBaseURL:  server.URL,
+		cloudID:     "cloud-1",
 		projectKeys: []string{"ENG"},
 	}
 
@@ -314,7 +331,9 @@ func TestJiraSyncPaginatesIssues(t *testing.T) {
 	connector := &JiraConnector{
 		info:        NewJiraConnector().Info(),
 		client:      server.Client(),
-		baseURL:     server.URL,
+		baseURL:     "https://jira.test",
+		apiBaseURL:  server.URL,
+		cloudID:     "cloud-1",
 		projectKeys: []string{"ENG"},
 	}
 
@@ -376,7 +395,9 @@ func TestJiraSyncSelectedUsesSelectedProjectJQL(t *testing.T) {
 	connector := &JiraConnector{
 		info:        NewJiraConnector().Info(),
 		client:      server.Client(),
-		baseURL:     server.URL,
+		baseURL:     "https://jira.test",
+		apiBaseURL:  server.URL,
+		cloudID:     "cloud-1",
 		projectKeys: []string{"OPS"},
 	}
 

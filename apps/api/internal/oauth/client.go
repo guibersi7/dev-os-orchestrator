@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,6 +45,10 @@ func AuthorizationURL(provider Provider, redirectURI string, state string) strin
 	if len(provider.Scopes) > 0 {
 		values.Set("scope", strings.Join(provider.Scopes, " "))
 	}
+	if provider.Service == "jira" {
+		values.Set("audience", "api.atlassian.com")
+		values.Set("prompt", "consent")
+	}
 	if provider.Service == "calendar" {
 		values.Set("access_type", "offline")
 		values.Set("prompt", "consent")
@@ -64,11 +69,30 @@ func ExchangeCode(ctx context.Context, client *http.Client, provider Provider, c
 	form.Set("client_id", provider.ClientID)
 	form.Set("client_secret", provider.ClientSecret)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
+	var body *strings.Reader
+	contentType := "application/x-www-form-urlencoded"
+	if provider.Service == "jira" {
+		payload, err := json.Marshal(map[string]string{
+			"grant_type":    "authorization_code",
+			"code":          code,
+			"redirect_uri":  redirectURI,
+			"client_id":     provider.ClientID,
+			"client_secret": provider.ClientSecret,
+		})
+		if err != nil {
+			return TokenResponse{}, err
+		}
+		body = strings.NewReader(string(payload))
+		contentType = "application/json"
+	} else {
+		body = strings.NewReader(form.Encode())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, body)
 	if err != nil {
 		return TokenResponse{}, err
 	}
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	req.Header.Set("content-type", contentType)
 	req.Header.Set("accept", "application/json")
 
 	res, err := client.Do(req)
@@ -119,11 +143,29 @@ func RefreshToken(ctx context.Context, client *http.Client, provider Provider, r
 	form.Set("client_id", provider.ClientID)
 	form.Set("client_secret", provider.ClientSecret)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
+	var tokenBody *bytes.Reader
+	contentType := "application/x-www-form-urlencoded"
+	if provider.Service == "jira" {
+		payload, err := json.Marshal(map[string]string{
+			"grant_type":    "refresh_token",
+			"refresh_token": refreshToken,
+			"client_id":     provider.ClientID,
+			"client_secret": provider.ClientSecret,
+		})
+		if err != nil {
+			return TokenResponse{}, err
+		}
+		tokenBody = bytes.NewReader(payload)
+		contentType = "application/json"
+	} else {
+		tokenBody = bytes.NewReader([]byte(form.Encode()))
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, tokenBody)
 	if err != nil {
 		return TokenResponse{}, err
 	}
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	req.Header.Set("content-type", contentType)
 	req.Header.Set("accept", "application/json")
 
 	res, err := client.Do(req)
