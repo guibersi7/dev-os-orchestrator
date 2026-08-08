@@ -105,7 +105,8 @@ func (c *SlackConnector) SyncSelected(ctx context.Context, gatewayContext domain
 		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
 	}
 
-	records, err := c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels)
+	options := slackSyncOptionsFromSelection(selection)
+	records, scanned, err := c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels, options)
 	if err != nil {
 		return domain.SyncResult{}, err
 	}
@@ -116,7 +117,7 @@ func (c *SlackConnector) SyncSelected(ctx context.Context, gatewayContext domain
 	return domain.SyncResult{
 		Service:        domain.ServiceSlack,
 		Status:         "connected",
-		RecordsScanned: len(records),
+		RecordsScanned: scanned,
 		EventsCreated:  len(events),
 		NextCursor:     cursor,
 		Events:         events,
@@ -128,11 +129,13 @@ func (c *SlackConnector) fetchRecentRecordsForChannels(ctx context.Context, acce
 	for _, channelID := range channelIDs {
 		channels = append(channels, slackChannel{ID: channelID})
 	}
-	return c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels)
+	records, _, err := c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels, defaultSlackSyncOptions())
+	return records, err
 }
 
-func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context, accessToken string, channels []slackChannel) ([]domain.ExternalRecord, error) {
+func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context, accessToken string, channels []slackChannel, options slackSyncOptions) ([]domain.ExternalRecord, int, error) {
 	records := []domain.ExternalRecord{}
+	scanned := 0
 	for _, channel := range channels {
 		if channel.Name == "" {
 			var err error
@@ -141,17 +144,18 @@ func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context,
 				if isSlackChannelAccessError(err) {
 					continue
 				}
-				return nil, err
+				return nil, scanned, err
 			}
 		}
 
-		messages, err := c.fetchHistory(ctx, accessToken, channel.ID)
+		messages, err := c.fetchHistory(ctx, accessToken, channel.ID, options.oldest)
 		if err != nil {
 			if isSlackChannelAccessError(err) {
 				continue
 			}
-			return nil, err
+			return nil, scanned, err
 		}
+		scanned += len(messages)
 
 		for _, message := range messages {
 			replies := []slackMessage{}
@@ -161,19 +165,19 @@ func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context,
 					if isSlackChannelAccessError(err) {
 						replies = []slackMessage{}
 					} else {
-						return nil, err
+						return nil, scanned, err
 					}
 				}
 			}
 
-			record, ok := message.toRecord(channel, replies)
+			record, ok := message.toRecord(channel, replies, options)
 			if ok {
 				records = append(records, record)
 			}
 		}
 	}
 
-	return records, nil
+	return records, scanned, nil
 }
 
 func (c *SlackConnector) Normalize(records []domain.ExternalRecord) []domain.WorkEvent {
@@ -281,13 +285,17 @@ func (c *SlackConnector) fetchChannel(ctx context.Context, token string, channel
 	return response.Channel, nil
 }
 
-func (c *SlackConnector) fetchHistory(ctx context.Context, token string, channelID string) ([]slackMessage, error) {
+func (c *SlackConnector) fetchHistory(ctx context.Context, token string, channelID string, oldest string) ([]slackMessage, error) {
 	var response struct {
 		OK       bool           `json:"ok"`
 		Error    string         `json:"error"`
 		Messages []slackMessage `json:"messages"`
 	}
-	if err := c.get(ctx, token, "conversations.history", url.Values{"channel": []string{channelID}, "limit": []string{"50"}}, &response); err != nil {
+	values := url.Values{"channel": []string{channelID}, "limit": []string{"50"}}
+	if oldest != "" {
+		values.Set("oldest", oldest)
+	}
+	if err := c.get(ctx, token, "conversations.history", values, &response); err != nil {
 		return nil, err
 	}
 	if !response.OK {
@@ -383,9 +391,56 @@ type slackReaction struct {
 	Count int    `json:"count"`
 }
 
-func (m slackMessage) toRecord(channel slackChannel, replies []slackMessage) (domain.ExternalRecord, bool) {
+type slackSyncOptions struct {
+	extractionTypes map[string]bool
+	oldest          string
+}
+
+func defaultSlackSyncOptions() slackSyncOptions {
+	return slackSyncOptions{
+		extractionTypes: map[string]bool{
+			"decisions":          true,
+			"blockers":           true,
+			"mentions":           true,
+			"threads_with_links": true,
+		},
+	}
+}
+
+func slackSyncOptionsFromSelection(selection domain.ResourceSelection) slackSyncOptions {
+	options := defaultSlackSyncOptions()
+
+	slackSettings, ok := nestedSettings(selection.Settings, string(domain.ServiceSlack))
+	if !ok {
+		return options
+	}
+
+	if values, ok := stringSliceSetting(slackSettings["extractionTypes"]); ok {
+		options.extractionTypes = map[string]bool{}
+		for _, value := range values {
+			options.extractionTypes[value] = true
+		}
+	}
+
+	switch value, _ := slackSettings["syncWindow"].(string); value {
+	case "last_7_days":
+		options.oldest = slackOldestTimestamp(time.Now().UTC().AddDate(0, 0, -7))
+	case "last_30_days":
+		options.oldest = slackOldestTimestamp(time.Now().UTC().AddDate(0, 0, -30))
+	case "from_now_on":
+		options.oldest = slackOldestTimestamp(time.Now().UTC())
+	}
+
+	return options
+}
+
+func (o slackSyncOptions) extract(value string) bool {
+	return o.extractionTypes[value]
+}
+
+func (m slackMessage) toRecord(channel slackChannel, replies []slackMessage, options slackSyncOptions) (domain.ExternalRecord, bool) {
 	threadText := combinedThreadText(m, replies)
-	eventType, priority, summary, ok := classifySlackText(threadText)
+	eventType, priority, summary, ok := classifySlackText(threadText, len(replies) > 0, options)
 	if !ok {
 		return domain.ExternalRecord{}, false
 	}
@@ -422,20 +477,30 @@ func (m slackMessage) toRecord(channel slackChannel, replies []slackMessage) (do
 	}, true
 }
 
-func classifySlackText(text string) (string, string, string, bool) {
+func classifySlackText(text string, hasThread bool, options slackSyncOptions) (string, string, string, bool) {
 	normalized := strings.ToLower(text)
-	blockerTerms := []string{"blocked", "blocker", "blocking", "bloqueado", "bloqueador", "travado", "impedimento", "waiting on", "stuck"}
-	decisionTerms := []string{"decision", "decided", "agreed", "approved", "ship it", "decisao", "decidido", "aprovado", "combinado"}
+	blockerTerms := []string{"blocked", "blocker", "blocking", "bloqueado", "bloqueador", "bloqueio", "travado", "impedimento", "impedido", "waiting on", "stuck", "dependencia", "dependência"}
+	decisionTerms := []string{"decision", "decided", "agreed", "approved", "ship it", "decisao", "decisão", "decidido", "definido", "definimos", "aprovado", "combinado"}
 
-	for _, term := range blockerTerms {
-		if strings.Contains(normalized, term) {
-			return "slack.blocker", "high", "A Slack conversation indicates a blocker or dependency.", true
+	if options.extract("blockers") {
+		for _, term := range blockerTerms {
+			if strings.Contains(normalized, term) {
+				return "slack.blocker", "high", "A Slack conversation indicates a blocker or dependency.", true
+			}
 		}
 	}
-	for _, term := range decisionTerms {
-		if strings.Contains(normalized, term) {
-			return "slack.decision", "medium", "A Slack conversation captured a decision that should be durable context.", true
+	if options.extract("decisions") {
+		for _, term := range decisionTerms {
+			if strings.Contains(normalized, term) {
+				return "slack.decision", "medium", "A Slack conversation captured a decision that should be durable context.", true
+			}
 		}
+	}
+	if options.extract("mentions") && containsSlackMention(normalized) {
+		return "slack.mention", "low", "A Slack conversation includes a direct mention that may need follow-up.", true
+	}
+	if options.extract("threads_with_links") && hasThread && len(extractLinkedRefs(text)) > 0 {
+		return "slack.thread_with_link", "medium", "A Slack thread contains links that may be useful project context.", true
 	}
 
 	return "", "", "", false
@@ -462,9 +527,14 @@ func slackTimestamp(value string) time.Time {
 }
 
 func summarizeSlackTitle(eventType string, channelName string) string {
-	prefix := "Slack decision detected"
-	if eventType == "slack.blocker" {
+	prefix := "Slack thread with links detected"
+	switch eventType {
+	case "slack.blocker":
 		prefix = "Slack blocker detected"
+	case "slack.decision":
+		prefix = "Slack decision detected"
+	case "slack.mention":
+		prefix = "Slack mention detected"
 	}
 	return prefix + " in #" + channelName
 }
@@ -479,6 +549,44 @@ func extractLinkedRefs(text string) []string {
 		}
 	}
 	return refs
+}
+
+func containsSlackMention(text string) bool {
+	return strings.Contains(text, "<@") || strings.Contains(text, "@standup")
+}
+
+func nestedSettings(settings map[string]any, key string) (map[string]any, bool) {
+	if settings == nil {
+		return nil, false
+	}
+	value, ok := settings[key]
+	if !ok {
+		return nil, false
+	}
+	nested, ok := value.(map[string]any)
+	return nested, ok
+}
+
+func stringSliceSetting(value any) ([]string, bool) {
+	switch typed := value.(type) {
+	case []string:
+		return typed, true
+	case []any:
+		values := make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if ok && strings.TrimSpace(text) != "" {
+				values = append(values, strings.TrimSpace(text))
+			}
+		}
+		return values, true
+	default:
+		return nil, false
+	}
+}
+
+func slackOldestTimestamp(value time.Time) string {
+	return strconv.FormatInt(value.Unix(), 10)
 }
 
 var (

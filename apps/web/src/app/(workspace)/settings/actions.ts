@@ -1,7 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { disconnectConnection, saveResourceSelection, type SelectableResource, type Service, syncIntegration } from "@/lib/api-client";
+import { redirect } from "next/navigation";
+import {
+  disconnectConnection,
+  getActiveWorkspaceId,
+  saveResourceSelection,
+  type SelectableResource,
+  type Service,
+  syncIntegration,
+} from "@/lib/api-client";
 
 function serviceFromForm(formData: FormData): Service {
   return formData.get("service") as Service;
@@ -30,10 +38,25 @@ export async function saveResourceSelectionAction(formData: FormData) {
   const settingsValue = formData.get("settings");
   const settings = typeof settingsValue === "string" && settingsValue ? (JSON.parse(settingsValue) as Record<string, unknown>) : undefined;
 
-  await saveResourceSelection(service, resources, settings);
-  await syncIntegration(service);
+  const selectionState = await saveResourceSelection(service, resources, settings);
+  if (selectionState.error) {
+    redirect(`/integrations/${service}/resources?selectionError=${encodeURIComponent(selectionState.error)}`);
+  }
+
+  const syncState = await syncIntegration(service);
   revalidatePath("/settings");
   revalidatePath("/dashboard");
   revalidatePath(`/integrations/${service}`);
   revalidatePath(`/integrations/${service}/resources`);
+
+  if (syncState.error) {
+    redirect(`/integrations/${service}/resources?syncError=${encodeURIComponent(syncState.error)}`);
+  }
+
+  if (syncState.data?.result.eventsCreated) {
+    const workspaceId = await getActiveWorkspaceId();
+    redirect(`/dashboard/${encodeURIComponent(workspaceId)}`);
+  }
+
+  redirect(`/integrations/${service}/resources?sync=empty`);
 }
