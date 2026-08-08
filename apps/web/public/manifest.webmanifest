@@ -1,7 +1,7 @@
 {
   "name": "Standup",
   "short_name": "Standup",
-  "description": "The developer OS for understanding what matters before you start building.",
+  "description": "Standup ranks what needs you across GitHub, Slack, Linear, Jira, Trello, Notion, and Calendar.",
   "display": "standalone",
   "background_color": "#080C15",
   "theme_color": "#1D9C4C",

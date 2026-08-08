@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "Standup",
-  description: "The developer OS for focus, integrations, WorkEvents, summaries, and workspace chat.",
+  description: "Standup ranks what needs you across GitHub, Slack, Linear, Jira, Trello, Notion, and Calendar.",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
