@@ -278,6 +278,83 @@ func TestSlackSyncSelectedUsesOnlySelectedChannels(t *testing.T) {
 	}
 }
 
+func TestSlackSyncSelectedUsesSelectedChannelMetadataWithoutInfoLookup(t *testing.T) {
+	seenInfo := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.info":
+			seenInfo = true
+			t.Fatalf("conversations.info should not be called when channel metadata is selected")
+		case "/conversations.history":
+			if r.URL.Query().Get("channel") != "C999" {
+				t.Fatalf("unexpected selected channel %s", r.URL.Query().Get("channel"))
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U2",
+						"text": "Blocked waiting on GitHub checks",
+						"ts":   "1785326500.000000",
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "C999", Type: "public_channel", Name: "#release", Metadata: map[string]any{"channelId": "C999", "channelName": "release"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if seenInfo {
+		t.Fatal("sync looked up selected channel info")
+	}
+	if result.Status != "connected" || result.EventsCreated != 1 {
+		t.Fatalf("unexpected sync result: %#v", result)
+	}
+	if result.Events[0].Source != "Slack · #release" {
+		t.Fatalf("expected selected channel source, got %q", result.Events[0].Source)
+	}
+}
+
+func TestSlackRateLimitErrorIncludesRetryAfter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("retry-after", "42")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	_, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err == nil {
+		t.Fatal("expected rate limit error")
+	}
+	if err.Error() != "slack rate limit exceeded for conversations.list; retry after 42s" {
+		t.Fatalf("unexpected error: %q", err.Error())
+	}
+}
+
 func TestClassifySlackTextPrefersBlockersOverDecisions(t *testing.T) {
 	eventType, priority, _, ok := classifySlackText("Decision is approved but blocked waiting on staging")
 	if !ok {

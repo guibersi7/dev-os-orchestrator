@@ -62,6 +62,13 @@ export default async function IntegrationResourcesPage({
 
       {resourcesState.error ? <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">{resourcesState.error}</Card> : null}
 
+      {payload?.status === "rate_limited" ? (
+        <Card className="border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
+          Slack is temporarily rate limiting channel listing. Standup is showing your saved channel selection, and you can retry
+          once the Slack limit resets.
+        </Card>
+      ) : null}
+
       {payload?.status === "needs_auth" ? (
         <Card className="p-8 text-center">
           <h2 className="text-base font-semibold">Connect {integration.name} first</h2>
