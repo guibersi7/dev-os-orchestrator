@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AlertTriangle, ArrowRight, ExternalLink, PlugZap, RefreshCw, Unplug } from "lucide-react";
 import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
@@ -177,10 +176,10 @@ export default async function SettingsPage({
                     </Button>
                   </form>
                   <Button asChild size="sm" variant="ghost">
-                    <Link href={`/integrations/${integration.id}`} prefetch={false}>
+                    <a href={`/integrations/${integration.id}`}>
                       <ExternalLink className="h-4 w-4" />
                       Details
-                    </Link>
+                    </a>
                   </Button>
                   <form action={disconnectConnectionAction}>
                     <input type="hidden" name="service" value={integration.id} />

@@ -87,7 +87,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                     </p>
                   ) : null}
                   {reviewQueue.map((pr) => (
-                    <Link key={pr.id} href={`/integrations/${pr.service}`} prefetch={false} className="block py-4 first:pt-0 last:pb-0">
+                    <a key={pr.id} href={`/integrations/${pr.service}`} className="block py-4 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">{pr.title}</p>
@@ -99,7 +99,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                           {pr.status.replace("_", " ")}
                         </Badge>
                       </div>
-                    </Link>
+                    </a>
                   ))}
                 </AnimeStagger>
               </Card>
@@ -114,10 +114,9 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                     const health = healthByService[integration.id];
                     const connected = health?.status === "connected";
                     return (
-                      <Link
+                      <a
                         key={integration.id}
                         href={`/integrations/${integration.id}`}
-                        prefetch={false}
                         className="flex items-center justify-between gap-3 rounded-md p-2 transition-colors hover:bg-accent"
                       >
                         <div>
@@ -128,7 +127,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                           </p>
                         </div>
                         <Badge tone={connected ? "green" : "neutral"}>{connected ? "On" : "Ready"}</Badge>
-                      </Link>
+                      </a>
                     );
                   })}
                 </AnimeStagger>
@@ -167,17 +166,16 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                     <p className="text-sm text-muted-foreground">No issue, ticket, or card events in the latest sync.</p>
                   ) : null}
                   {issueQueue.map((issue) => (
-                    <Link
+                    <a
                       key={issue.id}
                       href={`/integrations/${issue.service}`}
-                      prefetch={false}
                       className="block rounded-md border border-border p-3 transition-colors hover:bg-accent"
                     >
                       <p className="text-sm font-medium">{issue.title}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {issue.source} · {issue.actor} · {issue.priority}
                       </p>
-                    </Link>
+                    </a>
                   ))}
                 </AnimeStagger>
               </Card>
