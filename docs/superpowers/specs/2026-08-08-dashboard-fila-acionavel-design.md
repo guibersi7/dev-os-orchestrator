@@ -86,20 +86,26 @@ continua com shell e integrações. Todos server components exceto `QueueFilters
 - `TodayBrief` — primeira dobra. Nome do workspace, badge de sync, e a frase de
   síntese em destaque. Abaixo, quatro métricas em texto corrido (não cards),
   cada uma com número e consequência ("2 bloqueadores · travando outra pessoa"),
-  atuando como atalho para o filtro correspondente. Substitui `MetricStrip`
-  nesta tela.
+  atuando como link para o filtro correspondente. Substitui `MetricStrip` nesta
+  tela. O badge de sync tem três tons: verde (sincronizado), âmbar (sync antigo
+  ou em andamento) e vermelho (gateway offline).
 - `ActionQueue` — coluna principal. Header com contagem e `QueueFilters`. Linhas
-  em `divide-y` dentro de um único `Card`. Divisor rotulado quando a `lane` muda
-  ("Waiting on others", "Blocked / failed"). Rodapé com a contagem de eventos
-  que não exigem ação.
-- `QueueFilters` — único client component. Estado `useState`, valores
-  `all | action | waiting | blocked`. Sem sincronização com a URL.
+  em `divide-y` dentro de um único `Card`. A fila é ordenada só por score: as
+  lanes se intercalam e **não há divisor nem agrupamento por lane** — a lane é
+  comunicada apenas pelo chip da linha. Rodapé com a contagem de eventos que não
+  exigem ação.
+- `QueueFilters` — faixa de `<Link>` (`all | action | waiting | blocked`) com a
+  contagem de cada lane e `aria-current` no ativo. Sem estado de cliente.
 - `QueueRow` — a linha. Grid `[1fr_auto]`. Chip de lane, `ServiceBadge`, fonte e
   idade em mono; título; `reason` com `line-clamp-2`; ação à direita.
+  `priority: "high"` adiciona uma barra de acento de 2px na borda esquerda
+  (`--danger-600` quando `lane` é `blocked`, `--standup-accent` caso contrário);
+  `medium` e `low` não recebem realce. É o único destaque de linha da fila.
 - `ServiceBadge` — ícone `lucide-react` mais rótulo, a partir de um mapa único
   por serviço; reusa `Badge` de `components/ui`.
 - `SignalBoard` — rail: sinal recente de Slack/Notion/decisões, agrupado por
-  serviço.
+  serviço. O cabeçalho de cada grupo é sempre um link para
+  `/integrations/{service}`; itens sem link resolvido são texto não clicável.
 - `SourceSignalList` — substitui o card "Connected sources": por serviço, quantos
   eventos contribuíram e o status de sync; fontes não conectadas ao final,
   apagadas, com CTA de conexão.
@@ -109,8 +115,11 @@ continua com shell e integrações. Todos server components exceto `QueueFilters
   `<details>` rotulado "All activity".
 
 Layout `grid xl:grid-cols-[1fr_380px]`, mantendo o padrão atual. Abaixo de `xl`,
-coluna única na ordem: brief, fila, signal, weekly, sources, timeline. Sem cards
-aninhados: o rail são cards irmãos e a fila é um card com linhas.
+coluna única na ordem: brief, chips de filtro mais fila, signal, weekly, sources,
+timeline. Os chips ficam colados ao topo do card da fila e não são sticky. Sem
+cards aninhados: o rail são cards irmãos e a fila é um card com linhas.
+
+A tela inteira é composta de server components — não há nenhum client component.
 
 Estilo pelos tokens de `globals.css` (`--standup-accent*`, `--line`, `--ink-*`,
 `--danger-*`, `--warn-*`). Sem estética de marketing.
@@ -122,13 +131,22 @@ fetches em paralelo, construção da identidade, chamada dos builders,
 renderização. O `IntegrationEmptyState` para workspace vazio e o card de erro de
 gateway permanecem como estão.
 
+O filtro da fila vive na URL: `?lane=action|waiting|blocked`, ausente significa
+todas. A página lê `searchParams`, valida o valor (qualquer outro cai em todas) e
+filtra os itens antes de passar para `ActionQueue`. Chips e métricas do brief são
+links para o mesmo parâmetro, preservando o restante da query. Assim o filtro não
+introduz estado de cliente.
+
+A rota ganha um `loading.tsx` mínimo — headline e um bloco de linhas em
+`animate-pulse`. Nenhum componente de lista tem estado de loading próprio.
+
 ## Estados vazios
 
 - Workspace sem fontes → `IntegrationEmptyState` ocupando a tela.
 - Fontes conectadas e fila vazia → "Nada exige sua ação agora.", mais a contagem
   do que existe em waiting/recent e link para a timeline. Sem ilustração.
-- Lane vazia sob filtro ativo → uma linha de texto no lugar da lista, com o
-  filtro ainda visível.
+- Lane vazia sob filtro ativo → uma linha de texto no lugar da lista, com os
+  chips ainda visíveis e um link de volta para a fila completa.
 - Identidade não resolvida → modo workspace, conforme descrito acima.
 - Sem riscos ou weekly vazio → texto factual ("Nenhum risco de alta prioridade
   na última sync"), sem zeros em destaque.
