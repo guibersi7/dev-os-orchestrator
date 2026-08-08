@@ -149,7 +149,7 @@ func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/search/jql" {
+		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/search" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		if r.Header.Get("authorization") != "Bearer token" {
@@ -347,6 +347,33 @@ func TestJiraSyncPaginatesIssues(t *testing.T) {
 	}
 	if result.EventsCreated != 2 {
 		t.Fatalf("expected 2 events, got %d", result.EventsCreated)
+	}
+}
+
+func TestJiraSyncIncludesProviderErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		if _, err := w.Write([]byte(`{"errorMessages":["The value 'updated' does not exist for the field 'updated'."],"errors":{}}`)); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	defer server.Close()
+
+	connector := &JiraConnector{
+		info:       NewJiraConnector().Info(),
+		client:     server.Client(),
+		baseURL:    "https://jira.test",
+		apiBaseURL: server.URL,
+		cloudID:    "cloud-1",
+	}
+
+	_, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err == nil {
+		t.Fatal("expected Jira API error")
+	}
+	if !strings.Contains(err.Error(), "errorMessages") {
+		t.Fatalf("expected provider error body, got %q", err.Error())
 	}
 }
 
