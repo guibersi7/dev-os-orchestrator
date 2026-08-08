@@ -342,6 +342,62 @@ func TestSlackSyncSelectedUsesSelectedChannelMetadataWithoutInfoLookup(t *testin
 	}
 }
 
+func TestSlackSyncSelectedSkipsChannelsWithoutAccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			switch r.URL.Query().Get("channel") {
+			case "CNOACCESS":
+				writeSlackJSON(t, w, map[string]any{"ok": false, "error": "not_in_channel"})
+			case "C999":
+				writeSlackJSON(t, w, map[string]any{
+					"ok": true,
+					"messages": []map[string]any{
+						{
+							"user": "U2",
+							"text": "Blocked waiting on GitHub checks",
+							"ts":   "1785326500.000000",
+						},
+					},
+				})
+			default:
+				t.Fatalf("unexpected selected channel %s", r.URL.Query().Get("channel"))
+			}
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "CNOACCESS", Type: "public_channel", Name: "#no-access", Metadata: map[string]any{"channelId": "CNOACCESS", "channelName": "no-access"}},
+			{ID: "C999", Type: "public_channel", Name: "#release", Metadata: map[string]any{"channelId": "C999", "channelName": "release"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Status != "connected" {
+		t.Fatalf("expected connected, got %q", result.Status)
+	}
+	if result.EventsCreated != 1 {
+		t.Fatalf("expected one event from accessible channel, got %d", result.EventsCreated)
+	}
+	if result.Events[0].Source != "Slack · #release" {
+		t.Fatalf("expected accessible channel source, got %q", result.Events[0].Source)
+	}
+}
+
 func TestSlackRateLimitErrorIncludesRetryAfter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("retry-after", "42")

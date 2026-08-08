@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { CheckCircle2, Search } from "lucide-react";
 import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { Badge } from "@/components/ui/badge";
@@ -203,13 +204,23 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-border bg-[#121826] p-4">
-          <Button type="submit">{resourceConfig?.firstSyncLabel ?? "Save selection"}</Button>
+          <ResourceSelectionSubmitButton label={resourceConfig?.firstSyncLabel ?? "Save selection"} />
           <Button asChild variant="secondary">
             <a href={`/integrations/${integration.id}`}>Open connector details</a>
           </Button>
         </div>
       </Card>
     </form>
+  );
+}
+
+function ResourceSelectionSubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Starting sync..." : label}
+    </Button>
   );
 }
 

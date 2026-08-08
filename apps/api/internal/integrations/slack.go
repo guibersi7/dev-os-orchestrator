@@ -138,12 +138,18 @@ func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context,
 			var err error
 			channel, err = c.fetchChannel(ctx, accessToken, channel.ID)
 			if err != nil {
+				if isSlackChannelAccessError(err) {
+					continue
+				}
 				return nil, err
 			}
 		}
 
 		messages, err := c.fetchHistory(ctx, accessToken, channel.ID)
 		if err != nil {
+			if isSlackChannelAccessError(err) {
+				continue
+			}
 			return nil, err
 		}
 
@@ -152,7 +158,11 @@ func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context,
 			if message.ReplyCount > 0 && message.ThreadTS != "" {
 				replies, err = c.fetchReplies(ctx, accessToken, channel.ID, message.ThreadTS)
 				if err != nil {
-					return nil, err
+					if isSlackChannelAccessError(err) {
+						replies = []slackMessage{}
+					} else {
+						return nil, err
+					}
 				}
 			}
 
@@ -266,7 +276,7 @@ func (c *SlackConnector) fetchChannel(ctx context.Context, token string, channel
 		return slackChannel{}, err
 	}
 	if !response.OK {
-		return slackChannel{}, fmt.Errorf("slack conversations.info failed: %s", response.Error)
+		return slackChannel{}, slackAPIError{Method: "conversations.info", Code: response.Error}
 	}
 	return response.Channel, nil
 }
@@ -281,7 +291,7 @@ func (c *SlackConnector) fetchHistory(ctx context.Context, token string, channel
 		return nil, err
 	}
 	if !response.OK {
-		return nil, fmt.Errorf("slack conversations.history failed: %s", response.Error)
+		return nil, slackAPIError{Method: "conversations.history", Code: response.Error}
 	}
 	return response.Messages, nil
 }
@@ -296,7 +306,7 @@ func (c *SlackConnector) fetchReplies(ctx context.Context, token string, channel
 		return nil, err
 	}
 	if !response.OK {
-		return nil, fmt.Errorf("slack conversations.replies failed: %s", response.Error)
+		return nil, slackAPIError{Method: "conversations.replies", Code: response.Error}
 	}
 	return response.Messages, nil
 }
@@ -337,6 +347,15 @@ func (e slackRateLimitError) Error() string {
 		return fmt.Sprintf("slack rate limit exceeded for %s; retry after %s", e.Method, e.RetryAfter.Round(time.Second))
 	}
 	return fmt.Sprintf("slack rate limit exceeded for %s", e.Method)
+}
+
+type slackAPIError struct {
+	Method string
+	Code   string
+}
+
+func (e slackAPIError) Error() string {
+	return fmt.Sprintf("slack %s failed: %s", e.Method, e.Code)
 }
 
 type slackChannel struct {
@@ -541,6 +560,20 @@ func retryAfterDuration(value string) time.Duration {
 		return 0
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+func isSlackChannelAccessError(err error) bool {
+	var apiErr slackAPIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+
+	switch apiErr.Code {
+	case "not_in_channel", "channel_not_found", "is_archived":
+		return true
+	default:
+		return false
+	}
 }
 
 func slackUnixTimestamp(value int64) string {
