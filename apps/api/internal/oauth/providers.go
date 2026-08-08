@@ -44,7 +44,7 @@ func ProviderFor(service domain.Service) (Provider, bool) {
 			ClientSecret: os.Getenv("LINEAR_CLIENT_SECRET"),
 			AuthURL:      envOrDefault("LINEAR_AUTH_URL", "https://linear.app/oauth/authorize"),
 			TokenURL:     envOrDefault("LINEAR_TOKEN_URL", "https://api.linear.app/oauth/token"),
-			Scopes:       splitScopes(os.Getenv("LINEAR_OAUTH_SCOPES"), []string{"read", "write"}),
+			Scopes:       splitScopes(os.Getenv("LINEAR_OAUTH_SCOPES"), []string{"read"}),
 		},
 		domain.ServiceJira: {
 			Service:      domain.ServiceJira,

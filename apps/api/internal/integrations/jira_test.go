@@ -79,6 +79,56 @@ func TestJiraListSelectableResourcesReturnsProjects(t *testing.T) {
 	}
 }
 
+func TestJiraListSelectableResourcesPaginatesProjects(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path != "/rest/api/3/project/search" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+
+		switch r.URL.Query().Get("startAt") {
+		case "0":
+			writeJiraJSON(t, w, map[string]any{
+				"startAt":    0,
+				"maxResults": 100,
+				"total":      2,
+				"isLast":     false,
+				"values":     []map[string]any{{"id": "10000", "key": "ENG", "name": "Engineering"}},
+			})
+		case "1":
+			writeJiraJSON(t, w, map[string]any{
+				"startAt":    1,
+				"maxResults": 100,
+				"total":      2,
+				"isLast":     true,
+				"values":     []map[string]any{{"id": "10001", "key": "OPS", "name": "Operations"}},
+			})
+		default:
+			t.Fatalf("unexpected startAt %q", r.URL.Query().Get("startAt"))
+		}
+	}))
+	defer server.Close()
+
+	connector := &JiraConnector{
+		info:    NewJiraConnector().Info(),
+		client:  server.Client(),
+		baseURL: server.URL,
+	}
+
+	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if requests != 2 {
+		t.Fatalf("expected 2 project page requests, got %d", requests)
+	}
+	if len(resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resources))
+	}
+}
+
 func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -184,6 +234,100 @@ func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
 		}
+	}
+}
+
+func TestJiraSyncPaginatesIssues(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+
+		if requests == 1 {
+			if payload["startAt"] != float64(0) {
+				t.Fatalf("expected first startAt 0, got %#v", payload["startAt"])
+			}
+			writeJiraJSON(t, w, map[string]any{
+				"startAt":    0,
+				"maxResults": 50,
+				"total":      2,
+				"isLast":     false,
+				"issues": []map[string]any{
+					{
+						"id":   "10001",
+						"key":  "ENG-12",
+						"self": "https://jira.test/rest/api/3/issue/10001",
+						"fields": map[string]any{
+							"summary":        "First page ticket",
+							"updated":        "2026-07-29T12:30:00.000+0000",
+							"created":        "2026-07-29T12:00:00.000+0000",
+							"resolutiondate": nil,
+							"labels":         []string{},
+							"status":         map[string]any{"name": "Todo", "statusCategory": map[string]any{"key": "new", "name": "To Do"}},
+							"project":        map[string]any{"key": "ENG", "name": "Engineering"},
+							"priority":       map[string]any{"name": "Medium"},
+							"issuetype":      map[string]any{"name": "Task"},
+							"assignee":       nil,
+							"comment":        map[string]any{"total": 0, "comments": []map[string]any{}},
+						},
+					},
+				},
+			})
+			return
+		}
+
+		if payload["startAt"] != float64(1) {
+			t.Fatalf("expected second startAt 1, got %#v", payload["startAt"])
+		}
+		writeJiraJSON(t, w, map[string]any{
+			"startAt":    1,
+			"maxResults": 50,
+			"total":      2,
+			"isLast":     true,
+			"issues": []map[string]any{
+				{
+					"id":   "10002",
+					"key":  "ENG-13",
+					"self": "https://jira.test/rest/api/3/issue/10002",
+					"fields": map[string]any{
+						"summary":        "Second page ticket",
+						"updated":        "2026-07-29T13:30:00.000+0000",
+						"created":        "2026-07-29T13:00:00.000+0000",
+						"resolutiondate": nil,
+						"labels":         []string{},
+						"status":         map[string]any{"name": "Todo", "statusCategory": map[string]any{"key": "new", "name": "To Do"}},
+						"project":        map[string]any{"key": "ENG", "name": "Engineering"},
+						"priority":       map[string]any{"name": "Medium"},
+						"issuetype":      map[string]any{"name": "Task"},
+						"assignee":       nil,
+						"comment":        map[string]any{"total": 0, "comments": []map[string]any{}},
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	connector := &JiraConnector{
+		info:        NewJiraConnector().Info(),
+		client:      server.Client(),
+		baseURL:     server.URL,
+		projectKeys: []string{"ENG"},
+	}
+
+	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if requests != 2 {
+		t.Fatalf("expected 2 issue page requests, got %d", requests)
+	}
+	if result.EventsCreated != 2 {
+		t.Fatalf("expected 2 events, got %d", result.EventsCreated)
 	}
 }
 

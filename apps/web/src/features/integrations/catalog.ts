@@ -21,7 +21,7 @@ export type IntegrationCatalogItem = {
     preConnectTitle: string;
     preConnectDescription: string;
     permissionBullets: string[];
-    continueLabel: string;
+    oauthCtaLabel: string;
   };
   resources?: {
     title: string;
@@ -30,13 +30,15 @@ export type IntegrationCatalogItem = {
     firstSyncLabel: string;
     emptyTitle: string;
     emptyDescription: string;
+    searchPlaceholder: string;
     setupQuestions: {
-      contextChannels: string;
-      privateChannels: string;
-      privateChannelsHelp: string;
+      contextScope: string;
+      includeRecent: string;
+      includeRecentHelp: string;
       extractionTypes: string;
       syncWindow: string;
     };
+    extractionOptions: { value: string; label: string }[];
   };
 };
 
@@ -67,7 +69,7 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
         "Detect decisions, blockers, mentions, and threads with links.",
         "Keep channel selection under your control before the first sync.",
       ],
-      continueLabel: "Continue to Slack",
+      oauthCtaLabel: "Continue to Slack",
     },
     resources: {
       title: "Choose Slack channels",
@@ -77,14 +79,21 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
       emptyTitle: "No Slack channels are available",
       emptyDescription:
         "Standup could not find public or private channels for this token. Private channels only appear when the Slack app has permission and has been added to those channels.",
+      searchPlaceholder: "Search Slack channels",
       setupQuestions: {
-        contextChannels: "Quais canais devem virar contexto?",
-        privateChannels: "Incluir canais privados?",
-        privateChannelsHelp:
+        contextScope: "Quais canais devem virar contexto?",
+        includeRecent: "Incluir canais privados?",
+        includeRecentHelp:
           "Private channels appear only when Slack grants the required scope and the app has access to those channels.",
         extractionTypes: "Que tipo de informação extrair?",
         syncWindow: "A partir de quando sincronizar?",
       },
+      extractionOptions: [
+        { value: "decisions", label: "Decisions" },
+        { value: "blockers", label: "Blockers" },
+        { value: "mentions", label: "Mentions" },
+        { value: "threads_with_links", label: "Threads with links" },
+      ],
     },
   },
   {
@@ -95,6 +104,42 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     syncMode: "incremental_polling",
     objects: ["teams", "projects", "cycles", "issues", "labels", "comments"],
     icon: ListTodo,
+    connect: {
+      preConnectTitle: "Connect Linear",
+      preConnectDescription:
+        "Authorize Linear so Standup can read issues, cycles, projects, labels, comments, assignees, estimates, and blockers.",
+      permissionBullets: [
+        "Read teams, projects, cycles, and issues",
+        "Find blockers, ownership, priorities, and delivery context",
+        "Choose which teams or projects should feed Standup after authorization",
+      ],
+      oauthCtaLabel: "Continue to Linear",
+    },
+    resources: {
+      title: "Choose Linear scope",
+      description:
+        "Select the Linear teams or projects Standup should read for blockers, cycle risk, assignments, comments, and delivery changes.",
+      resourceSelectionLabel: "Linear teams and projects",
+      firstSyncLabel: "Start first sync",
+      emptyTitle: "No Linear teams or projects are available",
+      emptyDescription:
+        "Standup could not find Linear teams or projects for this token. Check that the authorized Linear user can access the workspace resources.",
+      searchPlaceholder: "Search Linear teams or projects",
+      setupQuestions: {
+        contextScope: "Quais times/projetos devem virar contexto?",
+        includeRecent: "Incluir issues arquivadas/fechadas recentes?",
+        includeRecentHelp: "Recent closed or archived issues can help Standup identify completed work and delivery risk.",
+        extractionTypes: "Que tipo de contexto extrair?",
+        syncWindow: "A partir de quando sincronizar?",
+      },
+      extractionOptions: [
+        { value: "blockers", label: "Blockers" },
+        { value: "cycle_risk", label: "Cycle risk" },
+        { value: "assignments", label: "Assignments" },
+        { value: "comments", label: "Comments" },
+        { value: "delivery_changes", label: "Delivery changes" },
+      ],
+    },
   },
   {
     id: "jira",
@@ -104,6 +149,42 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     syncMode: "incremental_polling",
     objects: ["projects", "epics", "issues", "sprints", "comments", "statuses"],
     icon: ListTodo,
+    connect: {
+      preConnectTitle: "Connect Jira",
+      preConnectDescription:
+        "Authorize Jira so Standup can read projects, epics, issues, sprint status, comments, and blockers.",
+      permissionBullets: [
+        "Read projects, boards/sprints, epics, and issues",
+        "Find blockers, status changes, assignments, and delivery risk",
+        "Choose which Jira projects should feed Standup after authorization",
+      ],
+      oauthCtaLabel: "Continue to Jira",
+    },
+    resources: {
+      title: "Choose Jira projects",
+      description:
+        "Select the Jira projects Standup should read for blockers, status changes, comments, sprint risk, and assignments.",
+      resourceSelectionLabel: "Jira projects",
+      firstSyncLabel: "Start first sync",
+      emptyTitle: "No Jira projects are available",
+      emptyDescription:
+        "Standup could not find Jira projects for this token. Check that the authorized Jira user can browse projects on the configured site.",
+      searchPlaceholder: "Search Jira projects",
+      setupQuestions: {
+        contextScope: "Quais projetos devem virar contexto?",
+        includeRecent: "Incluir sprints ativos e recentes?",
+        includeRecentHelp: "Active and recent sprint context helps Standup identify sprint risk and delivery changes.",
+        extractionTypes: "Que tipo de contexto extrair?",
+        syncWindow: "A partir de quando sincronizar?",
+      },
+      extractionOptions: [
+        { value: "blockers", label: "Blockers" },
+        { value: "status_changes", label: "Status changes" },
+        { value: "comments", label: "Comments" },
+        { value: "sprint_risk", label: "Sprint risk" },
+        { value: "assignments", label: "Assignments" },
+      ],
+    },
   },
   {
     id: "trello",

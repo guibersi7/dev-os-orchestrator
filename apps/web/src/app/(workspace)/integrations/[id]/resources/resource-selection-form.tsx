@@ -16,37 +16,39 @@ type ResourceSelectionFormProps = {
   integration: {
     id: string;
     resources?: {
+      title: string;
+      description: string;
       resourceSelectionLabel: string;
       firstSyncLabel: string;
+      emptyTitle: string;
+      emptyDescription: string;
+      searchPlaceholder: string;
       setupQuestions: {
-        contextChannels: string;
-        privateChannels: string;
-        privateChannelsHelp: string;
+        contextScope: string;
+        includeRecent: string;
+        includeRecentHelp: string;
         extractionTypes: string;
         syncWindow: string;
       };
+      extractionOptions: { value: string; label: string }[];
     };
   };
   resources: SelectableResource[];
   selectedResourceIds: string[];
 };
 
-const slackExtractionTypes = [
-  ["decisions", "Decisions"],
-  ["blockers", "Blockers"],
-  ["mentions", "Mentions"],
-  ["threads_with_links", "Threads with links"],
-];
-
 export function ResourceSelectionForm({ integration, resources, selectedResourceIds }: ResourceSelectionFormProps) {
   const [query, setQuery] = useState("");
-  const [includePrivateChannels, setIncludePrivateChannels] = useState(true);
-  const [extractionTypes, setExtractionTypes] = useState(["decisions", "blockers", "mentions", "threads_with_links"]);
+  const resourceConfig = integration.resources;
+  const [includeRecent, setIncludeRecent] = useState(true);
+  const [extractionTypes, setExtractionTypes] = useState(
+    resourceConfig?.extractionOptions.map((option) => option.value) ?? [],
+  );
   const [syncWindow, setSyncWindow] = useState("last_7_days");
   const [showInactiveChannels, setShowInactiveChannels] = useState(false);
   const selected = useMemo(() => new Set(selectedResourceIds), [selectedResourceIds]);
-  const resourceConfig = integration.resources;
-  const isSlack = integration.id === "slack" && resourceConfig;
+  const hasGuidedSetup = Boolean(resourceConfig);
+  const isSlack = integration.id === "slack";
   const queryValue = query.trim().toLowerCase();
   const matchingResources = resources.filter((resource) => resourceMatchesQuery(resource, queryValue));
   const hiddenInactiveCount = isSlack
@@ -55,10 +57,10 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
   const filteredResources = matchingResources
     .filter((resource) => !isSlack || showInactiveChannels || selected.has(resource.id) || !isInactiveSlackChannel(resource))
     .sort((a, b) => compareResources(a, b, selected));
-  const settings = isSlack
+  const settings = resourceConfig
     ? {
-        slack: {
-          includePrivateChannels,
+        [integration.id]: {
+          includeRecent,
           extractionTypes,
           syncWindow,
         },
@@ -70,21 +72,21 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
       <input type="hidden" name="service" value={integration.id} />
       {settings ? <input type="hidden" name="settings" value={JSON.stringify(settings)} /> : null}
 
-      {isSlack ? (
+      {hasGuidedSetup && resourceConfig ? (
         <Card className="mb-6 p-5">
-          <h2 className="text-base font-semibold">Slack setup</h2>
+          <h2 className="text-base font-semibold">{resourceConfig.title}</h2>
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div>
-              <p className="text-sm font-medium">{resourceConfig.setupQuestions.privateChannels}</p>
+              <p className="text-sm font-medium">{resourceConfig.setupQuestions.includeRecent}</p>
               <label className="mt-3 flex items-start gap-3 text-sm leading-6 text-muted-foreground">
                 <Checkbox
-                  checked={includePrivateChannels}
-                  onCheckedChange={(checked) => setIncludePrivateChannels(checked === true)}
+                  checked={includeRecent}
+                  onCheckedChange={(checked) => setIncludeRecent(checked === true)}
                   className="mt-1"
                 />
                 <span>
-                  Include private channels when available.
-                  <span className="mt-1 block text-xs leading-5">{resourceConfig.setupQuestions.privateChannelsHelp}</span>
+                  Include when available.
+                  <span className="mt-1 block text-xs leading-5">{resourceConfig.setupQuestions.includeRecentHelp}</span>
                 </span>
               </label>
             </div>
@@ -106,17 +108,19 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
             <div className="lg:col-span-2">
               <p className="text-sm font-medium">{resourceConfig.setupQuestions.extractionTypes}</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {slackExtractionTypes.map(([value, label]) => (
-                  <label key={value} className="flex items-center gap-3 text-sm text-muted-foreground">
+                {resourceConfig.extractionOptions.map((option) => (
+                  <label key={option.value} className="flex items-center gap-3 text-sm text-muted-foreground">
                     <Checkbox
-                      checked={extractionTypes.includes(value)}
+                      checked={extractionTypes.includes(option.value)}
                       onCheckedChange={(checked) =>
                         setExtractionTypes((current) =>
-                          checked === true ? [...new Set([...current, value])] : current.filter((item) => item !== value),
+                          checked === true
+                            ? [...new Set([...current, option.value])]
+                            : current.filter((item) => item !== option.value),
                         )
                       }
                     />
-                    {label}
+                    {option.label}
                   </label>
                 ))}
               </div>
@@ -129,7 +133,7 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
         <div className="border-b border-brand-border p-5">
           <h2 className="text-base font-semibold">{resourceConfig?.resourceSelectionLabel ?? "Available resources"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {isSlack ? resourceConfig.setupQuestions.contextChannels : "Select one or more resources to include in sync."}
+            {resourceConfig?.setupQuestions.contextScope ?? "Select one or more resources to include in sync."}
           </p>
           <div className="relative mt-4">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -137,7 +141,7 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={isSlack ? "Search Slack channels" : "Search resources"}
+              placeholder={resourceConfig?.searchPlaceholder ?? "Search resources"}
               className="pl-9"
             />
           </div>
@@ -164,7 +168,7 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
         {filteredResources.length ? (
           <AnimeStagger className="divide-y divide-brand-border">
             {filteredResources.map((resource) => {
-              const inactive = Boolean(isSlack) && isInactiveSlackChannel(resource);
+              const inactive = isSlack && isInactiveSlackChannel(resource);
               const lastActivity = isSlack ? slackLastActivityLabel(resource) : "";
 
               return (
