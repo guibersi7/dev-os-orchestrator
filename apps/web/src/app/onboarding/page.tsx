@@ -75,13 +75,15 @@ export default async function OnboardingPage({
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <Button asChild>
-              <Link href="/settings">
+              <a href="/settings">
                 Open Connection Center
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </Button>
             <Button asChild variant="secondary">
-              <Link href="/dashboard">Open dashboard</Link>
+              {/* Intentionally use document navigation to avoid protected-route RSC requests. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/dashboard">Open dashboard</a>
             </Button>
             <HeaderAuthControl />
           </div>
@@ -237,7 +239,9 @@ export default async function OnboardingPage({
               </div>
             </div>
             <Button asChild variant="secondary">
-              <Link href="/dashboard">Open dashboard</Link>
+              {/* Intentionally use document navigation to avoid protected-route RSC requests. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/dashboard">Open dashboard</a>
             </Button>
           </div>
         </section>
