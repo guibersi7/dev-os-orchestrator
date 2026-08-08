@@ -63,7 +63,7 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 			writeSlackJSON(t, w, map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
-					{"id": "C123", "name": "eng"},
+					{"id": "C123", "name": "eng", "created": 1785320000, "updated": 1785326400, "is_member": true},
 				},
 				"response_metadata": map[string]any{"next_cursor": "page-2"},
 			})
@@ -74,8 +74,8 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 			writeSlackJSON(t, w, map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
-					{"id": "C999", "name": "release", "is_private": false},
-					{"id": "G999", "name": "leadership", "is_private": true},
+					{"id": "C999", "name": "release", "is_private": false, "is_shared": true, "created": 1785320100},
+					{"id": "G999", "name": "leadership", "is_private": true, "is_member": true, "created": 1785320200, "updated": 1785326500},
 				},
 				"response_metadata": map[string]any{"next_cursor": ""},
 			})
@@ -102,11 +102,20 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 	if resources[0].ID != "C123" || resources[0].Type != "public_channel" || resources[0].Name != "#eng" {
 		t.Fatalf("unexpected first resource: %#v", resources[0])
 	}
+	if resources[0].Metadata["lastActivityAt"] != "2026-07-29T12:00:00Z" || resources[0].Metadata["isMember"] != true {
+		t.Fatalf("unexpected first resource metadata: %#v", resources[0].Metadata)
+	}
 	if resources[1].ID != "C999" || resources[1].Type != "public_channel" || resources[1].Name != "#release" {
 		t.Fatalf("unexpected second resource: %#v", resources[1])
 	}
+	if resources[1].Metadata["lastActivityAt"] != "2026-07-29T10:15:00Z" || resources[1].Metadata["isShared"] != true {
+		t.Fatalf("unexpected second resource metadata: %#v", resources[1].Metadata)
+	}
 	if resources[2].ID != "G999" || resources[2].Type != "private_channel" || resources[2].Name != "#leadership" {
 		t.Fatalf("unexpected third resource: %#v", resources[2])
+	}
+	if resources[2].Metadata["lastActivityAt"] != "2026-07-29T12:01:40Z" || resources[2].Metadata["isPrivate"] != true {
+		t.Fatalf("unexpected third resource metadata: %#v", resources[2].Metadata)
 	}
 	if requests != 2 {
 		t.Fatalf("expected 2 paginated requests, got %d", requests)

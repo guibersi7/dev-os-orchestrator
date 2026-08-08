@@ -74,14 +74,20 @@ func (c *SlackConnector) ListSelectableResources(ctx context.Context, _ domain.G
 		if channel.IsPrivate {
 			resourceType = "private_channel"
 		}
+		lastActivityAt := channelLastActivityAt(channel)
 		resources = append(resources, domain.SelectableResource{
 			ID:   channel.ID,
 			Type: resourceType,
 			Name: "#" + channel.Name,
 			Metadata: map[string]any{
-				"channelId":   channel.ID,
-				"channelName": channel.Name,
-				"isPrivate":   channel.IsPrivate,
+				"channelId":      channel.ID,
+				"channelName":    channel.Name,
+				"isPrivate":      channel.IsPrivate,
+				"isMember":       channel.IsMember,
+				"isShared":       channel.IsShared,
+				"createdAt":      slackUnixTimestamp(channel.Created),
+				"updatedAt":      slackUnixTimestamp(channel.Updated),
+				"lastActivityAt": lastActivityAt,
 			},
 		})
 	}
@@ -337,6 +343,10 @@ type slackChannel struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	IsPrivate bool   `json:"is_private"`
+	IsMember  bool   `json:"is_member"`
+	IsShared  bool   `json:"is_shared"`
+	Created   int64  `json:"created"`
+	Updated   int64  `json:"updated"`
 }
 
 type slackMessage struct {
@@ -531,4 +541,18 @@ func retryAfterDuration(value string) time.Duration {
 		return 0
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+func slackUnixTimestamp(value int64) string {
+	if value <= 0 {
+		return ""
+	}
+	return time.Unix(value, 0).UTC().Format(time.RFC3339)
+}
+
+func channelLastActivityAt(channel slackChannel) string {
+	if channel.Updated > 0 {
+		return slackUnixTimestamp(channel.Updated)
+	}
+	return slackUnixTimestamp(channel.Created)
 }
