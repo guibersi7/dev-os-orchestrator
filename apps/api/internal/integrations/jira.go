@@ -19,6 +19,8 @@ type JiraConnector struct {
 	info        domain.ConnectorInfo
 	client      *http.Client
 	baseURL     string
+	apiBaseURL  string
+	cloudID     string
 	projectKeys []string
 }
 
@@ -34,6 +36,8 @@ func NewJiraConnector() Connector {
 		},
 		client:      &http.Client{Timeout: 15 * time.Second},
 		baseURL:     strings.TrimRight(os.Getenv("JIRA_BASE_URL"), "/"),
+		apiBaseURL:  strings.TrimRight(envOrDefault("JIRA_API_BASE_URL", "https://api.atlassian.com"), "/"),
+		cloudID:     strings.TrimSpace(os.Getenv("JIRA_CLOUD_ID")),
 		projectKeys: parseCSV(os.Getenv("JIRA_PROJECT_KEYS")),
 	}
 }
@@ -47,18 +51,20 @@ func (c *JiraConnector) FetchRecentRecords(ctx context.Context, _ domain.Gateway
 	if accessToken == "" {
 		return nil, errJiraNeedsAuth
 	}
-	if c.baseURL == "" {
-		return nil, errJiraNeedsSiteConfig
+
+	site, err := c.resolveSite(ctx, accessToken)
+	if err != nil {
+		return nil, err
 	}
 
-	issues, err := c.searchIssues(ctx, accessToken)
+	issues, err := c.searchIssues(ctx, accessToken, site)
 	if err != nil {
 		return nil, err
 	}
 
 	records := make([]domain.ExternalRecord, 0, len(issues))
 	for _, issue := range issues {
-		records = append(records, issue.toRecord(c.baseURL))
+		records = append(records, issue.toRecord(site.URL))
 	}
 	return records, nil
 }
@@ -68,11 +74,13 @@ func (c *JiraConnector) ListSelectableResources(ctx context.Context, _ domain.Ga
 	if accessToken == "" {
 		return nil, errJiraNeedsAuth
 	}
-	if c.baseURL == "" {
-		return nil, errJiraNeedsSiteConfig
+
+	site, err := c.resolveSite(ctx, accessToken)
+	if err != nil {
+		return nil, err
 	}
 
-	projects, err := c.fetchProjects(ctx, accessToken)
+	projects, err := c.fetchProjects(ctx, accessToken, site)
 	if err != nil {
 		return nil, err
 	}
@@ -86,10 +94,12 @@ func (c *JiraConnector) ListSelectableResources(ctx context.Context, _ domain.Ga
 			ID:          project.Key,
 			Type:        "project",
 			Name:        project.Name,
-			ExternalURL: strings.TrimRight(c.baseURL, "/") + "/jira/software/c/projects/" + url.PathEscape(project.Key),
+			ExternalURL: strings.TrimRight(site.URL, "/") + "/jira/software/c/projects/" + url.PathEscape(project.Key),
 			Metadata: map[string]any{
 				"projectId":  project.ID,
 				"projectKey": project.Key,
+				"cloudId":    site.CloudID,
+				"siteUrl":    site.URL,
 			},
 		})
 	}
@@ -151,8 +161,13 @@ func (c *JiraConnector) SyncSelected(ctx context.Context, gatewayContext domain.
 	if accessToken == "" {
 		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
 	}
-	if c.baseURL == "" {
+
+	site, err := c.resolveSite(ctx, accessToken)
+	if errors.Is(err, errJiraNeedsSiteConfig) {
 		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_site_config", Events: []domain.WorkEvent{}}, nil
+	}
+	if err != nil {
+		return domain.SyncResult{}, err
 	}
 
 	projectKeys := selectedJiraProjectKeys(selection)
@@ -160,14 +175,14 @@ func (c *JiraConnector) SyncSelected(ctx context.Context, gatewayContext domain.
 		return domain.SyncResult{Service: domain.ServiceJira, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
 	}
 
-	issues, err := c.searchIssuesForProjectKeys(ctx, accessToken, projectKeys)
+	issues, err := c.searchIssuesForProjectKeys(ctx, accessToken, site, projectKeys)
 	if err != nil {
 		return domain.SyncResult{}, err
 	}
 
 	records := make([]domain.ExternalRecord, 0, len(issues))
 	for _, issue := range issues {
-		records = append(records, issue.toRecord(c.baseURL))
+		records = append(records, issue.toRecord(site.URL))
 	}
 
 	events := c.Normalize(records)
@@ -183,11 +198,11 @@ func (c *JiraConnector) SyncSelected(ctx context.Context, gatewayContext domain.
 	}, nil
 }
 
-func (c *JiraConnector) searchIssues(ctx context.Context, token string) ([]jiraIssue, error) {
-	return c.searchIssuesForProjectKeys(ctx, token, c.projectKeys)
+func (c *JiraConnector) searchIssues(ctx context.Context, token string, site jiraSite) ([]jiraIssue, error) {
+	return c.searchIssuesForProjectKeys(ctx, token, site, c.projectKeys)
 }
 
-func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token string, projectKeys []string) ([]jiraIssue, error) {
+func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token string, site jiraSite, projectKeys []string) ([]jiraIssue, error) {
 	jql := "updated >= -14d ORDER BY updated DESC"
 	if len(projectKeys) > 0 {
 		quoted := make([]string, 0, len(projectKeys))
@@ -227,7 +242,7 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 		}
 
 		var response jiraSearchResponse
-		if err := c.post(ctx, token, "/rest/api/3/search/jql", payload, &response); err != nil {
+		if err := c.post(ctx, token, site, "/rest/api/3/search/jql", payload, &response); err != nil {
 			return nil, err
 		}
 
@@ -250,13 +265,13 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 	}
 }
 
-func (c *JiraConnector) fetchProjects(ctx context.Context, token string) ([]jiraProject, error) {
+func (c *JiraConnector) fetchProjects(ctx context.Context, token string, site jiraSite) ([]jiraProject, error) {
 	projects := []jiraProject{}
 	startAt := 0
 	for {
 		var response jiraProjectSearchResponse
 		path := fmt.Sprintf("/rest/api/3/project/search?maxResults=100&startAt=%d", startAt)
-		if err := c.get(ctx, token, path, &response); err != nil {
+		if err := c.get(ctx, token, site, path, &response); err != nil {
 			return nil, err
 		}
 
@@ -282,8 +297,60 @@ func cloneMap(input map[string]any) map[string]any {
 	return output
 }
 
-func (c *JiraConnector) get(ctx context.Context, token string, path string, output any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+func (c *JiraConnector) resolveSite(ctx context.Context, token string) (jiraSite, error) {
+	if c.cloudID != "" {
+		siteURL := c.baseURL
+		if siteURL == "" {
+			siteURL = "https://api.atlassian.com/ex/jira/" + url.PathEscape(c.cloudID)
+		}
+		return jiraSite{CloudID: c.cloudID, URL: siteURL}, nil
+	}
+
+	resources, err := c.fetchAccessibleResources(ctx, token)
+	if err != nil {
+		return jiraSite{}, err
+	}
+
+	for _, resource := range resources {
+		if !resource.hasJiraScope() {
+			continue
+		}
+		if c.baseURL == "" || strings.EqualFold(strings.TrimRight(resource.URL, "/"), c.baseURL) {
+			return jiraSite{CloudID: resource.ID, URL: strings.TrimRight(resource.URL, "/")}, nil
+		}
+	}
+
+	return jiraSite{}, errJiraNeedsSiteConfig
+}
+
+func (c *JiraConnector) fetchAccessibleResources(ctx context.Context, token string) ([]jiraAccessibleResource, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBaseURL+"/oauth/token/accessible-resources", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("authorization", "Bearer "+token)
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("user-agent", "developer-os-api")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("jira accessible resources request failed: %s", resp.Status)
+	}
+
+	var resources []jiraAccessibleResource
+	if err := json.NewDecoder(resp.Body).Decode(&resources); err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
+func (c *JiraConnector) get(ctx context.Context, token string, site jiraSite, path string, output any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.jiraAPIURL(site, path), nil)
 	if err != nil {
 		return err
 	}
@@ -303,13 +370,13 @@ func (c *JiraConnector) get(ctx context.Context, token string, path string, outp
 	return json.NewDecoder(resp.Body).Decode(output)
 }
 
-func (c *JiraConnector) post(ctx context.Context, token string, path string, input any, output any) error {
+func (c *JiraConnector) post(ctx context.Context, token string, site jiraSite, path string, input any, output any) error {
 	payload, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.jiraAPIURL(site, path), bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -328,6 +395,31 @@ func (c *JiraConnector) post(ctx context.Context, token string, path string, inp
 		return fmt.Errorf("jira api request failed: %s", resp.Status)
 	}
 	return json.NewDecoder(resp.Body).Decode(output)
+}
+
+func (c *JiraConnector) jiraAPIURL(site jiraSite, path string) string {
+	return c.apiBaseURL + "/ex/jira/" + url.PathEscape(site.CloudID) + path
+}
+
+type jiraSite struct {
+	CloudID string
+	URL     string
+}
+
+type jiraAccessibleResource struct {
+	ID     string   `json:"id"`
+	URL    string   `json:"url"`
+	Name   string   `json:"name"`
+	Scopes []string `json:"scopes"`
+}
+
+func (r jiraAccessibleResource) hasJiraScope() bool {
+	for _, scope := range r.Scopes {
+		if strings.Contains(scope, "jira") {
+			return true
+		}
+	}
+	return false
 }
 
 type jiraIssue struct {
