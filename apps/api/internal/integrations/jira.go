@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -242,7 +243,7 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 		}
 
 		var response jiraSearchResponse
-		if err := c.post(ctx, token, site, "/rest/api/3/search/jql", payload, &response); err != nil {
+		if err := c.post(ctx, token, site, "/rest/api/3/search", payload, &response); err != nil {
 			return nil, err
 		}
 
@@ -339,7 +340,7 @@ func (c *JiraConnector) fetchAccessibleResources(ctx context.Context, token stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("jira accessible resources request failed: %s", resp.Status)
+		return nil, jiraHTTPError("jira accessible resources request failed", resp)
 	}
 
 	var resources []jiraAccessibleResource
@@ -365,7 +366,7 @@ func (c *JiraConnector) get(ctx context.Context, token string, site jiraSite, pa
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("jira api request failed: %s", resp.Status)
+		return jiraHTTPError("jira api request failed", resp)
 	}
 	return json.NewDecoder(resp.Body).Decode(output)
 }
@@ -392,9 +393,18 @@ func (c *JiraConnector) post(ctx context.Context, token string, site jiraSite, p
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("jira api request failed: %s", resp.Status)
+		return jiraHTTPError("jira api request failed", resp)
 	}
 	return json.NewDecoder(resp.Body).Decode(output)
+}
+
+func jiraHTTPError(prefix string, resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	message := strings.TrimSpace(string(body))
+	if message == "" {
+		return fmt.Errorf("%s: %s", prefix, resp.Status)
+	}
+	return fmt.Errorf("%s: %s: %s", prefix, resp.Status, message)
 }
 
 func (c *JiraConnector) jiraAPIURL(site jiraSite, path string) string {
