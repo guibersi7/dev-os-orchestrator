@@ -148,8 +148,8 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
           {isSlack ? (
             <div className="mt-4 space-y-3 rounded-md border border-brand-border bg-brand-muted/40 p-3 text-xs leading-5 text-muted-foreground">
               <p>
-                Private channels only appear when Slack grants access and the app has been added to the channel. If a
-                private channel is missing, invite the Standup app to that channel and retry the connection.
+                Private channels and DMs only appear when Slack grants access and the app has access to the conversation.
+                If a private conversation is missing, invite the Standup app where possible and retry the connection.
               </p>
               <label className="flex items-center gap-3">
                 <Checkbox

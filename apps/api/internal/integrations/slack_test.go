@@ -51,7 +51,7 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 		if r.URL.Path != "/conversations.list" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("types") != "public_channel,private_channel" {
+		if r.URL.Query().Get("types") != "public_channel,private_channel,im,mpim" {
 			t.Fatalf("expected channel types query, got %s", r.URL.RawQuery)
 		}
 		requests++
@@ -76,6 +76,8 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 				"channels": []map[string]any{
 					{"id": "C999", "name": "release", "is_private": false, "is_shared": true, "created": 1785320100},
 					{"id": "G999", "name": "leadership", "is_private": true, "is_member": true, "created": 1785320200, "updated": 1785326500},
+					{"id": "D123", "is_im": true, "user": "U123", "created": 1785320300, "updated": 1785326600},
+					{"id": "GMPIM", "name": "mpdm-alice-bob-1", "is_mpim": true, "created": 1785320400, "updated": 1785326700},
 				},
 				"response_metadata": map[string]any{"next_cursor": ""},
 			})
@@ -96,8 +98,8 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(resources))
+	if len(resources) != 5 {
+		t.Fatalf("expected 5 resources, got %d", len(resources))
 	}
 	if resources[0].ID != "C123" || resources[0].Type != "public_channel" || resources[0].Name != "#eng" {
 		t.Fatalf("unexpected first resource: %#v", resources[0])
@@ -116,6 +118,18 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 	}
 	if resources[2].Metadata["lastActivityAt"] != "2026-07-29T12:01:40Z" || resources[2].Metadata["isPrivate"] != true {
 		t.Fatalf("unexpected third resource metadata: %#v", resources[2].Metadata)
+	}
+	if resources[3].ID != "D123" || resources[3].Type != "direct_message" || resources[3].Name != "DM with U123" {
+		t.Fatalf("unexpected fourth resource: %#v", resources[3])
+	}
+	if resources[3].Metadata["lastActivityAt"] != "2026-07-29T12:03:20Z" || resources[3].Metadata["isIm"] != true || resources[3].Metadata["userId"] != "U123" {
+		t.Fatalf("unexpected fourth resource metadata: %#v", resources[3].Metadata)
+	}
+	if resources[4].ID != "GMPIM" || resources[4].Type != "group_direct_message" || resources[4].Name != "Group DM mpdm-alice-bob-1" {
+		t.Fatalf("unexpected fifth resource: %#v", resources[4])
+	}
+	if resources[4].Metadata["lastActivityAt"] != "2026-07-29T12:05:00Z" || resources[4].Metadata["isMpim"] != true {
+		t.Fatalf("unexpected fifth resource metadata: %#v", resources[4].Metadata)
 	}
 	if requests != 2 {
 		t.Fatalf("expected 2 paginated requests, got %d", requests)
@@ -339,6 +353,57 @@ func TestSlackSyncSelectedUsesSelectedChannelMetadataWithoutInfoLookup(t *testin
 	}
 	if result.Events[0].Source != "Slack · #release" {
 		t.Fatalf("expected selected channel source, got %q", result.Events[0].Source)
+	}
+}
+
+func TestSlackSyncSelectedReadsSelectedDirectMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			if r.URL.Query().Get("channel") != "D123" {
+				t.Fatalf("unexpected selected conversation %s", r.URL.Query().Get("channel"))
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U123",
+						"text": "Decision: move the Slack onboarding checklist into setup",
+						"ts":   "1785326500.000000",
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "D123", Type: "direct_message", Name: "DM with U123", Metadata: map[string]any{"conversationId": "D123"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.EventsCreated != 1 {
+		t.Fatalf("expected one event from selected DM, got %d", result.EventsCreated)
+	}
+	if result.Events[0].Source != "Slack · DM with U123" {
+		t.Fatalf("expected DM source, got %q", result.Events[0].Source)
+	}
+	if result.Events[0].Title != "Slack decision detected in DM with U123" {
+		t.Fatalf("expected DM title, got %q", result.Events[0].Title)
 	}
 }
 
