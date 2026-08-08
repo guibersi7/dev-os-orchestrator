@@ -232,18 +232,15 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 	}
 
 	issues := []jiraIssue{}
-	startAt := 0
 	nextPageToken := ""
 	for {
 		payload := cloneMap(basePayload)
 		if nextPageToken != "" {
 			payload["nextPageToken"] = nextPageToken
-		} else {
-			payload["startAt"] = startAt
 		}
 
 		var response jiraSearchResponse
-		if err := c.post(ctx, token, site, "/rest/api/3/search", payload, &response); err != nil {
+		if err := c.post(ctx, token, site, "/rest/api/3/search/jql", payload, &response); err != nil {
 			return nil, err
 		}
 
@@ -258,11 +255,7 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 		if (response.IsLast != nil && *response.IsLast) || len(response.Issues) == 0 {
 			return issues, nil
 		}
-		if response.Total != nil && *response.Total > 0 && startAt+len(response.Issues) >= *response.Total {
-			return issues, nil
-		}
-
-		startAt += len(response.Issues)
+		return issues, nil
 	}
 }
 

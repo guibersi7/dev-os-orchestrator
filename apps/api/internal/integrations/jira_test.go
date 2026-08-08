@@ -149,7 +149,7 @@ func TestJiraSyncFetchesAndNormalizesTickets(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/search" {
+		if r.URL.Path != "/ex/jira/cloud-1/rest/api/3/search/jql" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
 		if r.Header.Get("authorization") != "Bearer token" {
@@ -264,14 +264,16 @@ func TestJiraSyncPaginatesIssues(t *testing.T) {
 		}
 
 		if requests == 1 {
-			if payload["startAt"] != float64(0) {
-				t.Fatalf("expected first startAt 0, got %#v", payload["startAt"])
+			if _, ok := payload["startAt"]; ok {
+				t.Fatalf("expected no startAt for enhanced search, got %#v", payload["startAt"])
+			}
+			if _, ok := payload["nextPageToken"]; ok {
+				t.Fatalf("expected no first nextPageToken, got %#v", payload["nextPageToken"])
 			}
 			writeJiraJSON(t, w, map[string]any{
-				"startAt":    0,
-				"maxResults": 50,
-				"total":      2,
-				"isLast":     false,
+				"maxResults":    50,
+				"isLast":        false,
+				"nextPageToken": "next-token",
 				"issues": []map[string]any{
 					{
 						"id":   "10001",
@@ -296,13 +298,14 @@ func TestJiraSyncPaginatesIssues(t *testing.T) {
 			return
 		}
 
-		if payload["startAt"] != float64(1) {
-			t.Fatalf("expected second startAt 1, got %#v", payload["startAt"])
+		if payload["nextPageToken"] != "next-token" {
+			t.Fatalf("expected second nextPageToken, got %#v", payload["nextPageToken"])
+		}
+		if _, ok := payload["startAt"]; ok {
+			t.Fatalf("expected no startAt for enhanced search, got %#v", payload["startAt"])
 		}
 		writeJiraJSON(t, w, map[string]any{
-			"startAt":    1,
 			"maxResults": 50,
-			"total":      2,
 			"isLast":     true,
 			"issues": []map[string]any{
 				{
