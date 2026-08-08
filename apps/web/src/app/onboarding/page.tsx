@@ -216,7 +216,7 @@ export default async function OnboardingPage({
                       </Button>
                     </form>
                     <Button asChild size="sm" variant="ghost">
-                      <Link href={`/integrations/${integration.id}`} prefetch={false}>Details</Link>
+                      <a href={`/integrations/${integration.id}`}>Details</a>
                     </Button>
                   </div>
                 </Card>
