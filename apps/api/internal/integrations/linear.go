@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -68,8 +69,12 @@ func (c *LinearConnector) ListSelectableResources(ctx context.Context, _ domain.
 	if err != nil {
 		return nil, err
 	}
+	projects, err := c.fetchProjects(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
 
-	resources := []domain.SelectableResource{}
+	resources := make([]domain.SelectableResource, 0, len(teams)+len(projects))
 	for _, team := range teams {
 		if team.ID != "" {
 			resources = append(resources, domain.SelectableResource{
@@ -82,23 +87,21 @@ func (c *LinearConnector) ListSelectableResources(ctx context.Context, _ domain.
 				},
 			})
 		}
+	}
 
-		for _, project := range team.Projects.Nodes {
-			if project.ID == "" {
-				continue
-			}
-			resources = append(resources, domain.SelectableResource{
-				ID:   project.ID,
-				Type: "project",
-				Name: project.Name,
-				Metadata: map[string]any{
-					"projectId":   project.ID,
-					"projectName": project.Name,
-					"teamId":      team.ID,
-					"teamKey":     team.Key,
-				},
-			})
+	for _, project := range projects {
+		if project.ID == "" {
+			continue
 		}
+		resources = append(resources, domain.SelectableResource{
+			ID:   project.ID,
+			Type: "project",
+			Name: project.Name,
+			Metadata: map[string]any{
+				"projectId":   project.ID,
+				"projectName": project.Name,
+			},
+		})
 	}
 	return resources, nil
 }
@@ -195,16 +198,6 @@ func (c *LinearConnector) fetchTeams(ctx context.Context, token string) ([]linea
       id
       name
       key
-      projects(first: 100) {
-        nodes {
-          id
-          name
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
     }
     pageInfo {
       hasNextPage
@@ -224,18 +217,7 @@ func (c *LinearConnector) fetchTeams(ctx context.Context, token string) ([]linea
 			return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
 		}
 
-		for _, team := range response.Data.Teams.Nodes {
-			if team.Projects.PageInfo.HasNextPage {
-				projects, err := c.fetchTeamProjects(ctx, token, team.ID, team.Projects.PageInfo.EndCursor)
-				if err != nil {
-					return nil, err
-				}
-				team.Projects.Nodes = append(team.Projects.Nodes, projects...)
-				team.Projects.PageInfo = linearPageInfo{}
-			}
-			teams = append(teams, team)
-		}
-
+		teams = append(teams, response.Data.Teams.Nodes...)
 		if !response.Data.Teams.PageInfo.HasNextPage {
 			return teams, nil
 		}
@@ -297,41 +279,36 @@ func (c *LinearConnector) fetchIssues(ctx context.Context, token string) ([]line
 	}
 }
 
-func (c *LinearConnector) fetchTeamProjects(ctx context.Context, token string, teamID string, after string) ([]linearProjectResource, error) {
-	query := `query DeveloperOSTeamProjects($teamId: String!, $first: Int!, $after: String) {
-  team(id: $teamId) {
-    projects(first: $first, after: $after) {
-      nodes {
-        id
-        name
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+func (c *LinearConnector) fetchProjects(ctx context.Context, token string) ([]linearProjectResource, error) {
+	query := `query DeveloperOSProjects($first: Int!, $after: String) {
+  projects(first: $first, after: $after) {
+    nodes {
+      id
+      name
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }`
 
 	projects := []linearProjectResource{}
-	var cursor any = after
+	var after any
 	for {
-		var response linearTeamProjectsResponse
-		if err := c.graphql(ctx, token, query, map[string]any{"teamId": teamID, "first": 100, "after": cursor}, &response); err != nil {
+		var response linearProjectsResponse
+		if err := c.graphql(ctx, token, query, map[string]any{"first": 100, "after": after}, &response); err != nil {
 			return nil, err
 		}
 		if len(response.Errors) > 0 {
 			return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
 		}
-		if response.Data.Team == nil {
-			return projects, nil
-		}
 
-		projects = append(projects, response.Data.Team.Projects.Nodes...)
-		if !response.Data.Team.Projects.PageInfo.HasNextPage {
+		projects = append(projects, response.Data.Projects.Nodes...)
+		if !response.Data.Projects.PageInfo.HasNextPage {
 			return projects, nil
 		}
-		cursor = response.Data.Team.Projects.PageInfo.EndCursor
+		after = response.Data.Projects.PageInfo.EndCursor
 	}
 }
 
@@ -360,7 +337,12 @@ func (c *LinearConnector) graphql(ctx context.Context, token string, query strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("linear api request failed: %s", resp.Status)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		message := strings.TrimSpace(string(body))
+		if message == "" {
+			return fmt.Errorf("linear api request failed: %s", resp.Status)
+		}
+		return fmt.Errorf("linear api request failed: %s: %s", resp.Status, message)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(output)
@@ -409,13 +391,9 @@ type linearTeam struct {
 }
 
 type linearTeamResource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Key      string `json:"key"`
-	Projects struct {
-		Nodes    []linearProjectResource `json:"nodes"`
-		PageInfo linearPageInfo          `json:"pageInfo"`
-	} `json:"projects"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 type linearProjectResource struct {
@@ -442,14 +420,12 @@ type linearTeamsResponse struct {
 	Errors []linearGraphQLError `json:"errors"`
 }
 
-type linearTeamProjectsResponse struct {
+type linearProjectsResponse struct {
 	Data struct {
-		Team *struct {
-			Projects struct {
-				Nodes    []linearProjectResource `json:"nodes"`
-				PageInfo linearPageInfo          `json:"pageInfo"`
-			} `json:"projects"`
-		} `json:"team"`
+		Projects struct {
+			Nodes    []linearProjectResource `json:"nodes"`
+			PageInfo linearPageInfo          `json:"pageInfo"`
+		} `json:"projects"`
 	} `json:"data"`
 	Errors []linearGraphQLError `json:"errors"`
 }

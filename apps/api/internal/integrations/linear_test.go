@@ -35,28 +35,40 @@ func TestLinearListSelectableResourcesReturnsTeamsAndProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 		query, _ := payload["query"].(string)
-		if !strings.Contains(query, "teams") {
-			t.Fatalf("expected teams query, got %s", query)
-		}
 
-		writeLinearJSON(t, w, map[string]any{
-			"data": map[string]any{
-				"teams": map[string]any{
-					"nodes": []map[string]any{
-						{
-							"id":   "team-1",
-							"name": "Dev OS",
-							"key":  "DEV",
-							"projects": map[string]any{
-								"nodes": []map[string]any{
-									{"id": "project-1", "name": "Developer OS Integrations MVP"},
-								},
+		if strings.Contains(query, "teams") {
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"teams": map[string]any{
+						"nodes": []map[string]any{
+							{
+								"id":   "team-1",
+								"name": "Dev OS",
+								"key":  "DEV",
 							},
 						},
+						"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
 					},
 				},
-			},
-		})
+			})
+			return
+		}
+
+		if strings.Contains(query, "projects") {
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"projects": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "project-1", "name": "Developer OS Integrations MVP"},
+						},
+						"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+					},
+				},
+			})
+			return
+		}
+
+		t.Fatalf("unexpected query %s", query)
 	}))
 	defer server.Close()
 
@@ -93,66 +105,54 @@ func TestLinearListSelectableResourcesPaginatesTeamsAndProjects(t *testing.T) {
 		query, _ := payload["query"].(string)
 		variables, _ := payload["variables"].(map[string]any)
 
-		if strings.Contains(query, "team(id: $teamId)") {
-			if variables["after"] != "project-cursor" {
-				t.Fatalf("expected project cursor, got %#v", variables["after"])
-			}
-			writeLinearJSON(t, w, map[string]any{
-				"data": map[string]any{
-					"team": map[string]any{
-						"projects": map[string]any{
-							"nodes":    []map[string]any{{"id": "project-2", "name": "Second project page"}},
-							"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
-						},
-					},
-				},
-			})
-			return
-		}
-
-		if variables["after"] == nil {
+		switch {
+		case strings.Contains(query, "teams") && variables["after"] == nil:
 			writeLinearJSON(t, w, map[string]any{
 				"data": map[string]any{
 					"teams": map[string]any{
 						"nodes": []map[string]any{
-							{
-								"id":   "team-1",
-								"name": "Dev OS",
-								"key":  "DEV",
-								"projects": map[string]any{
-									"nodes":    []map[string]any{{"id": "project-1", "name": "First project page"}},
-									"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "project-cursor"},
-								},
-							},
+							{"id": "team-1", "name": "Dev OS", "key": "DEV"},
 						},
 						"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "team-cursor"},
 					},
 				},
 			})
-			return
-		}
-
-		if variables["after"] != "team-cursor" {
-			t.Fatalf("expected team cursor, got %#v", variables["after"])
-		}
-		writeLinearJSON(t, w, map[string]any{
-			"data": map[string]any{
-				"teams": map[string]any{
-					"nodes": []map[string]any{
-						{
-							"id":   "team-2",
-							"name": "Ops",
-							"key":  "OPS",
-							"projects": map[string]any{
-								"nodes":    []map[string]any{},
-								"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
-							},
+		case strings.Contains(query, "teams") && variables["after"] == "team-cursor":
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"teams": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "team-2", "name": "Ops", "key": "OPS"},
 						},
+						"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
 					},
-					"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
 				},
-			},
-		})
+			})
+		case strings.Contains(query, "projects") && variables["after"] == nil:
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"projects": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "project-1", "name": "First project page"},
+						},
+						"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "project-cursor"},
+					},
+				},
+			})
+		case strings.Contains(query, "projects") && variables["after"] == "project-cursor":
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"projects": map[string]any{
+						"nodes": []map[string]any{
+							{"id": "project-2", "name": "Second project page"},
+						},
+						"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected query/cursor query=%s after=%#v", query, variables["after"])
+		}
 	}))
 	defer server.Close()
 
@@ -167,17 +167,16 @@ func TestLinearListSelectableResourcesPaginatesTeamsAndProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if requests != 3 {
-		t.Fatalf("expected 3 paginated requests, got %d", requests)
+	if requests != 4 {
+		t.Fatalf("expected 4 paginated requests, got %d", requests)
 	}
 	if len(resources) != 4 {
 		t.Fatalf("expected 2 teams and 2 projects, got %d: %#v", len(resources), resources)
 	}
-	if resources[2].ID != "project-2" {
-		t.Fatalf("expected second project page in resources, got %#v", resources)
+	if resources[2].ID != "project-1" || resources[3].ID != "project-2" {
+		t.Fatalf("expected paginated projects in resources, got %#v", resources)
 	}
 }
-
 func TestLinearSyncFetchesAndNormalizesIssues(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
