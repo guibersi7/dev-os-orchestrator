@@ -58,12 +58,20 @@ export default function TodayPage() {
             <span className="font-mono">⌘K</span>
           </button>
           <nav className="mt-5 space-y-1">
-            {nav.map(([label, badge], index) => (
-              <Link key={label} href={label === "Chat" ? "/chat" : label === "Settings" || label === "Connections" ? "/settings" : "/today"} className={`flex h-9 items-center justify-between rounded-lg px-3 text-[13px] ${index === 0 ? "bg-[var(--standup-accent-surface)] font-medium text-[var(--standup-accent-text)]" : "text-[#9AA4BA] hover:bg-[#121826]"}`}>
-                <span>{label}</span>
-                {badge ? <span className="font-mono text-[11px]">{badge}</span> : null}
-              </Link>
-            ))}
+            {nav.map(([label, badge], index) => {
+              const href = label === "Chat" ? "/chat" : label === "Settings" || label === "Connections" ? "/settings" : "/today";
+
+              return (
+                <a
+                  key={label}
+                  href={href}
+                  className={`flex h-9 items-center justify-between rounded-lg px-3 text-[13px] ${index === 0 ? "bg-[var(--standup-accent-surface)] font-medium text-[var(--standup-accent-text)]" : "text-[#9AA4BA] hover:bg-[#121826]"}`}
+                >
+                  <span>{label}</span>
+                  {badge ? <span className="font-mono text-[11px]">{badge}</span> : null}
+                </a>
+              );
+            })}
           </nav>
           <Card className="mt-8 border-[#212938] bg-[#121826] p-4">
             <p className="text-sm font-semibold">{connected.length} of 7 sources connected</p>

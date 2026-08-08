@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AlertTriangle, ArrowLeft, GitPullRequest, MessagesSquare, Workflow } from "lucide-react";
 import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
@@ -51,10 +50,12 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground">
-            <Link href="/dashboard">
+            {/* Intentionally use document navigation to avoid protected-route RSC requests. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a href="/dashboard">
               <ArrowLeft className="h-4 w-4" />
               Dashboards
-            </Link>
+            </a>
           </Button>
           <h1 className="text-2xl font-semibold tracking-tight">{workspace?.name ?? "Dashboard"}</h1>
           <p className="text-sm text-muted-foreground">What matters now across code, planning, conversations, docs, and meetings.</p>

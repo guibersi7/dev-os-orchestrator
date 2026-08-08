@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +29,10 @@ export default async function IntegrationResourcesPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Link href="/settings" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-brand-primary">
+      <a href="/settings" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-brand-primary">
         <ArrowLeft className="h-4 w-4" />
         Back to settings
-      </Link>
+      </a>
 
       <Card className="p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">

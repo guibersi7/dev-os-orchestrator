@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { LogOut, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signOutAction } from "@/app/login/actions";
@@ -29,7 +28,7 @@ export function HeaderAuthControl() {
   if (!isAuthenticated || !user) {
     return (
       <Button asChild variant="outline" size="sm">
-        <Link href="/login">Sign in</Link>
+        <a href="/login">Sign in</a>
       </Button>
     );
   }
@@ -68,7 +67,7 @@ export function HeaderAuthControl() {
             <p className="truncate text-sm font-semibold text-[#E9EDF7]">{user.name}</p>
             <p className="truncate text-xs text-[#6A7489]">{user.email}</p>
           </div>
-          <Link
+          <a
             href="/settings"
             role="menuitem"
             className="mt-1 flex h-9 items-center gap-2 rounded-md px-3 text-sm text-[#9AA4BA] transition-colors hover:bg-[#1A2130] hover:text-[#E9EDF7]"
@@ -76,7 +75,7 @@ export function HeaderAuthControl() {
           >
             <Settings className="h-4 w-4" />
             Settings
-          </Link>
+          </a>
           <form action={signOutAction}>
             <button
               type="submit"

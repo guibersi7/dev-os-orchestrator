@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { integrationIcon, integrations } from "@/lib/product-data";
@@ -12,9 +11,11 @@ export default function RepositorySelectionPage() {
             <h1 className="text-3xl font-semibold tracking-tight">Select sources</h1>
             <p className="mt-2 text-[#9AA4BA]">Choose the services that should feed Standup from day 0.</p>
           </div>
-          <Link href="/dashboard">
+          {/* Intentionally use document navigation to avoid protected-route RSC requests. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/dashboard">
             <Button>Start sync</Button>
-          </Link>
+          </a>
         </div>
         <div className="mt-8 overflow-hidden rounded-lg border border-[#212938] bg-[#121826]">
           {integrations.map((integration) => {
