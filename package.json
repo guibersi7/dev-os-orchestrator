@@ -13,7 +13,8 @@
     "build:web": "npm run build --workspace @devos/web",
     "lint": "npm run lint:web",
     "lint:web": "npm run lint --workspace @devos/web",
-    "test:api": "cd apps/api && go test ./..."
+    "test:api": "cd apps/api && go test ./...",
+    "test:web": "npm run test --workspace @devos/web"
   },
   "optionalDependencies": {
     "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",

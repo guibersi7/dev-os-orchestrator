@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #080C15; }
+  body { font-family: Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; color: #E9EDF7; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  a { color: #4FD98C; text-decoration: none; }
+  a:hover { color: #7FE3A8; }
+  ::selection { background: rgba(29,156,76,.35); color: #F4F7FF; }
+</style>
+</helmet>
+
+<section style="padding: 56px 56px 96px 56px; display: flex; flex-direction: column; gap: 40px;">
+
+  <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+    <h1 style="font-size: 30px; font-weight: 600; letter-spacing: -0.03em; margin: 0;">Brand exploration</h1>
+    <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6A7489;">turn 1 · names + marks · reference any option by its id</span>
+  </div>
+
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px;">
+      <h2 style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em; margin: 0;">Names</h2>
+      <span style="font-size: 13px; color: #6A7489;">three families · <a href="#1a">1a</a>–<a href="#1i">1i</a></span>
+    </div>
+    <p style="font-size: 14px; color: #9AA4BA; line-height: 1.55; margin: 0 0 22px 0; max-width: 760px; text-wrap: pretty;">“Developer OS” describes the category, not the product — it is honest but unownable, and every competitor can say it. These trade some description for a name you can defend. All were checked for obvious collisions in dev tooling; a real trademark and domain search still has to happen.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(300px, 1fr)); gap: 16px;">
+      <sc-for list="{{ names }}" as="n" hint-placeholder-count="9">
+        <div id="{{ n.id }}" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px;" style-hover="border-color: #2E3849;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">{{ n.id }}</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">{{ n.family }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px;">
+            <span style="width: 24px; height: 24px; border-radius: 7px; background: #1D9C4C; display: flex; align-items: center; justify-content: center;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #EEF3FF;"></span></span>
+            <span style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em;">{{ n.name }}</span>
+          </div>
+          <p style="font-size: 13.5px; color: #9AA4BA; line-height: 1.5; margin: 0;">{{ n.why }}</p>
+          <div style="border-top: 1px solid #1B2230; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
+            <div style="font-size: 13px; color: #E9EDF7; line-height: 1.45;">“{{ n.line }}”</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">{{ n.domain }}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ n.riskColor }};">· {{ n.risk }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px;">
+      <h2 style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em; margin: 0;">Marks</h2>
+      <span style="font-size: 13px; color: #6A7489;">six directions · <a href="#1j">1j</a>–<a href="#1o">1o</a></span>
+    </div>
+    <p style="font-size: 14px; color: #9AA4BA; line-height: 1.55; margin: 0 0 22px 0; max-width: 760px; text-wrap: pretty;">Every mark is built from squares, circles and bars only — it survives a 16px favicon, a menu-bar icon and a monochrome print. Each card shows the mark at 64px and at 20px, because the small size is the one that decides.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(300px, 1fr)); gap: 16px;">
+
+      <div id="1j" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1j</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">the queue</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; border-radius: 17px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+            <div style="width: 30px; height: 6px; border-radius: 3px; background: #EEF3FF;"></div>
+            <div style="width: 22px; height: 6px; border-radius: 3px; background: rgba(238,243,255,.55);"></div>
+            <div style="width: 14px; height: 6px; border-radius: 3px; background: rgba(238,243,255,.3);"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; border-radius: 17px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; transform: scale(.3125); transform-origin: top left;">
+              <div style="width: 30px; height: 6px; border-radius: 3px; background: #EEF3FF;"></div>
+              <div style="width: 22px; height: 6px; border-radius: 3px; background: rgba(238,243,255,.55);"></div>
+              <div style="width: 14px; height: 6px; border-radius: 3px; background: rgba(238,243,255,.3);"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">Three bars, ranked. The most literal expression of the product: not a list, a <span style="color: #E9EDF7;">priority</span>. Reads instantly at 16px.</p>
+      </div>
+
+      <div id="1k" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1k</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">the event</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; border-radius: 999px; border: 6px solid #1D9C4C; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 22px; height: 22px; border-radius: 6px; background: #1D9C4C;"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; border-radius: 999px; border: 6px solid #1D9C4C; display: flex; align-items: center; justify-content: center; transform: scale(.3125); transform-origin: top left;">
+              <div style="width: 22px; height: 22px; border-radius: 6px; background: #1D9C4C;"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">A square inside a circle: the normalizer. Any shape that arrives leaves as the <span style="color: #E9EDF7;">same shape</span>. Abstract enough to age well.</p>
+      </div>
+
+      <div id="1l" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1l</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">converge</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; gap: 9px;">
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 999px; background: #2E3849;"></div>
+              <div style="width: 9px; height: 9px; border-radius: 999px; background: #4FD98C;"></div>
+              <div style="width: 9px; height: 9px; border-radius: 999px; background: #2E3849;"></div>
+            </div>
+            <div style="width: 10px; height: 46px; border-radius: 5px; background: #1D9C4C;"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; gap: 9px; transform: scale(.3125); transform-origin: top left;">
+              <div style="display: flex; flex-direction: column; gap: 7px;">
+                <div style="width: 9px; height: 9px; border-radius: 999px; background: #2E3849;"></div>
+                <div style="width: 9px; height: 9px; border-radius: 999px; background: #4FD98C;"></div>
+                <div style="width: 9px; height: 9px; border-radius: 999px; background: #2E3849;"></div>
+              </div>
+              <div style="width: 10px; height: 46px; border-radius: 5px; background: #1D9C4C;"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">Many sources on the left, one spine on the right. The weakest at small sizes — the dots close up. Keep only if the wordmark carries the load.</p>
+      </div>
+
+      <div id="1m" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1m</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">the chain</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; position: relative;">
+            <div style="position: absolute; left: 10px; top: 10px; width: 20px; height: 20px; border-radius: 999px; background: #1D9C4C;"></div>
+            <div style="position: absolute; left: 26px; top: 26px; width: 12px; height: 12px; border-radius: 999px; background: #4FD98C;"></div>
+            <div style="position: absolute; left: 34px; top: 34px; width: 20px; height: 20px; border-radius: 999px; background: #2E3849;"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; position: relative; transform: scale(.3125); transform-origin: top left;">
+              <div style="position: absolute; left: 10px; top: 10px; width: 20px; height: 20px; border-radius: 999px; background: #1D9C4C;"></div>
+              <div style="position: absolute; left: 26px; top: 26px; width: 12px; height: 12px; border-radius: 999px; background: #4FD98C;"></div>
+              <div style="position: absolute; left: 34px; top: 34px; width: 20px; height: 20px; border-radius: 999px; background: #2E3849;"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">Dependency: your review, the issue, the release. Diagonal gives it motion, which no other mark here has.</p>
+      </div>
+
+      <div id="1n" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1n</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">first light</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;">
+            <div style="width: 44px; height: 22px; border-radius: 22px 22px 0 0; background: #1D9C4C;"></div>
+            <div style="width: 52px; height: 6px; border-radius: 3px; background: #2E3849;"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; transform: scale(.3125); transform-origin: top left;">
+              <div style="width: 44px; height: 22px; border-radius: 22px 22px 0 0; background: #1D9C4C;"></div>
+              <div style="width: 52px; height: 6px; border-radius: 3px; background: #2E3849;"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">The morning, literally. Warm and human — the risk is that a sunrise says <span style="color: #E9EDF7;">wellness app</span>, not engineering tool.</p>
+      </div>
+
+      <div id="1o" style="border: 1px solid #212938; background: #121826; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 6px; padding: 3px 8px;">1o</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">the cut</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 20px;">
+          <div style="width: 64px; height: 64px; border-radius: 17px; background: #121826; border: 1px solid #2E3849; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            <div style="width: 9px; height: 44px; border-radius: 5px; background: #1D9C4C; transform: rotate(22deg);"></div>
+          </div>
+          <div style="width: 20px; height: 20px; overflow: hidden;">
+            <div style="width: 64px; height: 64px; border-radius: 17px; background: #121826; border: 1px solid #2E3849; display: flex; align-items: center; justify-content: center; overflow: hidden; transform: scale(.3125); transform-origin: top left;">
+              <div style="width: 9px; height: 44px; border-radius: 5px; background: #1D9C4C; transform: rotate(22deg);"></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">A single slash — the cut through noise. Quietest of the six, and the most at home next to a terminal. Also the least distinctive.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px;">
+      <h2 style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em; margin: 0;">Lockups</h2>
+      <span style="font-size: 13px; color: #6A7489;">mark <a href="#1j">1j</a> against the three strongest names</span>
+    </div>
+    <p style="font-size: 14px; color: #9AA4BA; line-height: 1.55; margin: 0 0 22px 0; max-width: 760px;">Wordmark set in Geist 600 at -0.03em tracking. Mark height equals cap height; clear space equals the mark's corner radius.</p>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 16px;">
+      <sc-for list="{{ lockups }}" as="l" hint-placeholder-count="3">
+        <div style="border: 1px solid #212938; background: {{ l.bg }}; border-radius: 14px; padding: 34px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 30px; height: 30px; border-radius: 8px; background: {{ l.mark }}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+              <div style="width: 14px; height: 3px; border-radius: 2px; background: {{ l.bar1 }};"></div>
+              <div style="width: 10px; height: 3px; border-radius: 2px; background: {{ l.bar2 }};"></div>
+              <div style="width: 6px; height: 3px; border-radius: 2px; background: {{ l.bar3 }};"></div>
+            </div>
+            <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.03em; color: {{ l.fg }};">{{ l.name }}</span>
+          </div>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: {{ l.meta }};">{{ l.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="border: 1px solid #1C4A31; background: #0E2418; border-radius: 14px; padding: 24px 26px; max-width: 860px;">
+    <div style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">My recommendation</div>
+    <p style="font-size: 14px; color: #9AA4BA; line-height: 1.6; margin: 0 0 12px 0; text-wrap: pretty;"><span style="color: #E9EDF7;">Upstream</span> (<a href="#1d">1d</a>) with the queue mark (<a href="#1j">1j</a>). The name is native to the vocabulary engineers already use, it points at the product's real job — finding where work originates and where it is stuck — and it survives the company growing past GitHub. The mark says “ranked”, which is the one promise every screen keeps.</p>
+    <p style="font-size: 14px; color: #9AA4BA; line-height: 1.6; margin: 0;">Second choice: <span style="color: #E9EDF7;">Foreground</span> (<a href="#1g">1g</a>) — a better name, a harder domain. Keep “Developer OS” as the category line under whichever name wins: <span style="color: #E9EDF7;">“Upstream · the developer OS”</span>.</p>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    const risk = { low: '#4FD98C', mid: '#D9B871', high: '#FF8FA6' };
+    return {
+      names: [
+        { id: '1a', family: 'ritual', name: 'Standup', why: 'The meeting everyone has and nobody likes. The product is the standup that actually works — and it takes ninety seconds.', line: 'Your standup, before the standup.', domain: 'standup.dev', risk: 'crowded term', riskColor: risk.mid },
+        { id: '1b', family: 'ritual', name: 'Firstlight', why: 'The first hour of the day, named. Warm, memorable, and it owns the morning framing your whole product is built on.', line: 'Know what matters by first light.', domain: 'firstlight.dev', risk: 'soft for B2B', riskColor: risk.mid },
+        { id: '1c', family: 'ritual', name: 'Prime', why: 'Short, sharp, verb and adjective at once: prime your day, prime the queue. Very brandable, very taken.', line: 'Prime the day.', domain: 'prime.* hard', risk: 'heavy collision', riskColor: risk.high },
+        { id: '1d', family: 'dev-native', name: 'Upstream', why: 'Where work comes from and where it gets stuck. Already in every engineer\u2019s vocabulary, so it needs no explanation — and it reads as infrastructure, not productivity app.', line: 'Everything, from upstream.', domain: 'upstream.dev', risk: 'generic in git', riskColor: risk.low },
+        { id: '1e', family: 'dev-native', name: 'Relay', why: 'Work moves between people; the product shows you the baton you are holding. Fits the blocked-chain idea exactly.', line: 'Don\u2019t drop the baton.', domain: 'relay.* taken', risk: 'used in dev tools', riskColor: risk.mid },
+        { id: '1f', family: 'dev-native', name: 'Cadence', why: 'The rhythm a team ships at. Premium, calm, executive-friendly — leans manager rather than engineer.', line: 'Find the cadence.', domain: 'cadence.dev', risk: 'EDA vendor exists', riskColor: risk.mid },
+        { id: '1g', family: 'perspective', name: 'Foreground', why: 'The exact job: pull the three things that matter into the foreground and leave the rest behind. Also a computing term, so it stays technical.', line: 'What belongs in the foreground.', domain: 'foreground.dev', risk: 'long to type', riskColor: risk.low },
+        { id: '1h', family: 'perspective', name: 'Vantage', why: 'A place you see the whole system from. Confident and short; slightly corporate, works well for the EM buyer.', line: 'The vantage point for your week.', domain: 'vantage.* taken', risk: 'analytics vibe', riskColor: risk.mid },
+        { id: '1i', family: 'perspective', name: 'Meridian', why: 'The moment the sun is highest — and a line drawn through a system. Beautiful, but it explains nothing on its own.', line: 'Everything at its highest point.', domain: 'meridian.dev', risk: 'needs a tagline', riskColor: risk.mid }
+      ],
+      lockups: [
+        { name: 'Upstream', note: 'primary · on surface', bg: '#121826', fg: '#E9EDF7', mark: '#1D9C4C', bar1: '#EEF3FF', bar2: 'rgba(238,243,255,.55)', bar3: 'rgba(238,243,255,.3)', meta: '#6A7489' },
+        { name: 'Foreground', note: 'reversed · on accent', bg: '#1D9C4C', fg: '#F4F7FF', mark: '#0B2E19', bar1: '#EEF3FF', bar2: 'rgba(238,243,255,.55)', bar3: 'rgba(238,243,255,.3)', meta: 'rgba(244,247,255,.7)' },
+        { name: 'Cadence', note: 'monochrome · one ink', bg: '#080C15', fg: '#E9EDF7', mark: '#E9EDF7', bar1: '#080C15', bar2: 'rgba(8,12,21,.55)', bar3: 'rgba(8,12,21,.3)', meta: '#6A7489' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

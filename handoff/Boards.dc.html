@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #080C15; }
+  body { font-family: Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; color: #E9EDF7; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: inherit; }
+  ::selection { background: rgba(29,156,76,.35); color: #F4F7FF; }
+  @keyframes bRise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #080C15; padding: 40px 40px 80px 40px;">
+  <div style="max-width: 1280px; margin: 0 auto;">
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; margin-bottom: 34px; animation: bRise .35s ease both;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <span style="width: 22px; height: 22px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6px;">
+            <span style="width: 11px; height: 2px; border-radius: 1px; background: #EEF3FF;"></span>
+            <span style="width: 8px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></span>
+            <span style="width: 5px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></span>
+          </span>
+          <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Standup</span>
+          <span style="font-size: 13px; color: #4A5468;">/</span>
+          <span style="font-size: 13px; color: #9AA4BA;">Design boards</span>
+        </div>
+        <h1 style="font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px 0;">Tudo que existe até agora</h1>
+        <p style="font-size: 14.5px; color: #9AA4BA; line-height: 1.55; margin: 0; max-width: 560px;">Cada board abre em tela cheia. Clique na miniatura para navegar — ela é o design real rodando, não uma imagem.</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px; flex: none; padding-top: 6px;">
+        <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+          <div style="text-align: right;">
+            <div style="font-family: 'Geist Mono', monospace; font-size: 20px; letter-spacing: -0.02em; color: #E9EDF7;">{{ s.value }}</div>
+            <div style="font-size: 11.5px; color: #8C96AD; margin-top: 2px;">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+      <div style="margin-bottom: 34px; animation: bRise .4s .05s ease both;">
+        <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #79839B;">{{ g.name }}</span>
+          <span style="flex: 1; height: 1px; background: #1B2230;"></span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ g.count }}</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, 372px); justify-content: start; gap: 16px;">
+          <sc-for list="{{ g.boards }}" as="b" hint-placeholder-count="3">
+            <a href="{{ b.href }}" style="display: block; border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden;" style-hover="border-color: #39435A;">
+              <div style="height: {{ b.thumbH }}px; background: {{ b.canvas }}; border-bottom: 1px solid #1B2230; position: relative; overflow: hidden;">
+                <iframe src="{{ b.href }}" tabindex="-1" scrolling="no" style="width: {{ b.frameW }}px; height: {{ b.frameH }}px; border: 0; transform: scale({{ b.scale }}); transform-origin: top left; pointer-events: none; position: absolute; top: 0; left: 0;"></iframe>
+                <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,12,21,0) 55%, rgba(8,12,21,.55) 100%);"></div>
+                <span style="position: absolute; top: 10px; right: 10px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: {{ b.statusFg }}; background: {{ b.statusBg }}; border: 1px solid {{ b.statusBd }}; border-radius: 5px; padding: 3px 7px;">{{ b.status }}</span>
+              </div>
+              <div style="padding: 14px 15px 15px 15px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 5px;">
+                  <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">{{ b.name }}</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B; flex: none;">{{ b.screens }}</span>
+                </div>
+                <p style="font-size: 12.5px; color: #8C96AD; line-height: 1.5; margin: 0 0 11px 0;">{{ b.desc }}</p>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <sc-for list="{{ b.tags }}" as="t" hint-placeholder-count="2">
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 10px; color: #8C96AD; border: 1px solid #212938; border-radius: 5px; padding: 2px 7px;">{{ t }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="border: 1px dashed #2E3849; border-radius: 13px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; animation: bRise .45s .1s ease both;">
+      <div>
+        <div style="font-size: 14px; font-weight: 600; margin-bottom: 5px;">Todas as 14 telas do escopo estão desenhadas</div>
+        <p style="font-size: 12.5px; color: #8C96AD; line-height: 1.5; margin: 0; max-width: 560px;">O que falta agora não é desenho: é escolher a direção de navegação, fechar o handoff com os tokens dark e o nome Standup, e plugar os dados reais.</p>
+      </div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <sc-for list="{{ pending }}" as="p" hint-placeholder-count="3">
+          <span style="font-size: 11.5px; color: #79839B; border: 1px solid #1B2230; border-radius: 6px; padding: 5px 9px;">{{ p }}</span>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals() {
+    const COL = 372, THUMB = 209;
+    const shot = (w, h) => {
+      const scale = COL / w;
+      return { frameW: w, frameH: Math.round(THUMB / scale), scale, thumbH: THUMB };
+    };
+    const st = {
+      done: { status: 'revisado', statusFg: '#4FD98C', statusBg: '#0E2418', statusBd: '#1C4A31' },
+      wip: { status: 'em revisão', statusFg: '#D9B871', statusBg: '#231D12', statusBd: '#3A3220' }
+    };
+
+    return {
+      stats: [
+        { value: '4', label: 'boards' },
+        { value: '14', label: 'telas' },
+        { value: '0', label: 'a desenhar' }
+      ],
+      groups: [
+        {
+          name: 'Produto', count: '3 boards',
+          boards: [
+            { name: 'Onda 2 · detalhe e contexto', href: 'Standup-wave-2.dc.html', screens: '5 telas',
+              desc: 'PR detail, issue detail, timeline, resumo semanal e chat. Detalhe como briefing, não como clone da ferramenta de origem.',
+              tags: ['pr', 'timeline', 'chat'], canvas: '#080C15', ...shot(1440, 900), ...st.wip },
+            { name: 'Dashboard', href: 'Standup-dashboard.dc.html', screens: '4 estados',
+              desc: 'Fila única ranqueada, brief narrativo e rail de contexto. Três direções de navegação alternáveis.',
+              tags: ['fila', 'brief', 'nav ×3'], canvas: '#080C15', ...shot(1440, 900), ...st.wip },
+            { name: 'Landing e onboarding', href: 'Standup-landing-and-onboarding.dc.html', screens: '7 telas',
+              desc: 'Landing com órbita de fontes, setup, connection center multi-fonte, OAuth em fila, seleção de recursos e sync paralelo.',
+              tags: ['landing', 'oauth', 'sync'], canvas: '#080C15', ...shot(1440, 900), ...st.done }
+          ]
+        },
+        {
+          name: 'Marca', count: '1 board',
+          boards: [
+            { name: 'Brand exploration', href: 'Brand.dc.html', screens: '9 nomes · 6 marcas',
+              desc: 'Nomes em três famílias, marcas testadas a 64px e 20px, e os lockups. Standup e a marca da fila foram os escolhidos.',
+              tags: ['naming', 'símbolo', 'lockup'], canvas: '#080C15', ...shot(1280, 900), ...st.done }
+          ]
+        }
+      ],
+      pending: ['Escolher navegação', 'Atualizar handoff', 'Plugar dados reais']
+    };
+  }
+}
+</script>
+</body>
+</html>

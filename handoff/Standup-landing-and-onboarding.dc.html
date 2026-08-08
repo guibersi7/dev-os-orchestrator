@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #080C15; }
+  body { color-scheme: dark; }
+  body { font-family: Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; color: #E9EDF7; }
+  a { color: #4FD98C; text-decoration: none; }
+  a:hover { color: #23B85A; }
+  * { box-sizing: border-box; }
+  ::selection { background: rgba(29,156,76,.35); color: #F4F7FF; }
+  @keyframes dosRise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes dosPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes dosSweep { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #080C15; display: flex; flex-direction: column;">
+
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+  <div style="background: #121826; min-height: 100vh; display: flex; flex-direction: column;">
+    <div style="height: 64px; border-bottom: 1px solid #1B2230; display: flex; align-items: center; justify-content: space-between; padding: 0 40px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 22px; height: 22px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+          <div style="width: 11px; height: 2px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 8px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 5px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></div>
+        </div>
+        <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Standup</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; color: #9AA4BA; padding: 8px 12px;">Changelog</span>
+        <span style="font-size: 13px; color: #9AA4BA; padding: 8px 12px;">Docs</span>
+        <button onClick="{{ goSetup }}" style="font-family: inherit; font-size: 13px; font-weight: 500; color: #E9EDF7; background: #121826; border: 1px solid #212938; border-radius: 8px; padding: 8px 14px; cursor: pointer;" style-hover="border-color: #39435A;">Sign in</button>
+      </div>
+    </div>
+
+    <div style="flex: 1; display: grid; grid-template-columns: minmax(480px, 1fr) minmax(520px, 720px); gap: 72px; align-items: center; padding: 72px 40px 40px 40px; max-width: 1440px; width: 100%; margin: 0 auto;">
+      <div style="animation: dosRise .5s ease both;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid #1E3A4C; background: #12293A; border-radius: 999px; padding: 5px 12px 5px 8px; margin-bottom: 28px;">
+          <span style="width: 6px; height: 6px; border-radius: 999px; background: #1D9C4C; animation: dosPulse 2.4s ease-in-out infinite;"></span>
+          <span style="font-size: 12px; font-weight: 500; color: #9FE0F2;">Seven tools in, one morning out</span>
+        </div>
+        <h1 style="font-size: 54px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 600; margin: 0 0 22px 0; text-wrap: balance;">Open Standup.<br />Understand what matters.<br /><span style="color: #79839B;">Start building.</span></h1>
+        <p style="font-size: 17px; line-height: 1.55; color: #9AA4BA; margin: 0 0 34px 0; max-width: 470px; text-wrap: pretty;">Your pull requests, issues, threads and meetings arrive from seven tools in seven shapes. Standup normalizes them into one stream of work events, then tells you which three deserve the next hour.</p>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 32px;">
+          <button onClick="{{ goSetup }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 12px 20px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.45);" style-hover="background: #23B85A; border-color: #23B85A;">Show me what needs me today</button>
+          <button onClick="{{ goToday }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #E9EDF7; background: #121826; border: 1px solid #212938; border-radius: 9px; padding: 12px 18px; cursor: pointer;" style-hover="border-color: #39435A;">Walk through a real morning</button>
+        </div>
+        <p style="font-size: 12.5px; color: #6A7489; margin: -20px 0 32px 0;">Under two minutes to your first ranked morning. Read-only, no setup meeting.</p>
+        <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">Normalizes</span>
+          <sc-for list="{{ connectorChips }}" as="c" hint-placeholder-count="7">
+            <span style="font-size: 12.5px; color: #9AA4BA; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 5px; height: 5px; border-radius: 999px; background: {{ c.dot }};"></span>{{ c.name }}
+            </span>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="animation: dosRise .6s .08s ease both;">
+        <div style="border: 1px solid #212938; border-radius: 14px; background: #121826; box-shadow: 0 24px 60px -28px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.35); overflow: hidden;">
+          <div style="height: 38px; border-bottom: 1px solid #1B2230; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #0F1421;">
+            <span style="width: 9px; height: 9px; border-radius: 999px; background: #212938;"></span>
+            <span style="width: 9px; height: 9px; border-radius: 999px; background: #212938;"></span>
+            <span style="width: 9px; height: 9px; border-radius: 999px; background: #212938;"></span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489; margin-left: 10px;">today · tuesday</span>
+          </div>
+          <div style="padding: 22px 24px 24px 24px;">
+            <p style="font-size: 15px; line-height: 1.5; margin: 0 0 20px 0; color: #E9EDF7; text-wrap: pretty;">Two things are blocking other people. <span style="color: #79839B;">Everything else can wait until after your 14:00.</span></p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ heroQueue }}" as="q" hint-placeholder-count="3">
+                <div style="border: 1px solid #1B2230; border-radius: 10px; padding: 13px 14px; display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; background: #121826;" style-hover="border-color: #1E3A4C; background: #161D2E;">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489; padding-top: 2px;">{{ q.n }}</span>
+                  <div>
+                    <div style="font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 3px;">{{ q.title }}</div>
+                    <div style="font-size: 12.5px; color: #8C96AD; line-height: 1.45;">{{ q.reason }}</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #6A7489; padding-top: 3px;">{{ q.src }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 12px; color: #6A7489; margin: 14px 2px 0 2px;">Not a dashboard. A decision about the next hour.</p>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #0B0F1A; padding: 96px 40px 40px 40px; overflow: hidden;">
+      <div style="max-width: 640px; margin: 0 auto; text-align: center; position: relative; z-index: 3;">
+        <div data-anim style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6A7489; margin-bottom: 18px;">everything you already use</div>
+        <h2 data-anim style="font-size: 38px; line-height: 1.12; letter-spacing: -0.032em; font-weight: 600; margin: 0 0 16px 0; text-wrap: balance;">Your work is already everywhere. It just has no center.</h2>
+        <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0; text-wrap: pretty;">Seven tools, each convinced it is the main one. Standup does not ask you to leave any of them — it pulls what happened into a single stream and gives the day a middle.</p>
+      </div>
+
+      <div style="position: relative; height: 460px; margin-top: 112px; z-index: 1;">
+        <div style="position: absolute; left: 50%; bottom: 0; width: 0; height: 0;">
+          <div style="position: absolute; left: 0; top: 0; width: 620px; height: 620px; margin-left: -310px; margin-top: -310px; border: 1px solid #161C2B; border-radius: 999px;"></div>
+          <div style="position: absolute; left: 0; top: 0; width: 900px; height: 900px; margin-left: -450px; margin-top: -450px; border: 1px solid #141A28; border-radius: 999px;"></div>
+          <div style="position: absolute; left: 0; top: 0; width: 1060px; height: 1060px; margin-left: -530px; margin-top: -530px; border: 1px solid #121724; border-radius: 999px;"></div>
+
+          <div data-orbit data-orbit-dur="74" data-orbit-dir="1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(-38deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-310px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #212938; background: #121826; border-radius: 999px; padding: 9px 16px 9px 12px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.8); transform: rotate(38deg);">
+                <img src="https://api.iconify.design/simple-icons:github.svg?color=%234FD98C&height=32" width="16" height="16" alt="" style="display: block;" />
+                <span style="font-size: 14px; font-weight: 500; color: #E9EDF7;">GitHub</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="74" data-orbit-dir="1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(34deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-310px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #212938; background: #121826; border-radius: 999px; padding: 9px 16px 9px 12px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.8); transform: rotate(-34deg);">
+                <img src="https://api.iconify.design/simple-icons:linear.svg?color=%239AA4BA&height=32" width="16" height="16" alt="" style="display: block;" />
+                <span style="font-size: 14px; font-weight: 500; color: #E9EDF7;">Linear</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="98" data-orbit-dir="-1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(-64deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-450px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #1C2432; background: #101623; border-radius: 999px; padding: 8px 15px 8px 11px; transform: rotate(64deg);">
+                <img src="https://api.iconify.design/simple-icons:slack.svg?color=%2379839B&height=32" width="15" height="15" alt="" style="display: block;" />
+                <span style="font-size: 13.5px; font-weight: 500; color: #9AA4BA;">Slack</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="98" data-orbit-dir="-1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(12deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-450px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #1C2432; background: #101623; border-radius: 999px; padding: 8px 15px 8px 11px; transform: rotate(-12deg);">
+                <img src="https://api.iconify.design/simple-icons:notion.svg?color=%2379839B&height=32" width="15" height="15" alt="" style="display: block;" />
+                <span style="font-size: 13.5px; font-weight: 500; color: #9AA4BA;">Notion</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="98" data-orbit-dir="-1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(78deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-450px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #1C2432; background: #101623; border-radius: 999px; padding: 8px 15px 8px 11px; transform: rotate(-78deg);">
+                <img src="https://api.iconify.design/simple-icons:googlecalendar.svg?color=%2379839B&height=32" width="15" height="15" alt="" style="display: block;" />
+                <span style="font-size: 13.5px; font-weight: 500; color: #9AA4BA;">Calendar</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="132" data-orbit-dir="1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(-26deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-530px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #1B2230; background: #0E1420; border-radius: 999px; padding: 8px 14px 8px 11px; transform: rotate(26deg);">
+                <img src="https://api.iconify.design/simple-icons:jira.svg?color=%235C6479&height=32" width="14" height="14" alt="" style="display: block;" />
+                <span style="font-size: 13px; font-weight: 500; color: #79839B;">Jira</span>
+              </div>
+            </div>
+          </div>
+
+          <div data-orbit data-orbit-dur="132" data-orbit-dir="1" style="position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(48deg);">
+            <div style="position: absolute; transform: translate(-50%, -50%) translateY(-530px); white-space: nowrap;">
+              <div data-orbit-inner style="display: inline-flex; align-items: center; gap: 9px; border: 1px solid #1B2230; background: #0E1420; border-radius: 999px; padding: 8px 14px 8px 11px; transform: rotate(-48deg);">
+                <img src="https://api.iconify.design/simple-icons:trello.svg?color=%235C6479&height=32" width="14" height="14" alt="" style="display: block;" />
+                <span style="font-size: 13px; font-weight: 500; color: #79839B;">Trello</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 50%; bottom: -96px; transform: translateX(-50%); width: 224px; height: 224px; border-radius: 999px; background: #0E2418; border: 1px solid #1C4A31; box-shadow: 0 0 90px rgba(29,156,76,.22); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; gap: 11px;">
+          <div style="width: 38px; height: 38px; border-radius: 11px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+            <div style="width: 18px; height: 3px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 13px; height: 3px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 8px; height: 3px; border-radius: 1px; background: rgba(238,243,255,.34);"></div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: #E9EDF7;">One stream</div>
+            <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4FD98C; margin-top: 3px;">1,284 work events</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #0B0F1A; padding: 108px 40px;">
+      <div style="max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(360px, 1fr) minmax(420px, 560px); gap: 72px; align-items: center;">
+        <div>
+          <div data-anim style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6A7489; margin-bottom: 20px;">01 · the primitive</div>
+          <h2 data-anim style="font-size: 38px; line-height: 1.12; letter-spacing: -0.032em; font-weight: 600; margin: 0 0 18px 0; text-wrap: balance;">Seven APIs. Seven vocabularies. One event.</h2>
+          <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0 0 18px 0; max-width: 480px; text-wrap: pretty;">A review request, a blocked issue, an unanswered thread and a meeting that eats your afternoon are the same kind of thing: something happened, and it may need you.</p>
+          <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0 0 34px 0; max-width: 480px; text-wrap: pretty;">Standup normalizes every source into a single <span style="font-family: 'Geist Mono', monospace; font-size: 14.5px; color: #E9EDF7;">WorkEvent</span> before any feature touches it. That is why ranking works across tools instead of inside one.</p>
+          <div data-anim-group style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; max-width: 480px;">
+            <div style="border-left: 2px solid #1D9C4C; padding-left: 13px;">
+              <div data-count="1284" style="font-family: 'Geist Mono', monospace; font-size: 24px; letter-spacing: -0.02em;">0</div>
+              <div style="font-size: 12.5px; color: #79839B; margin-top: 3px;">events in a typical week</div>
+            </div>
+            <div style="border-left: 2px solid #1C4A31; padding-left: 13px;">
+              <div data-count="41" style="font-family: 'Geist Mono', monospace; font-size: 24px; letter-spacing: -0.02em;">0</div>
+              <div style="font-size: 12.5px; color: #79839B; margin-top: 3px;">actually involve you</div>
+            </div>
+            <div style="border-left: 2px solid #1C4A31; padding-left: 13px;">
+              <div data-count="3" style="font-family: 'Geist Mono', monospace; font-size: 24px; letter-spacing: -0.02em;">0</div>
+              <div style="font-size: 12.5px; color: #79839B; margin-top: 3px;">need you this morning</div>
+            </div>
+          </div>
+        </div>
+        <div data-anim>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
+            <sc-for list="{{ connectorChips }}" as="c" hint-placeholder-count="7">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8C96AD; border: 1px solid #212938; background: #121826; border-radius: 6px; padding: 4px 9px;">{{ c.name }}</span>
+            </sc-for>
+          </div>
+          <div style="display: flex; justify-content: center; margin-bottom: 14px;">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6A7489;">↓ normalize</span>
+          </div>
+          <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden; box-shadow: 0 18px 44px -30px rgba(0,0,0,.6);">
+            <div style="height: 36px; border-bottom: 1px solid #181F2C; display: flex; align-items: center; padding: 0 14px; background: #0F1421;">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">work-event.ts</span>
+            </div>
+            <pre style="font-family: 'Geist Mono', monospace; font-size: 12.5px; line-height: 1.75; color: #E9EDF7; margin: 0; padding: 18px 20px; overflow-x: auto;"><span style="color: #6A7489;">type</span> <span style="color: #4FD98C;">WorkEvent</span> = {
+  service:   <span style="color: #4FD98C;">"github" | "slack" | "linear" | …</span>
+  type:      <span style="color: #4FD98C;">"pull_request.review_requested"</span>
+  title:     <span style="color: #4FD98C;">"Review requested · Auth OAuth flow"</span>
+  actor:     <span style="color: #4FD98C;">"Guilherme"</span>
+  source:    <span style="color: #4FD98C;">"guibersi7/dev-os-orchestrator"</span>
+  priority:  <span style="color: #4FD98C;">"high"</span>
+  occurredAt:<span style="color: #4FD98C;">"2026-07-31T10:20:00Z"</span>
+  metadata:  { prNumber: <span style="color: #4FD98C;">42</span>, blocks: <span style="color: #4FD98C;">["DEV-18"]</span> }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #121826; padding: 108px 40px;">
+      <div style="max-width: 1180px; margin: 0 auto;">
+        <div data-anim style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6A7489; margin-bottom: 20px;">02 · the first ninety seconds</div>
+        <h2 data-anim style="font-size: 38px; line-height: 1.12; letter-spacing: -0.032em; font-weight: 600; margin: 0 0 16px 0; max-width: 720px; text-wrap: balance;">Three answers, before your first coffee cools.</h2>
+        <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0 0 44px 0; max-width: 620px; text-wrap: pretty;">Every surface in the product exists to answer one question. If a card cannot say why it is on your screen, it is not on your screen.</p>
+        <div data-anim-group style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+          <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden; display: flex; flex-direction: column;" style-hover="border-color: #1C4A31;">
+            <div style="padding: 20px 20px 16px 20px;">
+              <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 6px;">Ranked, with a reason</div>
+              <p style="font-size: 13.5px; color: #9AA4BA; line-height: 1.5; margin: 0;">Never a wall of notifications. Three items, each carrying the sentence that justifies its position.</p>
+            </div>
+            <div style="border-top: 1px solid #181F2C; background: #0F1421; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
+              <div style="border: 1px solid #1B2230; border-radius: 9px; background: #121826; padding: 11px 12px;">
+                <div style="font-size: 12.5px; font-weight: 500; margin-bottom: 3px;">Review · Auth OAuth flow #42</div>
+                <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.4;">Ana has waited 2 days. DEV-18 sits behind it.</div>
+              </div>
+              <div style="border: 1px solid #1B2230; border-radius: 9px; background: #121826; padding: 11px 12px;">
+                <div style="font-size: 12.5px; font-weight: 500; margin-bottom: 3px;">Checks failing · retry-backoff #118</div>
+                <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.4;">Your branch. Nobody else is touching it.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden; display: flex; flex-direction: column;" style-hover="border-color: #1C4A31;">
+            <div style="padding: 20px 20px 16px 20px;">
+              <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 6px;">Blocked chains, end to end</div>
+              <p style="font-size: 13.5px; color: #9AA4BA; line-height: 1.5; margin: 0;">The link between a stalled review and a slipping release lives across three tools. We draw it in one.</p>
+            </div>
+            <div style="border-top: 1px solid #181F2C; background: #0F1421; padding: 18px 18px; margin-top: auto; display: flex; flex-direction: column; gap: 0;">
+              <div style="display: grid; grid-template-columns: 8px 1fr; gap: 12px; align-items: center;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #1D9C4C;"></span>
+                <div style="font-size: 12.5px; font-weight: 500;">PR #42 · waiting on your review</div>
+              </div>
+              <div style="width: 1px; height: 16px; background: #1C4A31; margin-left: 3.5px;"></div>
+              <div style="display: grid; grid-template-columns: 8px 1fr; gap: 12px; align-items: center;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #4FD98C;"></span>
+                <div style="font-size: 12.5px; font-weight: 500;">DEV-18 · blocked <span style="color: #79839B; font-weight: 400;">2 days</span></div>
+              </div>
+              <div style="width: 1px; height: 16px; background: #1C4A31; margin-left: 3.5px;"></div>
+              <div style="display: grid; grid-template-columns: 8px 1fr; gap: 12px; align-items: center;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #39435A;"></span>
+                <div style="font-size: 12.5px; font-weight: 500;">Mobile release <span style="color: #79839B; font-weight: 400;">· Friday</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden; display: flex; flex-direction: column;" style-hover="border-color: #1C4A31;">
+            <div style="padding: 20px 20px 16px 20px;">
+              <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 6px;">Ask, in plain language</div>
+              <p style="font-size: 13.5px; color: #9AA4BA; line-height: 1.5; margin: 0;">Answers cite the events they came from. No summary you have to take on faith.</p>
+            </div>
+            <div style="border-top: 1px solid #181F2C; background: #0F1421; padding: 14px 16px; margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+              <div style="align-self: flex-end; background: #1D9C4C; color: #F4F7FF; border-radius: 10px 10px 3px 10px; padding: 8px 11px; font-size: 12.5px; max-width: 88%;">What slipped this week and why?</div>
+              <div style="background: #121826; border: 1px solid #1B2230; border-radius: 10px 10px 10px 3px; padding: 11px 12px; font-size: 12.5px; line-height: 1.5; color: #E9EDF7; max-width: 94%;">Two items. Both trace back to review latency on the connectors repo.
+                <div style="display: flex; gap: 6px; margin-top: 9px;">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; color: #9FE0F2; background: #12293A; border-radius: 4px; padding: 2px 6px;">14 events</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; color: #8C96AD; background: #1A2130; border-radius: 4px; padding: 2px 6px;">DEV-18</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #0B0F1A; padding: 108px 40px;">
+      <div style="max-width: 1180px; margin: 0 auto;">
+        <div data-anim style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6A7489; margin-bottom: 20px;">03 · setup</div>
+        <h2 data-anim style="font-size: 38px; line-height: 1.12; letter-spacing: -0.032em; font-weight: 600; margin: 0 0 16px 0; max-width: 720px; text-wrap: balance;">Two minutes from authorize to answer.</h2>
+        <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0 0 44px 0; max-width: 620px; text-wrap: pretty;">Every integration follows the same four beats. Learn it once, repeat it for each tool you add.</p>
+        <div data-anim-group style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #212938; border: 1px solid #212938; border-radius: 13px; overflow: hidden;">
+          <sc-for list="{{ setupBeats }}" as="b" hint-placeholder-count="4">
+            <div style="background: #121826; padding: 22px 20px 24px 20px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">{{ b.n }}</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9FE0F2; background: #12293A; border-radius: 5px; padding: 2px 7px;">{{ b.time }}</span>
+              </div>
+              <div style="font-size: 15px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 6px;">{{ b.title }}</div>
+              <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0;">{{ b.desc }}</p>
+            </div>
+          </sc-for>
+        </div>
+        <div data-anim style="display: flex; align-items: center; gap: 12px; margin-top: 26px;">
+          <button onClick="{{ goConnect }}" style="font-family: inherit; font-size: 13.5px; font-weight: 500; color: #E9EDF7; background: #121826; border: 1px solid #212938; border-radius: 9px; padding: 10px 16px; cursor: pointer;" style-hover="border-color: #39435A;">See the connection center</button>
+          <span style="font-size: 12.5px; color: #6A7489;">Read-only scopes. Revoke from Settings at any time.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #121826; padding: 108px 40px;">
+      <div style="max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(340px, 1fr) minmax(400px, 1fr); gap: 72px; align-items: start;">
+        <div>
+          <div data-anim style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6A7489; margin-bottom: 20px;">04 · restraint</div>
+          <h2 data-anim style="font-size: 38px; line-height: 1.12; letter-spacing: -0.032em; font-weight: 600; margin: 0 0 18px 0; text-wrap: balance;">What Standup will never put on your screen.</h2>
+          <p data-anim style="font-size: 16px; line-height: 1.6; color: #9AA4BA; margin: 0; max-width: 460px; text-wrap: pretty;">Most engineering tools measure teams. This one serves the person opening it at 9am. Everything below was considered, prototyped, and cut.</p>
+        </div>
+        <div data-anim-group style="display: flex; flex-direction: column; gap: 1px; background: #1B2230; border: 1px solid #1B2230; border-radius: 13px; overflow: hidden;">
+          <sc-for list="{{ excluded }}" as="e" hint-placeholder-count="4">
+            <div style="background: #121826; padding: 17px 20px; display: grid; grid-template-columns: 14px 1fr; gap: 14px; align-items: start;">
+              <span style="width: 11px; height: 1.5px; background: #39435A; margin-top: 9px;"></span>
+              <div>
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 3px; text-decoration: line-through; text-decoration-color: #2E3849;">{{ e.title }}</div>
+                <div style="font-size: 12.5px; color: #79839B; line-height: 1.45;">{{ e.why }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #0B0F1A; padding: 96px 40px;">
+      <div style="max-width: 1180px; margin: 0 auto;">
+        <div data-anim style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 26px; flex-wrap: wrap; gap: 12px;">
+          <h2 style="font-size: 24px; letter-spacing: -0.025em; font-weight: 600; margin: 0;">Sources, one at a time</h2>
+          <span style="font-size: 13px; color: #79839B;">GitHub is live today. The rest land as the normalizer covers them.</span>
+        </div>
+        <div data-anim-group style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px;">
+          <sc-for list="{{ allTools }}" as="t" hint-placeholder-count="7">
+            <div style="border: 1px solid {{ t.bd }}; background: {{ t.bg }}; border-radius: 11px; padding: 16px 14px; display: flex; flex-direction: column; gap: 10px;">
+              <span style="width: 16px; height: 16px; display: block; background-image: {{ t.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+              <span style="font-size: 13.5px; font-weight: 500;">{{ t.name }}</span>
+              <span style="font-size: 11.5px; color: {{ t.stateColor }};">{{ t.state }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #121826; padding: 112px 40px;">
+      <div data-anim style="max-width: 780px; margin: 0 auto; text-align: center;">
+        <h2 style="font-size: 40px; line-height: 1.1; letter-spacing: -0.034em; font-weight: 600; margin: 0 0 16px 0; text-wrap: balance;">Tomorrow morning, open one thing.</h2>
+        <p style="font-size: 16.5px; line-height: 1.6; color: #9AA4BA; margin: 0 0 30px 0;">Understand what matters. Then start building.</p>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+          <button onClick="{{ goSetup }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 12px 22px; cursor: pointer;" style-hover="background: #23B85A;">Show me what needs me today</button>
+          <button onClick="{{ goToday }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #E9EDF7; background: #121826; border: 1px solid #212938; border-radius: 9px; padding: 12px 18px; cursor: pointer;" style-hover="border-color: #39435A;">Walk through a real morning</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #1B2230; background: #0B0F1A; padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <div style="width: 18px; height: 18px; border-radius: 5px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5px;"><div style="width: 9px; height: 1.5px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 6.5px; height: 1.5px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 4px; height: 1.5px; border-radius: 1px; background: rgba(238,243,255,.34);"></div></div>
+        <span style="font-size: 12.5px; color: #8C96AD;">Standup · the developer OS · read-only by design</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 22px;">
+        <span style="font-size: 12.5px; color: #79839B;">Security</span>
+        <span style="font-size: 12.5px; color: #79839B;">Docs</span>
+        <span style="font-size: 12.5px; color: #79839B;">Changelog</span>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: flex; flex-direction: column; background: #121826;">
+    <div style="height: 60px; border-bottom: 1px solid #1B2230; display: flex; align-items: center; justify-content: space-between; padding: 0 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;"><div style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></div></div>
+        <span style="font-size: 13px; font-weight: 600;">Standup</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 18px; height: 18px; border-radius: 999px; font-family: 'Geist Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; background: {{ s.bg }}; color: {{ s.fg }}; border: 1px solid {{ s.bd }};">{{ s.n }}</span>
+            <span style="font-size: 12.5px; color: {{ s.label }};">{{ s.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <span style="font-size: 12.5px; color: #6A7489;">workspace setup</span>
+    </div>
+
+    <div style="flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 76px 24px;">
+      <div style="width: 100%; max-width: 560px; animation: dosRise .4s ease both;">
+        <h2 style="font-size: 30px; letter-spacing: -0.03em; font-weight: 600; margin: 0 0 10px 0;">Set up your workspace</h2>
+        <p style="font-size: 15px; color: #9AA4BA; margin: 0 0 40px 0; line-height: 1.5;">Two answers. They decide what lands at the top of your morning.</p>
+
+        <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Workspace name</label>
+        <input value="{{ ws }}" onChange="{{ setWs }}" style="font-family: inherit; width: 100%; font-size: 14px; padding: 11px 13px; border: 1px solid #212938; border-radius: 9px; outline: none; color: #E9EDF7; margin-bottom: 8px;" style-focus="border-color: #4FD98C; box-shadow: 0 0 0 3px rgba(29,156,76,.32);" />
+        <p style="font-size: 12px; color: #6A7489; margin: 0 0 32px 0;">Everyone you invite sees the same normalized event stream.</p>
+
+        <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px;">How do you spend most of your week?</label>
+        <p style="font-size: 12px; color: #6A7489; margin: 0 0 12px 0;">Changes ranking, not features.</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px;">
+          <sc-for list="{{ roles }}" as="r" hint-placeholder-count="3">
+            <div onClick="{{ r.pick }}" style="border: 1px solid {{ r.bd }}; background: {{ r.bg }}; border-radius: 10px; padding: 14px 16px; cursor: pointer; display: grid; grid-template-columns: 16px 1fr; gap: 12px; align-items: start;">
+              <span style="width: 15px; height: 15px; border-radius: 999px; border: 1px solid {{ r.dotBd }}; background: {{ r.dotBg }}; margin-top: 2px; display: flex; align-items: center; justify-content: center;"><span style="width: 5px; height: 5px; border-radius: 999px; background: {{ r.dotIn }};"></span></span>
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; margin-bottom: 2px;">{{ r.name }}</div>
+                <div style="font-size: 12.5px; color: #8C96AD; line-height: 1.45;">{{ r.desc }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button onClick="{{ goConnect }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 11px 20px; cursor: pointer;" style-hover="background: #23B85A;">Continue</button>
+          <span style="font-size: 12.5px; color: #6A7489;">Next: connect your first tool</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isConnect }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: flex; flex-direction: column; background: #121826;">
+    <div style="height: 60px; border-bottom: 1px solid #1B2230; display: flex; align-items: center; justify-content: space-between; padding: 0 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;"><div style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></div></div>
+        <span style="font-size: 13px; font-weight: 600;">Standup</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 18px; height: 18px; border-radius: 999px; font-family: 'Geist Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; background: {{ s.bg }}; color: {{ s.fg }}; border: 1px solid {{ s.bd }};">{{ s.n }}</span>
+            <span style="font-size: 12.5px; color: {{ s.label }};">{{ s.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <span style="font-size: 12.5px; color: #6A7489;">connection center</span>
+    </div>
+
+    <div style="flex: 1; display: flex; justify-content: center; padding: 64px 24px 80px 24px;">
+      <div style="width: 100%; max-width: 780px; animation: dosRise .4s ease both;">
+        <h2 style="font-size: 30px; letter-spacing: -0.03em; font-weight: 600; margin: 0 0 10px 0;">Connect your sources</h2>
+        <p style="font-size: 15px; color: #9AA4BA; margin: 0 0 36px 0; line-height: 1.5;">Pick everything you want in from day one — <span style="color: #E9EDF7;">they sync in parallel</span>. One tool already answers “what should I do now?”. Three make the answer hard to argue with.</p>
+
+        <div style="border: 1px solid #1C4A31; border-radius: 12px; background: linear-gradient(180deg, #0E2418 0%, #121826 100%); padding: 20px 22px; margin-bottom: 28px; display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: center;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: #1A2130; display: flex; align-items: center; justify-content: center;"><img src="https://api.iconify.design/simple-icons:github.svg?color=%23E9EDF7&height=32" width="20" height="20" alt="" style="display: block;" /></div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+              <span style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">GitHub</span>
+              <span style="font-size: 10.5px; font-family: 'Geist Mono', monospace; text-transform: uppercase; letter-spacing: .06em; color: #9FE0F2; background: #12293A; border-radius: 5px; padding: 2px 6px;">recommended</span>
+            </div>
+            <div style="font-size: 13px; color: #9AA4BA; line-height: 1.45;">Pull requests, review requests, comments, checks and merges — normalized into work events.</div>
+          </div>
+          <div onClick="{{ toggleGithub }}" style="display: flex; align-items: center; gap: 9px; cursor: pointer; white-space: nowrap;">
+            <span style="font-size: 12.5px; color: #4FD98C;">Selected</span>
+            <span style="width: 19px; height: 19px; border-radius: 6px; border: 1px solid {{ githubBoxBd }}; background: {{ githubBoxBg }}; display: flex; align-items: center; justify-content: center;">
+              <sc-if value="{{ githubOn }}" hint-placeholder-val="{{ true }}">
+                <span style="width: 9px; height: 5px; border-left: 1.7px solid #FFFFFF; border-bottom: 1.7px solid #FFFFFF; transform: rotate(-45deg) translate(1px, -1px);"></span>
+              </sc-if>
+            </span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">Add now, or later from Settings</span>
+          <span style="font-size: 12px; color: #6A7489;">Each source adds signal, not screens</span>
+        </div>
+        <div style="border: 1px solid #212938; border-radius: 12px; overflow: hidden;">
+          <sc-for list="{{ connectors }}" as="c" hint-placeholder-count="6">
+            <div onClick="{{ c.toggle }}" style="display: grid; grid-template-columns: 32px 1fr auto 19px; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid #181F2C; background: {{ c.bg }}; cursor: pointer;" style-hover="background: #0F1421;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: #1A2130; border: 1px solid #1B2230; display: flex; align-items: center; justify-content: center;"><span style="width: 16px; height: 16px; display: block; background-image: {{ c.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span></div>
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; margin-bottom: 2px;">{{ c.name }}</div>
+                <div style="font-size: 12.5px; color: #79839B; line-height: 1.4;">{{ c.unlocks }}</div>
+              </div>
+              <span style="font-size: 12px; color: {{ c.stateColor }};">{{ c.state }}</span>
+              <span style="width: 19px; height: 19px; border-radius: 6px; border: 1px solid {{ c.boxBd }}; background: {{ c.boxBg }}; display: flex; align-items: center; justify-content: center;">
+                <sc-if value="{{ c.on }}" hint-placeholder-val="{{ true }}">
+                  <span style="width: 9px; height: 5px; border-left: 1.7px solid #FFFFFF; border-bottom: 1.7px solid #FFFFFF; transform: rotate(-45deg) translate(1px, -1px);"></span>
+                </sc-if>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="margin-top: 28px; display: flex; align-items: center; gap: 12px;">
+          <button onClick="{{ goOauth }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 11px 20px; cursor: pointer;" style-hover="background: #23B85A;">{{ connCta }}</button>
+          <span style="font-size: 12.5px; color: #6A7489;">{{ connSummary }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isOauth }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #080C15; padding: 40px 24px;">
+    <div style="width: 100%; max-width: 440px; animation: dosRise .35s ease both;">
+      <sc-if value="{{ authMulti }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px;">
+          <sc-for list="{{ authQueue }}" as="a" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 7px; border: 1px solid {{ a.bd }}; background: {{ a.bg }}; border-radius: 999px; padding: 5px 12px 5px 9px;">
+              <span style="width: 13px; height: 13px; display: block; background-image: {{ a.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+              <span style="font-size: 12px; font-weight: 500; color: {{ a.fg }};">{{ a.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ oauthOk }}" hint-placeholder-val="{{ true }}">
+        <div style="border: 1px solid #212938; border-radius: 14px; background: #121826; box-shadow: 0 20px 50px -30px rgba(0,0,0,.65); padding: 34px 32px 28px 32px; text-align: center;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: #12293A; border: 1px solid #1E3A4C; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 14px; height: 8px; border-left: 2px solid #1D9C4C; border-bottom: 2px solid #1D9C4C; transform: rotate(-45deg) translate(1px, -2px);"></div>
+          </div>
+          <h3 style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px 0;">{{ authName }} connected</h3>
+          <p style="font-size: 14px; color: #9AA4BA; line-height: 1.5; margin: 0 0 24px 0;">Authorized as <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #E9EDF7;">{{ authOwner }}</span> · {{ authCount }} {{ authResLabel }} visible.</p>
+          <div style="border: 1px solid #1B2230; border-radius: 10px; background: #0F1421; padding: 14px 16px; text-align: left; margin-bottom: 24px; display: flex; flex-direction: column; gap: 9px;">
+            <sc-for list="{{ scopes }}" as="s" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <span style="width: 4px; height: 4px; border-radius: 999px; background: #1D9C4C;"></span>
+                <span style="font-size: 12.5px; color: #9AA4BA;">{{ s }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <button onClick="{{ authNext }}" style="font-family: inherit; width: 100%; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 11px 20px; cursor: pointer;" style-hover="background: #23B85A;">{{ authNextLabel }}</button>
+        </div>
+        <p style="text-align: center; font-size: 12px; color: #6A7489; margin: 16px 0 0 0;">Read-only. Standup never writes back to your tools.</p>
+      </sc-if>
+      <sc-if value="{{ oauthBad }}" hint-placeholder-val="{{ false }}">
+        <div style="border: 1px solid #3A2130; border-radius: 14px; background: #121826; box-shadow: 0 20px 50px -30px rgba(0,0,0,.65); padding: 34px 32px 28px 32px;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: #22141C; border: 1px solid #3A2130; margin: 0 0 20px 0; display: flex; align-items: center; justify-content: center;"><span style="font-family: 'Geist Mono', monospace; font-size: 18px; color: #FF6B8A;">!</span></div>
+          <h3 style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px 0;">{{ authName }} authorization was cancelled</h3>
+          <p style="font-size: 14px; color: #9AA4BA; line-height: 1.5; margin: 0 0 20px 0;">{{ authName }} returned <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #FF6B8A;">access_denied</span>. Nothing was stored and no data was read.</p>
+          <div style="border: 1px solid #1B2230; border-radius: 10px; background: #0F1421; padding: 14px 16px; margin-bottom: 22px;">
+            <div style="font-size: 12px; font-weight: 500; margin-bottom: 8px;">Two common causes</div>
+            <div style="font-size: 12.5px; color: #8C96AD; line-height: 1.55;">The workspace requires an admin to approve third-party apps, or the window was closed before the grant finished.</div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+            <button onClick="{{ retryOauth }}" style="font-family: inherit; flex: 1; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 11px 20px; cursor: pointer;" style-hover="background: #23B85A;">Try again</button>
+            <button onClick="{{ goConnect }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #E9EDF7; background: #121826; border: 1px solid #212938; border-radius: 9px; padding: 11px 18px; cursor: pointer;" style-hover="border-color: #39435A;">Request admin approval</button>
+          </div>
+          <button onClick="{{ authNext }}" style="font-family: inherit; width: 100%; font-size: 13px; color: #9AA4BA; background: transparent; border: none; padding: 4px; cursor: pointer;" style-hover="color: #E9EDF7;">Skip this one and continue</button>
+        </div>
+      </sc-if>
+      <div style="text-align: center; margin-top: 20px;">
+        <button onClick="{{ toggleOauth }}" style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489; background: transparent; border: none; cursor: pointer; letter-spacing: .04em;" style-hover="color: #4FD98C;">↔ toggle success / failure state</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isRepos }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: flex; flex-direction: column; background: #121826;">
+    <div style="height: 60px; border-bottom: 1px solid #1B2230; display: flex; align-items: center; justify-content: space-between; padding: 0 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;"><div style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></div></div>
+        <span style="font-size: 13px; font-weight: 600;">Standup</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 18px; height: 18px; border-radius: 999px; font-family: 'Geist Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; background: {{ s.bg }}; color: {{ s.fg }}; border: 1px solid {{ s.bd }};">{{ s.n }}</span>
+            <span style="font-size: 12.5px; color: {{ s.label }};">{{ s.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <span style="font-size: 12.5px; color: #6A7489;">select what to watch</span>
+    </div>
+
+    <div style="flex: 1; display: grid; grid-template-columns: minmax(420px, 1fr) 300px; gap: 48px; max-width: 1000px; width: 100%; margin: 0 auto; padding: 56px 24px 80px 24px; align-items: start;">
+      <div style="animation: dosRise .4s ease both;">
+        <h2 style="font-size: 28px; letter-spacing: -0.03em; font-weight: 600; margin: 0 0 8px 0;">What should we watch?</h2>
+        <p style="font-size: 14.5px; color: #9AA4BA; margin: 0 0 22px 0; line-height: 1.5;">Per source, pick only what you actually work in. Noise here becomes noise in your morning.</p>
+
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 18px; flex-wrap: wrap;">
+          <sc-for list="{{ resourceTabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.pick }}" style="font-family: inherit; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; border: 1px solid {{ t.bd }}; background: {{ t.bg }}; color: {{ t.fg }}; border-radius: 8px; padding: 7px 12px; cursor: pointer;">
+              {{ t.name }}<span style="font-family: 'Geist Mono', monospace; font-size: 11px; opacity: .7;">{{ t.badge }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="{{ searchHint }}" style="font-family: inherit; width: 100%; font-size: 13.5px; padding: 10px 13px; border: 1px solid #212938; border-radius: 9px; outline: none; margin-bottom: 14px;" style-focus="border-color: #4FD98C; box-shadow: 0 0 0 3px rgba(29,156,76,.32);" />
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489;">{{ activeResLabel }} · {{ activeOwner }}</span>
+          <button onClick="{{ selectActive }}" style="font-family: inherit; font-size: 12px; color: #4FD98C; background: transparent; border: none; cursor: pointer; padding: 2px;" style-hover="color: #23B85A;">Select only the active ones</button>
+        </div>
+
+        <div style="border: 1px solid #212938; border-radius: 12px; overflow: hidden;">
+          <sc-for list="{{ resourceRows }}" as="r" hint-placeholder-count="6">
+            <div onClick="{{ r.toggle }}" style="display: grid; grid-template-columns: 18px 1fr auto; gap: 14px; align-items: center; padding: 13px 16px; border-bottom: 1px solid #181F2C; cursor: pointer; background: {{ r.bg }};">
+              <span style="width: 17px; height: 17px; border-radius: 5px; border: 1px solid {{ r.boxBd }}; background: {{ r.boxBg }}; display: flex; align-items: center; justify-content: center;">
+                <sc-if value="{{ r.on }}" hint-placeholder-val="{{ true }}">
+                  <span style="width: 8px; height: 4.5px; border-left: 1.6px solid #FFFFFF; border-bottom: 1.6px solid #FFFFFF; transform: rotate(-45deg) translate(1px, -1px);"></span>
+                </sc-if>
+              </span>
+              <div>
+                <div style="font-size: 13.5px; font-weight: 500; margin-bottom: 2px;">{{ r.name }}</div>
+                <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #6A7489;">{{ r.meta }}</div>
+              </div>
+              <span style="font-size: 11.5px; color: {{ r.sigColor }};">{{ r.signal }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="position: sticky; top: 56px; animation: dosRise .5s .06s ease both;">
+        <div style="border: 1px solid #212938; border-radius: 12px; background: #0F1421; padding: 18px;">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 14px;">First sync</div>
+          <div style="display: flex; flex-direction: column; gap: 11px; margin-bottom: 18px;">
+            <sc-for list="{{ summaryRows }}" as="r" hint-placeholder-count="3">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+                <span style="font-size: 12.5px; color: #9AA4BA;">{{ r.name }}</span>
+                <span style="font-size: 12px; color: {{ r.color }}; text-align: right;">{{ r.detail }}</span>
+              </div>
+            </sc-for>
+            <div style="height: 1px; background: #1B2230;"></div>
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <span style="font-size: 12.5px; color: #9AA4BA;">History window</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #E9EDF7;">30 days</span>
+            </div>
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <span style="font-size: 12.5px; color: #9AA4BA;">Est. work events</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #E9EDF7;">{{ estEvents }}</span>
+            </div>
+          </div>
+          <div style="border-top: 1px solid #1B2230; padding-top: 14px; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-family: 'Geist Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: #6A7489; margin-bottom: 9px;">Will be normalized</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <sc-for list="{{ eventTypes }}" as="t" hint-placeholder-count="5">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #9FE0F2; background: #12293A; border-radius: 5px; padding: 3px 7px;">{{ t }}</span>
+              </sc-for>
+            </div>
+          </div>
+          <button onClick="{{ startSync }}" style="font-family: inherit; width: 100%; font-size: 13.5px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 10px 16px; cursor: pointer;" style-hover="background: #23B85A;">{{ syncCta }}</button>
+          <p style="font-size: 11.5px; color: #6A7489; margin: 10px 0 0 0; line-height: 1.45;">Sources sync in parallel. About 40 seconds. You can leave the page.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isSync }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #121826; padding: 40px 24px;">
+    <div style="width: 100%; max-width: 620px; animation: dosRise .4s ease both;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px;">
+        <h2 style="font-size: 26px; letter-spacing: -0.03em; font-weight: 600; margin: 0;">{{ syncHeadline }}</h2>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #6A7489;">{{ syncPctLabel }}</span>
+      </div>
+      <p style="font-size: 14.5px; color: #9AA4BA; margin: 0 0 26px 0; line-height: 1.5;">{{ syncSub }}</p>
+
+      <div style="height: 4px; border-radius: 999px; background: #1B2230; overflow: hidden; margin-bottom: 30px;">
+        <div style="height: 100%; border-radius: 999px; background: #1D9C4C; width: {{ syncPct }}%; transition: width .5s cubic-bezier(.4,0,.2,1);"></div>
+      </div>
+
+      <div style="border: 1px solid #212938; border-radius: 12px; overflow: hidden;">
+        <sc-for list="{{ syncRows }}" as="s" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 30px 150px 1fr 92px 62px; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid #181F2C;">
+            <span style="background: #1A2130; border-radius: 6px; padding: 6px 0; display: flex; align-items: center; justify-content: center;"><span style="width: 15px; height: 15px; display: block; background-image: {{ s.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span></span>
+            <div>
+              <div style="font-size: 13.5px; font-weight: 500; color: {{ s.color }};">{{ s.name }}</div>
+              <div style="font-size: 11.5px; color: #6A7489;">{{ s.scope }}</div>
+            </div>
+            <div style="height: 3px; border-radius: 999px; background: #1B2230; overflow: hidden;">
+              <div style="height: 100%; border-radius: 999px; background: {{ s.bar }}; width: {{ s.barW }}%; transition: width .5s cubic-bezier(.4,0,.2,1);"></div>
+            </div>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #E9EDF7; text-align: right;">{{ s.count }}</span>
+            <span style="font-size: 11.5px; color: #6A7489; text-align: right;">{{ s.state }}</span>
+          </div>
+        </sc-for>
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; background: #0F1421;">
+          <span style="font-size: 13px; color: #9AA4BA;">{{ syncStageLine }}</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #E9EDF7;">{{ syncTotal }} work events</span>
+        </div>
+      </div>
+
+      <sc-if value="{{ syncDone }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 26px; border: 1px solid #1C4A31; background: #0E2418; border-radius: 12px; padding: 18px 20px; animation: dosRise .4s ease both;">
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">Your morning is ready</div>
+          <p style="font-size: 13px; color: #9AA4BA; line-height: 1.5; margin: 0 0 16px 0;">{{ syncDoneCopy }}</p>
+          <button onClick="{{ goToday }}" style="font-family: inherit; font-size: 14px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 9px; padding: 11px 20px; cursor: pointer;" style-hover="background: #23B85A;">Open Standup</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ syncRunning }}" hint-placeholder-val="{{ true }}">
+        <p style="font-size: 12.5px; color: #6A7489; margin: 20px 0 0 0;">Normalizing into work events — nothing is shown until it means something.</p>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isToday }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height: 100vh; display: grid; grid-template-columns: 216px minmax(0, 1fr); background: #080C15;">
+    <div style="border-right: 1px solid #1C2432; background: #0E1320; padding: 18px 12px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 9px; padding: 6px 8px 18px 8px;">
+        <div style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;"><div style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></div><div style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></div><div style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></div></div>
+        <span style="font-size: 13px; font-weight: 600;">{{ ws }}</span>
+      </div>
+      <div onClick="{{ noop }}" style="display: flex; align-items: center; justify-content: space-between; border: 1px solid #212938; background: #121826; border-radius: 8px; padding: 7px 10px; margin-bottom: 18px; cursor: pointer;" style-hover="border-color: #39435A;">
+        <span style="font-size: 12.5px; color: #79839B;">Search or ask…</span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">⌘K</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 1px;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="7">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 7px; cursor: pointer; background: {{ n.bg }};" style-hover="background: #181F2C;">
+            <span style="font-size: 13px; color: {{ n.color }}; font-weight: {{ n.weight }};">{{ n.name }}</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">{{ n.badge }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top: auto; border: 1px solid #1C2432; border-radius: 10px; background: #121826; padding: 13px;">
+        <div style="font-size: 12px; font-weight: 500; margin-bottom: 5px;">{{ connLabel }}</div>
+        <p style="font-size: 11.5px; color: #79839B; line-height: 1.45; margin: 0 0 10px 0;">{{ connNudge }}</p>
+        <button onClick="{{ goConnect }}" style="font-family: inherit; font-size: 12px; font-weight: 500; color: #4FD98C; background: #121826; border: 1px solid #1C4A31; border-radius: 7px; padding: 6px 10px; cursor: pointer; width: 100%;" style-hover="background: #0E2418;">Add a tool</button>
+      </div>
+    </div>
+
+    <div style="padding: 34px 40px 60px 40px; overflow-x: auto;">
+      <div style="max-width: 1080px; min-width: 940px; margin: 0 auto;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;">
+          <h2 style="font-size: 26px; letter-spacing: -0.03em; font-weight: 600; margin: 0;">Good morning, Guilherme</h2>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6A7489;">tue 31 jul · synced 2m ago</span>
+        </div>
+        <p style="font-size: 15px; color: #9AA4BA; line-height: 1.5; margin: 0 0 28px 0; max-width: 700px; text-wrap: pretty;">Two people are blocked behind you. Your first free block is at 14:00 — <span style="color: #E9EDF7;">clear the queue before your 11:30 sync</span>.</p>
+
+        <div style="display: grid; grid-template-columns: 1fr 316px; gap: 20px; align-items: start;">
+          <div>
+            <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden; margin-bottom: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid #181F2C;">
+                <div style="display: flex; align-items: center; gap: 9px;">
+                  <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Focus queue</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9FE0F2; background: #12293A; border-radius: 5px; padding: 2px 6px;">3 now</span>
+                </div>
+                <span style="font-size: 12px; color: #6A7489;">ranked by who is waiting</span>
+              </div>
+              <sc-for list="{{ queue }}" as="q" hint-placeholder-count="3">
+                <div style="padding: 16px 18px; border-bottom: 1px solid #181F2C; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; cursor: pointer; background: #121826;" style-hover="background: #161D2E;">
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: {{ q.tagFg }}; background: {{ q.tagBg }}; border-radius: 5px; padding: 2px 6px;">{{ q.tag }}</span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">{{ q.src }}</span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6A7489;">· {{ q.age }}</span>
+                    </div>
+                    <div style="font-size: 14.5px; font-weight: 500; letter-spacing: -0.012em; margin-bottom: 4px;">{{ q.title }}</div>
+                    <sc-if value="{{ showReasons }}" hint-placeholder-val="{{ true }}">
+                      <div style="font-size: 13px; color: #8C96AD; line-height: 1.45;">{{ q.reason }}</div>
+                    </sc-if>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <button style="font-family: inherit; font-size: 12.5px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 8px; padding: 7px 14px; cursor: pointer; white-space: nowrap;" style-hover="background: #23B85A;">{{ q.action }}</button>
+                    <button style="font-family: inherit; font-size: 12.5px; color: #8C96AD; background: #121826; border: 1px solid #212938; border-radius: 8px; padding: 7px 11px; cursor: pointer;" style-hover="border-color: #39435A; color: #E9EDF7;">Snooze</button>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="padding: 12px 18px; background: #0F1421;">
+                <span style="font-size: 12.5px; color: #79839B;">4 more events today — none of them block another person.</span>
+              </div>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; overflow: hidden;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid #181F2C;">
+                <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Waiting on others</span>
+                <span style="font-size: 12px; color: #6A7489;">nothing for you to do — yet</span>
+              </div>
+              <sc-for list="{{ waiting }}" as="w" hint-placeholder-count="3">
+                <div style="padding: 13px 18px; border-bottom: 1px solid #181F2C; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;">
+                  <div>
+                    <div style="font-size: 13.5px; font-weight: 500; margin-bottom: 2px;">{{ w.title }}</div>
+                    <div style="font-size: 12.5px; color: #79839B;">{{ w.detail }}</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: {{ w.ageColor }};">{{ w.age }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; padding: 16px 18px;">
+              <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px;">Shape of your day</div>
+              <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+                <sc-for list="{{ agenda }}" as="a" hint-placeholder-count="3">
+                  <div style="display: grid; grid-template-columns: 46px 3px 1fr; gap: 10px; align-items: center;">
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #6A7489;">{{ a.time }}</span>
+                    <span style="width: 3px; height: 26px; border-radius: 999px; background: {{ a.bar }};"></span>
+                    <div>
+                      <div style="font-size: 12.5px; font-weight: 500;">{{ a.title }}</div>
+                      <div style="font-size: 11.5px; color: #6A7489;">{{ a.meta }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="border-top: 1px solid #181F2C; padding-top: 12px;">
+                <span style="font-size: 12.5px; color: #9AA4BA; line-height: 1.45;">2h 40m uninterrupted after 14:00. <span style="color: #6A7489;">Best slot for DEV-21.</span></span>
+              </div>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 13px; background: #121826; padding: 16px 18px;">
+              <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px;">You are the bottleneck on</div>
+              <p style="font-size: 12.5px; color: #79839B; margin: 0 0 14px 0; line-height: 1.45;">Work that cannot move until you act.</p>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <sc-for list="{{ blocking }}" as="b" hint-placeholder-count="2">
+                  <div style="border-left: 2px solid #1D9C4C; padding-left: 11px;">
+                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 2px;">{{ b.title }}</div>
+                    <div style="font-size: 12px; color: #8C96AD; line-height: 1.45;">{{ b.detail }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="border: 1px dashed #2E3849; border-radius: 13px; background: #0E1320; padding: 16px 18px;">
+              <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #6A7489; margin-bottom: 8px;">Not connected</div>
+              <div style="font-size: 13.5px; font-weight: 500; margin-bottom: 5px;">{{ missingList }}</div>
+              <p style="font-size: 12.5px; color: #79839B; line-height: 1.5; margin: 0 0 13px 0;">{{ missingCopy }}</p>
+              <button onClick="{{ goConnect }}" style="font-family: inherit; font-size: 12.5px; font-weight: 500; color: #4FD98C; background: #121826; border: 1px solid #1C4A31; border-radius: 8px; padding: 7px 12px; cursor: pointer;" style-hover="background: #0E2418;">{{ missingCta }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ rail }}" hint-placeholder-val="{{ false }}">
+  <div style="position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; background: rgba(14,19,32,.94); backdrop-filter: blur(8px); border-radius: 11px; padding: 5px; box-shadow: 0 12px 30px -12px rgba(0,0,0,.7); z-index: 50;">
+    <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #8C96AD; padding: 0 9px 0 7px;">wave 1</span>
+    <sc-for list="{{ railItems }}" as="s" hint-placeholder-count="7">
+      <button onClick="{{ s.go }}" style="font-family: inherit; font-size: 12px; font-weight: 500; border: none; border-radius: 7px; padding: 6px 11px; cursor: pointer; background: {{ s.bg }}; color: {{ s.fg }};">{{ s.name }}</button>
+    </sc-for>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;intelligenceMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;reasons&quot;,&quot;silent&quot;],&quot;default&quot;:&quot;reasons&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Intelligence&quot;},&quot;showFlowRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;landing&quot;,&quot;setup&quot;,&quot;connect&quot;,&quot;oauth&quot;,&quot;repos&quot;,&quot;sync&quot;,&quot;today&quot;],&quot;default&quot;:&quot;landing&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;oauthFailure&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = {
+      screen: p.startScreen || 'landing',
+      role: 'lead',
+      ws: 'Bersi Labs',
+      query: '',
+      oauthOk: !p.oauthFailure,
+      conn: { github: true, linear: true, slack: true },
+      authIdx: 0,
+      tab: 'github',
+      res: {
+        github: { 'dev-os-orchestrator': true, 'dev-os-web': true, 'dev-os-connectors': true },
+        linear: { dev: true, mob: true },
+        slack: { platform: true, releases: true },
+        calendar: { work: true, team: true },
+        jira: { plat: true }, notion: { eng: true }, trello: { ship: true }
+      },
+      sync: 0
+    };
+  }
+
+  connectedIds() { return this.catalog.filter(c => this.state.conn[c.id]).map(c => c.id); }
+
+  resCount(id) {
+    const r = this.state.res[id] || {};
+    return (this.svc(id).items || []).filter(i => r[i.id]).length;
+  }
+
+  estFor(id) {
+    const r = this.state.res[id] || {};
+    return (this.svc(id).items || []).filter(i => r[i.id]).reduce((a, i) => a + i.est, 0);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this._t);
+    clearInterval(this._gsapPoll);
+    if (window.ScrollTrigger) window.ScrollTrigger.getAll().forEach(t => t.kill());
+  }
+
+  componentDidMount() { this.armScroll(); }
+
+  componentDidUpdate(_, prev) {
+    if (prev.screen !== this.state.screen) this.armScroll();
+  }
+
+  armScroll() {
+    clearInterval(this._gsapPoll);
+    if (this.state.screen !== 'landing') {
+      if (window.ScrollTrigger) window.ScrollTrigger.getAll().forEach(t => t.kill());
+      (this._orbits || []).forEach(t => t.kill());
+      this._orbits = [];
+      return;
+    }
+    let tries = 0;
+    const boot = () => {
+      const g = window.gsap, ST = window.ScrollTrigger;
+      if (!g || !ST) { if (++tries > 60) clearInterval(this._gsapPoll); return; }
+      clearInterval(this._gsapPoll);
+      g.registerPlugin(ST);
+      ST.getAll().forEach(t => t.kill());
+      const below = (el) => el.getBoundingClientRect().top > window.innerHeight * 0.88;
+
+      g.utils.toArray('[data-anim]').filter(below).forEach(el => {
+        g.fromTo(el, { opacity: 0, y: 16 }, {
+          opacity: 1, y: 0, duration: .7, ease: 'power2.out',
+          scrollTrigger: { trigger: el, start: 'top 88%', once: true }
+        });
+      });
+
+      g.utils.toArray('[data-anim-group]').filter(below).forEach(grp => {
+        g.fromTo(grp.children, { opacity: 0, y: 14 }, {
+          opacity: 1, y: 0, duration: .55, stagger: .07, ease: 'power2.out',
+          scrollTrigger: { trigger: grp, start: 'top 86%', once: true }
+        });
+      });
+
+      g.utils.toArray('[data-count]').forEach(el => {
+        const end = parseFloat(el.getAttribute('data-count'));
+        const o = { v: 0 };
+        g.to(o, {
+          v: end, duration: 1.4, ease: 'power2.out',
+          scrollTrigger: { trigger: el, start: 'top 92%', once: true },
+          onUpdate: () => { el.textContent = Math.round(o.v).toLocaleString('en-US'); },
+          onComplete: () => { el.textContent = end.toLocaleString('en-US'); }
+        });
+      });
+
+      this._orbits = this._orbits || [];
+      g.utils.toArray('[data-orbit]').forEach(sp => {
+        if (sp.dataset.orbitOn) return;
+        sp.dataset.orbitOn = '1';
+        const dur = parseFloat(sp.dataset.orbitDur) || 90;
+        const dir = parseFloat(sp.dataset.orbitDir) || 1;
+        const inner = sp.querySelector('[data-orbit-inner]');
+        this._orbits.push(g.to(sp, { rotation: '+=' + 360 * dir, duration: dur, repeat: -1, ease: 'none' }));
+        if (inner) this._orbits.push(g.to(inner, { rotation: '-=' + 360 * dir, duration: dur, repeat: -1, ease: 'none' }));
+      });
+
+      ST.refresh();
+    };
+    boot();
+    this._gsapPoll = setInterval(boot, 120);
+  }
+
+  go = (s) => {
+    clearInterval(this._t);
+    this.setState({ screen: s });
+    if (s === 'oauth') this.setState({ authIdx: 0, oauthOk: !this.props.oauthFailure });
+    if (s === 'sync') {
+      this.setState({ sync: 0 });
+      this._t = setInterval(() => {
+        this.setState(st => {
+          const n = st.sync + (st.sync < 70 ? 9 : 5);
+          if (n >= 100) { clearInterval(this._t); return { sync: 100 }; }
+          return { sync: n };
+        });
+      }, 420);
+    }
+  };
+
+  catalog = [
+    { id: 'github', icon: 'https://api.iconify.design/simple-icons:github.svg?color=%239AA4BA&height=32', tag: 'gh', name: 'GitHub', unlocks: 'Pull requests, review requests, checks and merges', resLabel: 'Repositories', owner: 'guibersi7', count: 14,
+      items: [
+        { id: 'dev-os-orchestrator', name: 'guibersi7/dev-os-orchestrator', meta: 'TypeScript · 12 open PRs · updated 8m ago', signal: 'high activity', hot: true, est: 512 },
+        { id: 'dev-os-web', name: 'guibersi7/dev-os-web', meta: 'TypeScript · 5 open PRs · updated 2h ago', signal: 'high activity', hot: true, est: 384 },
+        { id: 'dev-os-connectors', name: 'guibersi7/dev-os-connectors', meta: 'Go · 3 open PRs · updated yesterday', signal: 'high activity', hot: true, est: 388 },
+        { id: 'orchestrator-infra', name: 'guibersi7/orchestrator-infra', meta: 'HCL · 1 open PR · updated 3d ago', signal: 'low activity', hot: false, est: 96 },
+        { id: 'design-tokens', name: 'guibersi7/design-tokens', meta: 'CSS · 0 open PRs · updated 2w ago', signal: 'archived soon', hot: false, est: 24 },
+        { id: 'dev-os-docs', name: 'guibersi7/dev-os-docs', meta: 'MDX · 1 open PR · updated 5d ago', signal: 'low activity', hot: false, est: 61 }
+      ] },
+    { id: 'linear', icon: 'https://api.iconify.design/simple-icons:linear.svg?color=%239AA4BA&height=32', tag: 'li', name: 'Linear', unlocks: 'Blocked issues, cycle risk and what your PR unblocks', resLabel: 'Teams and projects', owner: 'bersi-labs', count: 6,
+      items: [
+        { id: 'dev', name: 'DEV · Platform', meta: 'Sprint 1 · 38 open issues · 4 blocked', signal: 'active cycle', hot: true, est: 302 },
+        { id: 'mob', name: 'MOB · Mobile release', meta: 'Sprint 1 · 12 open issues · ships Friday', signal: 'active cycle', hot: true, est: 148 },
+        { id: 'des', name: 'DES · Design', meta: '9 open issues · no cycle', signal: 'low activity', hot: false, est: 44 },
+        { id: 'ops', name: 'OPS · Infrastructure', meta: '5 open issues · updated 6d ago', signal: 'low activity', hot: false, est: 31 }
+      ] },
+    { id: 'slack', icon: 'https://api.iconify.design/simple-icons:slack.svg?color=%239AA4BA&height=32', tag: 'sl', name: 'Slack', unlocks: 'Threads waiting on you and decisions nobody answered', resLabel: 'Channels', owner: 'bersi-labs.slack.com', count: 41,
+      items: [
+        { id: 'platform', name: '#dev-os-platform', meta: '42 messages/day · you are mentioned often', signal: 'high signal', hot: true, est: 268 },
+        { id: 'releases', name: '#releases', meta: '11 messages/day · deploy and incident traffic', signal: 'high signal', hot: true, est: 121 },
+        { id: 'mobile', name: '#mobile', meta: '18 messages/day', signal: 'medium', hot: false, est: 96 },
+        { id: 'random', name: '#random', meta: '77 messages/day · mostly noise', signal: 'skip this one', hot: false, est: 12 }
+      ] },
+    { id: 'calendar', icon: 'https://api.iconify.design/simple-icons:googlecalendar.svg?color=%239AA4BA&height=32', tag: 'ca', name: 'Calendar', unlocks: 'Real focus windows between meetings', resLabel: 'Calendars', owner: 'guilherme@bersi.dev', count: 3,
+      items: [
+        { id: 'work', name: 'Work · guilherme@bersi.dev', meta: '18 events this week', signal: 'primary', hot: true, est: 74 },
+        { id: 'team', name: 'Platform team', meta: 'Shared · 9 events this week', signal: 'shared', hot: true, est: 38 },
+        { id: 'oncall', name: 'On-call rotation', meta: '2 events this week', signal: 'low', hot: false, est: 9 }
+      ] },
+    { id: 'jira', icon: 'https://api.iconify.design/simple-icons:jira.svg?color=%239AA4BA&height=32', tag: 'ji', name: 'Jira', unlocks: 'Sprint scope and status changes', resLabel: 'Projects', owner: 'bersi.atlassian.net', count: 4,
+      items: [
+        { id: 'plat', name: 'PLAT · Platform', meta: '64 issues · active sprint', signal: 'active', hot: true, est: 214 },
+        { id: 'sup', name: 'SUP · Support', meta: '31 issues', signal: 'medium', hot: false, est: 88 }
+      ] },
+    { id: 'notion', icon: 'https://api.iconify.design/simple-icons:notion.svg?color=%239AA4BA&height=32', tag: 'no', name: 'Notion', unlocks: 'Specs and docs referenced by open work', resLabel: 'Spaces', owner: 'bersi-labs', count: 5,
+      items: [
+        { id: 'eng', name: 'Engineering wiki', meta: '128 pages · 12 edited this week', signal: 'active', hot: true, est: 92 },
+        { id: 'rfc', name: 'RFCs', meta: '24 pages · 3 open proposals', signal: 'active', hot: true, est: 47 }
+      ] },
+    { id: 'trello', icon: 'https://api.iconify.design/simple-icons:trello.svg?color=%239AA4BA&height=32', tag: 'tr', name: 'Trello', unlocks: 'Cards moving without owners', resLabel: 'Boards', owner: 'bersi-labs', count: 2,
+      items: [
+        { id: 'ship', name: 'Shipping board', meta: '34 cards · 6 without owner', signal: 'active', hot: true, est: 63 }
+      ] }
+  ];
+
+  svc(id) { return this.catalog.find(c => c.id === id); }
+
+  renderVals() {
+    const s = this.state.screen;
+    const connIds = this.connectedIds();
+    const count = connIds.reduce((a, id) => a + this.resCount(id), 0);
+    const estTotal = connIds.reduce((a, id) => a + this.estFor(id), 0);
+    const tabId = this.state.conn[this.state.tab] ? this.state.tab : (connIds[0] || 'github');
+    const active = this.svc(tabId);
+    const stepIndex = { setup: 0, connect: 1, oauth: 1, repos: 2, sync: 3 }[s] ?? 0;
+    const q = this.state.query.trim().toLowerCase();
+
+    const steps = ['Workspace', 'Connect', 'Select', 'Sync'].map((name, i) => ({
+      n: i + 1, name,
+      bg: i < stepIndex ? '#1D9C4C' : i === stepIndex ? '#12293A' : '#121826',
+      fg: i < stepIndex ? '#F4F7FF' : i === stepIndex ? '#9FE0F2' : '#6A7489',
+      bd: i <= stepIndex ? 'transparent' : '#212938',
+      label: i <= stepIndex ? '#E9EDF7' : '#6A7489'
+    }));
+
+    const roleDefs = [
+      { id: 'ic', name: 'Writing code', desc: 'Ranks review requests, failing checks and your own unfinished work first.' },
+      { id: 'lead', name: 'Leading a team', desc: 'Ranks what blocks other people, then what blocks the cycle.' },
+      { id: 'em', name: 'Managing delivery', desc: 'Ranks risk to dates, stalled work and people waiting too long.' }
+    ];
+    const on = (id) => this.state.role === id;
+
+    const pct = this.state.sync;
+    const done = pct >= 100;
+    const stageLabels = [
+      'Reading history from each source',
+      'Resolving people, repositories and references',
+      'Normalizing everything into work events',
+      'Ranking your first morning'
+    ];
+    const stageNow = pct >= 100 ? 3 : pct >= 72 ? 2 : pct >= 40 ? 1 : 0;
+
+    return {
+      isLanding: s === 'landing', isSetup: s === 'setup', isConnect: s === 'connect',
+      isOauth: s === 'oauth', isRepos: s === 'repos', isSync: s === 'sync', isToday: s === 'today',
+      ws: this.state.ws, query: this.state.query,
+      showReasons: (this.props.intelligenceMode ?? 'reasons') === 'reasons',
+      rail: this.props.showFlowRail ?? true,
+      noop: () => {},
+      goSetup: () => this.go('setup'), goConnect: () => this.go('connect'),
+      goOauth: () => this.go('oauth'), goRepos: () => this.go('repos'),
+      goToday: () => this.go('today'), startSync: () => this.go('sync'),
+      setWs: (e) => this.setState({ ws: e.target.value }),
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      toggleOauth: () => this.setState(st => ({ oauthOk: !st.oauthOk })),
+      retryOauth: () => this.setState({ oauthOk: true }),
+      oauthOk: this.state.oauthOk, oauthBad: !this.state.oauthOk,
+      steps,
+
+      connectorChips: [
+        { name: 'GitHub', dot: '#1D9C4C' }, { name: 'Slack', dot: '#39435A' }, { name: 'Linear', dot: '#39435A' },
+        { name: 'Jira', dot: '#39435A' }, { name: 'Trello', dot: '#39435A' }, { name: 'Notion', dot: '#39435A' },
+        { name: 'Calendar', dot: '#39435A' }
+      ],
+      heroQueue: [
+        { n: '01', title: 'Review Auth OAuth flow · PR #42', reason: 'Ana has waited 2 days. DEV-18 is blocked behind it.', src: 'github' },
+        { n: '02', title: 'DEV-18 mobile release is blocked', reason: 'Sprint 1 ends Friday. Only your merge unblocks it.', src: 'linear' },
+        { n: '03', title: 'Connector retries thread needs your call', reason: 'Rafa asked 4h ago. Two engineers paused on the answer.', src: 'slack' }
+      ],
+
+      setupBeats: [
+        { n: '01', time: '20s', title: 'Authorize', desc: 'OAuth in a popup. Read-only scopes, shown before you approve.' },
+        { n: '02', time: '30s', title: 'Choose resources', desc: 'Pick the repositories, projects or channels you actually work in.' },
+        { n: '03', time: '40s', title: 'First sync', desc: '30 days of history pulled and translated into work events.' },
+        { n: '04', time: 'now', title: 'Value', desc: 'Your queue re-ranks the moment the new source lands.' }
+      ],
+      excluded: [
+        { title: 'Velocity and story-point charts', why: 'They measure estimation habits, not progress.' },
+        { title: 'Developer leaderboards', why: 'Ranking people breaks the trust the product depends on.' },
+        { title: 'A notification firehose', why: 'You already have six of those. This one has to be shorter.' },
+        { title: 'Dashboards nobody acts on', why: 'If a number does not change a decision, it is decoration.' }
+      ],
+      allTools: [
+        { tag: 'gh', slug: 'github', name: 'GitHub', state: 'Live', live: true },
+        { tag: 'li', slug: 'linear', name: 'Linear', state: 'Next', live: false },
+        { tag: 'sl', slug: 'slack', name: 'Slack', state: 'Next', live: false },
+        { tag: 'ji', slug: 'jira', name: 'Jira', state: 'Queued', live: false },
+        { tag: 'ca', slug: 'googlecalendar', name: 'Calendar', state: 'Queued', live: false },
+        { tag: 'no', slug: 'notion', name: 'Notion', state: 'Queued', live: false },
+        { tag: 'tr', slug: 'trello', name: 'Trello', state: 'Queued', live: false }
+      ].map(t => ({
+        iconCss: 'url("https://api.iconify.design/simple-icons:' + t.slug + '.svg?color=%23' + (t.live ? '4FD98C' : '79839B') + '&height=32")',
+        ...t,
+        bd: t.live ? '#1C4A31' : '#1C2432',
+        bg: t.live ? '#0E2418' : '#121826',
+        stateColor: t.live ? '#4FD98C' : '#6A7489'
+      })),
+
+      roles: roleDefs.map(r => ({
+        ...r,
+        pick: () => this.setState({ role: r.id }),
+        bd: on(r.id) ? '#1D9C4C' : '#212938',
+        bg: on(r.id) ? '#0E2418' : '#121826',
+        dotBd: on(r.id) ? '#1D9C4C' : '#39435A',
+        dotBg: on(r.id) ? '#1D9C4C' : '#0B0F1A',
+        dotIn: on(r.id) ? '#F4F7FF' : 'transparent'
+      })),
+
+      connectors: this.catalog.filter(c => c.id !== 'github').map(c => ({
+        tag: c.tag, icon: c.icon, iconCss: 'url("' + c.icon + '")', name: c.name, unlocks: c.unlocks,
+        on: !!this.state.conn[c.id],
+        state: this.state.conn[c.id] ? 'Selected' : 'Add',
+        bg: this.state.conn[c.id] ? '#0E2418' : '#121826',
+        boxBd: this.state.conn[c.id] ? '#1D9C4C' : '#39435A',
+        boxBg: this.state.conn[c.id] ? '#1D9C4C' : '#0B0F1A',
+        stateColor: this.state.conn[c.id] ? '#4FD98C' : '#6A7489',
+        toggle: () => this.setState(st => ({ conn: { ...st.conn, [c.id]: !st.conn[c.id] } }))
+      })),
+      githubOn: !!this.state.conn.github,
+      githubBoxBd: this.state.conn.github ? '#1D9C4C' : '#39435A',
+      githubBoxBg: this.state.conn.github ? '#1D9C4C' : '#0B0F1A',
+      toggleGithub: () => this.setState(st => ({ conn: { ...st.conn, github: !st.conn.github } })),
+      connCount: connIds.length,
+      connCta: connIds.length === 1 ? 'Authorize 1 tool' : 'Authorize ' + connIds.length + ' tools',
+      connSummary: connIds.length > 1
+        ? 'You will authorize them one after another. Each one takes about 20 seconds.'
+        : 'You can add the rest later without redoing setup.',
+
+      authQueue: connIds.map((id, i) => ({
+        name: this.svc(id).name, tag: this.svc(id).tag, iconCss: 'url("' + this.svc(id).icon + '")',
+        state: i < this.state.authIdx ? 'done' : i === this.state.authIdx ? 'now' : 'next',
+        bg: i < this.state.authIdx ? '#1D9C4C' : i === this.state.authIdx ? '#12293A' : '#121826',
+        fg: i < this.state.authIdx ? '#F4F7FF' : i === this.state.authIdx ? '#9FE0F2' : '#6A7489',
+        bd: i <= this.state.authIdx ? 'transparent' : '#212938'
+      })),
+      authMulti: connIds.length > 1,
+      authName: this.svc(connIds[this.state.authIdx] || 'github').name,
+      authOwner: this.svc(connIds[this.state.authIdx] || 'github').owner,
+      authCount: this.svc(connIds[this.state.authIdx] || 'github').count,
+      authResLabel: this.svc(connIds[this.state.authIdx] || 'github').resLabel.toLowerCase(),
+      authNextLabel: this.state.authIdx < connIds.length - 1
+        ? 'Authorize ' + this.svc(connIds[this.state.authIdx + 1]).name
+        : 'Choose what to sync',
+      authNext: () => {
+        if (this.state.authIdx < connIds.length - 1) this.setState(st => ({ authIdx: st.authIdx + 1, oauthOk: true }));
+        else this.go('repos');
+      },
+      scopes: (this.svc(connIds[this.state.authIdx] || 'github').id === 'github'
+        ? ['Read pull requests, reviews and comments', 'Read issues and linked references', 'Read commit checks and merge status']
+        : ['Read ' + this.svc(connIds[this.state.authIdx] || 'github').resLabel.toLowerCase() + ' you select', 'Read activity and status changes', 'Read people and references']),
+
+      resourceTabs: connIds.map(id => ({
+        name: this.svc(id).name, badge: this.resCount(id) + '',
+        bg: id === tabId ? '#1D9C4C' : '#121826',
+        fg: id === tabId ? '#F4F7FF' : '#9AA4BA',
+        bd: id === tabId ? '#1D9C4C' : '#212938',
+        pick: () => this.setState({ tab: id, query: '' })
+      })),
+      activeName: active.name,
+      activeOwner: active.owner,
+      activeResLabel: active.resLabel,
+      searchHint: 'Search ' + active.count + ' ' + active.resLabel.toLowerCase() + '…',
+      resourceRows: (active.items || []).filter(i => !q || i.name.toLowerCase().includes(q)).map(i => {
+        const on = !!(this.state.res[active.id] || {})[i.id];
+        return {
+          name: i.name, meta: i.meta, signal: i.signal, on,
+          sigColor: i.hot ? '#9FE0F2' : '#6A7489',
+          bg: on ? '#0E2418' : '#121826',
+          boxBd: on ? '#1D9C4C' : '#39435A',
+          boxBg: on ? '#1D9C4C' : '#0B0F1A',
+          toggle: () => this.setState(st => ({ res: { ...st.res, [active.id]: { ...(st.res[active.id] || {}), [i.id]: !(st.res[active.id] || {})[i.id] } } }))
+        };
+      }),
+      selectActive: () => this.setState(st => {
+        const next = {};
+        (active.items || []).forEach(i => { if (i.hot) next[i.id] = true; });
+        return { res: { ...st.res, [active.id]: next } };
+      }),
+      summaryRows: connIds.map(id => ({
+        name: this.svc(id).name,
+        detail: this.resCount(id) + ' of ' + (this.svc(id).items || []).length + ' ' + this.svc(id).resLabel.toLowerCase(),
+        color: this.resCount(id) ? '#E9EDF7' : '#6A7489'
+      })),
+      selectedCount: count,
+      estEvents: estTotal.toLocaleString('en-US'),
+      syncCta: 'Sync ' + count + ' resources',
+      eventTypes: ['review_requested', 'checks.failed', 'issue.blocked', 'thread.unanswered', 'meeting.scheduled'],
+
+      syncPct: pct, syncPctLabel: Math.min(pct, 100) + '%',
+      syncDone: done, syncRunning: !done,
+      syncHeadline: done ? 'Sync complete' : 'Reading your work',
+      syncSub: done
+        ? 'Every source now speaks the same language. From here, nothing is a GitHub thing or a Slack thing — it is a work event.'
+        : 'Pulling 30 days from ' + connIds.length + (connIds.length === 1 ? ' source' : ' sources') + ' in parallel, then translating each item into a work event.',
+      syncStageLine: stageLabels[stageNow],
+      syncTotal: done ? estTotal.toLocaleString('en-US') : Math.round(estTotal * pct / 100).toLocaleString('en-US'),
+      syncRows: connIds.map((id, i) => {
+        const local = Math.max(0, Math.min(100, Math.round((pct - i * 7) * 1.25)));
+        return {
+          name: this.svc(id).name, tag: this.svc(id).tag, iconCss: 'url("' + this.svc(id).icon + '")', icon: this.svc(id).icon,
+          scope: this.resCount(id) + ' ' + this.svc(id).resLabel.toLowerCase(),
+          count: local > 12 ? Math.round(this.estFor(id) * local / 100).toLocaleString('en-US') + ' events' : '—',
+          state: local >= 100 ? 'done' : local > 0 ? 'reading' : 'queued',
+          barW: local,
+          bar: local >= 100 ? '#1D9C4C' : '#4FD98C',
+          color: local > 0 ? '#E9EDF7' : '#6A7489'
+        };
+      }),
+      syncDoneCopy: estTotal.toLocaleString('en-US') + ' work events normalized across ' + connIds.length + (connIds.length === 1 ? ' source' : ' sources') + '. Three of them need you before lunch — one has been waiting two days.',
+
+      connLabel: connIds.length + ' of 7 sources connected',
+      connNudge: connIds.length >= 3
+        ? 'Enough signal to rank your morning across tools.'
+        : (connIds.includes('slack') ? 'Linear would show what your PRs unblock.' : 'Slack would explain why DEV-18 stalled.'),
+      missingList: this.catalog.filter(c => !this.state.conn[c.id]).map(c => c.name).join(' · ') || 'Everything is connected',
+      missingCopy: this.catalog.filter(c => !this.state.conn[c.id]).length
+        ? 'Today\u2019s ranking uses ' + connIds.map(id => this.svc(id).name).join(', ') + '. Items above may reference work Standup cannot see yet.'
+        : 'Every source you use is feeding the queue. Nothing is guessed.',
+      missingCta: 'Connect ' + (this.catalog.filter(c => !this.state.conn[c.id])[0] || { name: 'more' }).name,
+      nav: [
+        { name: 'Today', badge: '3', bg: '#113022', color: '#7FE3A8', weight: '500' },
+        { name: 'Focus queue', badge: '7', bg: 'transparent', color: '#9AA4BA', weight: '400' },
+        { name: 'Timeline', badge: '', bg: 'transparent', color: '#9AA4BA', weight: '400' },
+        { name: 'Weekly summary', badge: '', bg: 'transparent', color: '#9AA4BA', weight: '400' },
+        { name: 'Chat', badge: '', bg: 'transparent', color: '#9AA4BA', weight: '400' },
+        { name: 'Connections', badge: connIds.length + '/7', bg: 'transparent', color: '#9AA4BA', weight: '400' },
+        { name: 'Settings', badge: '', bg: 'transparent', color: '#9AA4BA', weight: '400' }
+      ],
+      queue: [
+        { tag: 'blocking 2', tagFg: '#9FE0F2', tagBg: '#12293A', src: 'guibersi7/dev-os-orchestrator', age: '2d', title: 'Review requested · Auth OAuth flow #42', reason: 'Ana asked on Monday and has not shipped since. DEV-18 and the mobile release sit behind this merge.', action: 'Review' },
+        { tag: 'failing', tagFg: '#FF8FA6', tagBg: '#22141C', src: 'guibersi7/dev-os-connectors', age: '40m', title: 'Checks failing on your branch · retry-backoff #118', reason: 'Two integration tests broke after your last push. Nobody else is touching this branch.', action: 'Open' },
+        { tag: 'decision', tagFg: '#D9B871', tagBg: '#231D12', src: 'thread · #dev-os-platform', age: '4h', title: 'Retry policy for connector webhooks', reason: 'Rafa asked a direct question. Two engineers paused their work waiting for the call.', action: 'Reply' }
+      ],
+      waiting: [
+        { title: 'PR #39 · Normalize Linear payloads', detail: 'Waiting on Tainá since yesterday', age: '1d', ageColor: '#6A7489' },
+        { title: 'DEV-14 · Rate limit strategy', detail: 'Waiting on infra review', age: '3d', ageColor: '#FF8FA6' },
+        { title: 'PR #44 · Event dedupe', detail: 'Approved, waiting on CI', age: '20m', ageColor: '#6A7489' }
+      ],
+      agenda: [
+        { time: '11:30', title: 'Platform sync', meta: '4 people · 30m', bar: '#1D9C4C' },
+        { time: '13:00', title: 'Design review · connectors', meta: 'Optional · 45m', bar: '#1E3A4C' },
+        { time: '14:00', title: 'Open', meta: 'No meetings until 16:40', bar: '#2E3849' }
+      ],
+      blocking: [
+        { title: 'Ana · shipping DEV-18', detail: 'Blocked by PR #42 for 2 days. Sprint 1 ends Friday.' },
+        { title: 'Rafa · connector retries', detail: 'Waiting on a decision in the platform thread.' }
+      ],
+
+      railItems: [
+        ['Landing', 'landing'], ['Setup', 'setup'], ['Connect', 'connect'], ['OAuth', 'oauth'],
+        ['Repos', 'repos'], ['Sync', 'sync'], ['Today', 'today']
+      ].map(([name, id]) => ({
+        name, go: () => this.go(id),
+        bg: s === id ? '#1D9C4C' : 'transparent',
+        fg: s === id ? '#F4F7FF' : '#6A7489'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

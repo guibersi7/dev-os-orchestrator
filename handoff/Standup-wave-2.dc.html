@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #080C15; }
+  body { font-family: Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; color: #E9EDF7; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  a { color: #4FD98C; text-decoration: none; }
+  a:hover { color: #7FE3A8; }
+  ::selection { background: rgba(29,156,76,.35); color: #F4F7FF; }
+  @keyframes wRise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: #080C15;">
+
+  <div style="height: 52px; flex: none; border-bottom: 1px solid #1C2432; background: #0B0F1A; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 24px;">
+    <div style="display: flex; align-items: center; gap: 18px; min-width: 0;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <span style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5px;">
+          <span style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></span>
+          <span style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></span>
+          <span style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></span>
+        </span>
+        <span style="font-size: 13px; font-weight: 600; letter-spacing: -0.01em;">Standup</span>
+        <span style="font-size: 12.5px; color: #4A5468;">/</span>
+        <span style="font-size: 12.5px; color: #9AA4BA;">Bersi Labs</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 2px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <div onClick="{{ t.go }}" style="display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 7px; cursor: pointer; background: {{ t.bg }};" style-hover="background: #131A28;">
+            <span style="font-size: 13px; color: {{ t.color }}; font-weight: {{ t.weight }};">{{ t.name }}</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ t.badgeColor }};">{{ t.badge }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; flex: none;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #212938; background: #121826; border-radius: 8px; padding: 5px 9px; cursor: pointer;" style-hover="border-color: #2E3849;">
+        <span style="font-size: 12.5px; color: #79839B;">Buscar ou perguntar…</span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">⌘K</span>
+      </div>
+      <span style="width: 26px; height: 26px; border-radius: 999px; background: #161C2B; border: 1px solid #212938; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9AA4BA; cursor: pointer;">gb</span>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow-x: auto; padding: 26px 32px 76px 32px;">
+
+    <sc-if value="{{ isPr }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width: 1180px; min-width: 880px; margin: 0 auto; animation: wRise .35s ease both;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8C96AD;">
+          <span style="width: 13px; height: 13px; display: block; background-image: {{ ghIcon }}; background-size: contain; background-repeat: no-repeat;"></span>
+          <span>bersi/dev-os-orchestrator</span><span style="color: #4A5468;">·</span><span>#42</span><span style="color: #4A5468;">·</span><span>aberto há 2 dias</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start;">
+          <div>
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+              <span style="font-size: 10.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: #4FD98C; background: #0E2418; border: 1px solid #1C4A31; border-radius: 5px; padding: 3px 7px; margin-top: 6px; flex: none;">ação</span>
+              <h1 style="font-size: 24px; line-height: 1.25; letter-spacing: -0.026em; font-weight: 600; margin: 0;">Auth OAuth flow</h1>
+            </div>
+            <p style="font-size: 15px; line-height: 1.55; color: #E9EDF7; margin: 0 0 22px 0; max-width: 640px; text-wrap: pretty;">Ana pediu sua review na segunda e não abriu nada novo desde então. <span style="color: #8C96AD;">Duas frentes esperam esse merge, e a release mobile é sexta.</span></p>
+
+            <div style="display: flex; gap: 9px; margin-bottom: 22px;">
+              <button style="font-family: inherit; font-size: 13px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 8px; padding: 9px 16px; cursor: pointer;" style-hover="background: #23B85A;">Revisar no GitHub</button>
+              <button style="font-family: inherit; font-size: 13px; font-weight: 500; color: #9AA4BA; background: transparent; border: 1px solid #2E3849; border-radius: 8px; padding: 9px 14px; cursor: pointer;" style-hover="border-color: #39435A; color: #E9EDF7;">Avisar Ana</button>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden; margin-bottom: 16px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230;">
+                <span style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">O que mudou</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">9 arquivos · +412 −87</span>
+              </div>
+              <sc-for list="{{ files }}" as="f" hint-placeholder-count="4">
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) 96px 66px; gap: 14px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #161C2B;">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9AA4BA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ f.path }}</span>
+                  <span style="font-size: 11.5px; color: {{ f.noteColor }};">{{ f.note }}</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8C96AD; text-align: right;">{{ f.churn }}</span>
+                </div>
+              </sc-for>
+              <div style="padding: 11px 15px; background: #0F1421;">
+                <span style="font-size: 12px; color: #8C96AD;">Standup destaca só os arquivos com lógica de autenticação — o resto é teste e tipos.</span>
+              </div>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230;">
+                <span style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Conversa que importa</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">2 de 14 comentários</span>
+              </div>
+              <sc-for list="{{ thread }}" as="c" hint-placeholder-count="2">
+                <div style="padding: 13px 15px; border-bottom: 1px solid #161C2B;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span style="font-size: 10.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: {{ c.tagFg }}; background: {{ c.tagBg }}; border: 1px solid {{ c.tagBd }}; border-radius: 5px; padding: 2px 6px;">{{ c.tag }}</span>
+                    <span style="font-size: 12.5px; font-weight: 500;">{{ c.who }}</span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ c.age }}</span>
+                  </div>
+                  <div style="font-size: 13px; color: #9AA4BA; line-height: 1.5;">{{ c.text }}</div>
+                </div>
+              </sc-for>
+              <div style="padding: 11px 15px; background: #0F1421;">
+                <span style="font-size: 12px; color: #8C96AD;">12 comentários de nit e aprovação de CI foram omitidos.</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="border: 1px solid #2B3B6E; border-radius: 12px; background: #0E1420; padding: 15px;">
+              <div style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px;">O que destrava</div>
+              <div style="display: flex; flex-direction: column; gap: 0;">
+                <sc-for list="{{ chain }}" as="c" hint-placeholder-count="3">
+                  <div>
+                    <div style="display: grid; grid-template-columns: 9px minmax(0, 1fr); gap: 11px; align-items: center;">
+                      <span style="width: 9px; height: 9px; border-radius: 999px; background: {{ c.dot }};"></span>
+                      <div>
+                        <div style="font-size: 12.5px; font-weight: 500; color: {{ c.titleColor }};">{{ c.title }}</div>
+                        <div style="font-size: 11.5px; color: #8C96AD; margin-top: 1px;">{{ c.meta }}</div>
+                      </div>
+                    </div>
+                    <sc-if value="{{ c.line }}" hint-placeholder-val="{{ true }}">
+                      <div style="width: 1px; height: 14px; background: #2B3B6E; margin: 3px 0 3px 4px;"></div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Quem está esperando</div>
+              <sc-for list="{{ people }}" as="p" hint-placeholder-count="3">
+                <div style="display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #161C2B;">
+                  <span style="width: 24px; height: 24px; border-radius: 999px; background: #1A2130; border: 1px solid #212938; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9AA4BA;">{{ p.initials }}</span>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 12.5px; font-weight: 500;">{{ p.name }}</div>
+                    <div style="font-size: 11.5px; color: #8C96AD;">{{ p.role }}</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: {{ p.ageColor }};">{{ p.age }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Checks</div>
+              <sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
+                <div style="display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 9px 15px; border-bottom: 1px solid #161C2B;">
+                  <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ c.dot }};"></span>
+                  <span style="font-size: 12.5px; color: #9AA4BA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.name }}</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8C96AD;">{{ c.time }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isIssue }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 1180px; min-width: 880px; margin: 0 auto; animation: wRise .35s ease both;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8C96AD;">
+          <span style="width: 13px; height: 13px; display: block; background-image: {{ linIcon }}; background-size: contain; background-repeat: no-repeat;"></span>
+          <span>DEV · Platform</span><span style="color: #4A5468;">·</span><span>DEV-18</span><span style="color: #4A5468;">·</span><span>Sprint 1</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start;">
+          <div>
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+              <span style="font-size: 10.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: #FF8FA6; background: #22141C; border: 1px solid #3A2130; border-radius: 5px; padding: 3px 7px; margin-top: 6px; flex: none;">bloqueado</span>
+              <h1 style="font-size: 24px; line-height: 1.25; letter-spacing: -0.026em; font-weight: 600; margin: 0;">Release mobile depende do novo fluxo de OAuth</h1>
+            </div>
+            <p style="font-size: 15px; line-height: 1.55; color: #E9EDF7; margin: 0 0 22px 0; max-width: 640px; text-wrap: pretty;">Parada há 2 dias, e não por falta de trabalho. <span style="color: #8C96AD;">O único caminho é o merge de #42 — que espera a sua review.</span></p>
+
+            <div style="display: flex; gap: 9px; margin-bottom: 22px;">
+              <button style="font-family: inherit; font-size: 13px; font-weight: 500; color: #F4F7FF; background: #1D9C4C; border: 1px solid #1D9C4C; border-radius: 8px; padding: 9px 16px; cursor: pointer;" style-hover="background: #23B85A;">Ir para a PR #42</button>
+              <button style="font-family: inherit; font-size: 13px; font-weight: 500; color: #9AA4BA; background: transparent; border: 1px solid #2E3849; border-radius: 8px; padding: 9px 14px; cursor: pointer;" style-hover="border-color: #39435A; color: #E9EDF7;">Abrir no Linear</button>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden; margin-bottom: 16px;">
+              <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Por que travou</div>
+              <div style="padding: 14px 15px; border-bottom: 1px solid #161C2B;">
+                <p style="font-size: 13px; color: #9AA4BA; line-height: 1.6; margin: 0;">Ana marcou como bloqueada na terça, logo depois de abrir a PR #42. Desde então a issue não teve commit, comentário ou mudança de estado — o trabalho existe, mas não pode ser integrado. <span style="color: #E9EDF7;">Nada mais no ciclo depende dela.</span></p>
+              </div>
+              <div style="padding: 11px 15px; background: #0F1421;">
+                <span style="font-size: 12px; color: #8C96AD;">Derivado de 6 work events entre terça e hoje.</span>
+              </div>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230;">
+                <span style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Histórico</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">6 eventos</span>
+              </div>
+              <sc-for list="{{ issueLog }}" as="e" hint-placeholder-count="4">
+                <div style="display: grid; grid-template-columns: 58px 7px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 10px 15px; border-bottom: 1px solid #161C2B;">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ e.when }}</span>
+                  <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ e.dot }}; position: relative; top: 4px;"></span>
+                  <div>
+                    <div style="font-size: 12.5px; color: #E9EDF7;">{{ e.title }}</div>
+                    <div style="font-size: 11.5px; color: #8C96AD; margin-top: 1px;">{{ e.meta }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="border: 1px solid #3A2130; border-radius: 12px; background: #150F16; padding: 15px;">
+              <div style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 10px;">Risco de ciclo</div>
+              <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 22px; letter-spacing: -0.02em; color: #FF8FA6;">2d</span>
+                <span style="font-size: 12.5px; color: #9AA4BA;">de atraso · sprint fecha sexta</span>
+              </div>
+              <p style="font-size: 12.5px; color: #8C96AD; line-height: 1.5; margin: 0;">No ritmo atual do ciclo, essa issue não fecha no prazo sem o merge hoje.</p>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Trabalho ligado</div>
+              <sc-for list="{{ linked }}" as="l" hint-placeholder-count="3">
+                <div style="display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #161C2B; cursor: pointer;" style-hover="background: #141B2A;">
+                  <span style="width: 14px; height: 14px; display: block; background-image: {{ l.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 12.5px; color: #E9EDF7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ l.title }}</div>
+                    <div style="font-size: 11.5px; color: #8C96AD;">{{ l.rel }}</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ l.age }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; padding: 15px;">
+              <div style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 11px;">Detalhes</div>
+              <div style="display: flex; flex-direction: column; gap: 9px;">
+                <sc-for list="{{ issueMeta }}" as="m" hint-placeholder-count="4">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                    <span style="font-size: 12.5px; color: #8C96AD;">{{ m.k }}</span>
+                    <span style="font-size: 12.5px; color: #E9EDF7; text-align: right;">{{ m.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTimeline }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 980px; min-width: 820px; margin: 0 auto; animation: wRise .35s ease both;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px;">
+          <div>
+            <h1 style="font-size: 24px; letter-spacing: -0.028em; font-weight: 600; margin: 0 0 6px 0;">Timeline</h1>
+            <p style="font-size: 14px; color: #9AA4BA; line-height: 1.5; margin: 0;">Todo work event normalizado, em ordem. Sem ranking, sem opinião — é o registro bruto.</p>
+          </div>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #79839B; flex: none; padding-top: 6px;">1.284 eventos · 30 dias</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 18px; flex-wrap: wrap;">
+          <sc-for list="{{ tlFilters }}" as="f" hint-placeholder-count="4">
+            <button onClick="{{ f.pick }}" style="font-family: inherit; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; border: 1px solid {{ f.bd }}; background: {{ f.bg }}; color: {{ f.fg }}; border-radius: 7px; padding: 5px 10px; cursor: pointer;" style-hover="border-color: #39435A;">
+              <sc-if value="{{ f.hasIcon }}" hint-placeholder-val="{{ true }}">
+                <span style="width: 13px; height: 13px; display: block; background-image: {{ f.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+              </sc-if>
+              {{ f.label }}<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: {{ f.countColor }};">{{ f.count }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <sc-for list="{{ days }}" as="d" hint-placeholder-count="2">
+          <div style="margin-bottom: 22px;">
+            <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px;">
+              <span style="font-size: 13px; font-weight: 600; letter-spacing: -0.01em;">{{ d.label }}</span>
+              <span style="flex: 1; height: 1px; background: #1B2230;"></span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ d.count }}</span>
+            </div>
+            <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+              <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="4">
+                <div style="display: grid; grid-template-columns: 46px 15px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #161C2B; cursor: pointer;" style-hover="background: #141B2A;">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ e.time }}</span>
+                  <span style="width: 15px; height: 15px; display: block; background-image: {{ e.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 13px; color: #E9EDF7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ e.title }}</div>
+                    <div style="font-size: 11.5px; color: #8C96AD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ e.summary }}</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B; border: 1px solid #1B2230; border-radius: 5px; padding: 2px 7px;">{{ e.type }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isWeekly }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 900px; min-width: 780px; margin: 0 auto; animation: wRise .35s ease both;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 20px;">
+          <h1 style="font-size: 24px; letter-spacing: -0.028em; font-weight: 600; margin: 0;">Semana de 27 a 31 de julho</h1>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #79839B;">gerado sexta, 17:00</span>
+        </div>
+
+        <p style="font-size: 19px; line-height: 1.5; letter-spacing: -0.018em; margin: 0 0 26px 0; max-width: 720px; text-wrap: pretty;">A semana entregou o que prometeu, exceto a release mobile. <span style="color: #8C96AD;">O gargalo não foi capacidade — foi latência de review: três PRs esperaram mais de 24h por alguém olhar.</span></p>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #212938; border: 1px solid #212938; border-radius: 12px; overflow: hidden; margin-bottom: 18px;">
+          <sc-for list="{{ wkStats }}" as="s" hint-placeholder-count="4">
+            <div style="background: #121826; padding: 15px;">
+              <div style="font-family: 'Geist Mono', monospace; font-size: 22px; letter-spacing: -0.02em; color: {{ s.color }}; margin-bottom: 4px;">{{ s.value }}</div>
+              <div style="font-size: 12px; color: #E9EDF7; margin-bottom: 2px;">{{ s.label }}</div>
+              <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.35;">{{ s.delta }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+          <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+            <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Entregue</div>
+            <sc-for list="{{ shipped }}" as="s" hint-placeholder-count="4">
+              <div style="display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #161C2B;">
+                <span style="width: 14px; height: 14px; display: block; background-image: {{ s.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                <span style="font-size: 12.5px; color: #9AA4BA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ s.title }}</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">{{ s.day }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+            <div style="padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Escorregou</div>
+            <sc-for list="{{ slipped }}" as="s" hint-placeholder-count="3">
+              <div style="padding: 11px 15px; border-bottom: 1px solid #161C2B;">
+                <div style="font-size: 12.5px; color: #E9EDF7; margin-bottom: 2px;">{{ s.title }}</div>
+                <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.4;">{{ s.why }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #2B3B6E; border-radius: 12px; background: #0E1420; padding: 18px 20px;">
+          <div style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px;">Para a próxima semana</div>
+          <div style="display: flex; flex-direction: column; gap: 11px;">
+            <sc-for list="{{ nextWeek }}" as="n" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 3px minmax(0, 1fr); gap: 12px; align-items: start;">
+                <span style="width: 3px; height: 15px; border-radius: 2px; background: #4FD98C; margin-top: 2px;"></span>
+                <div>
+                  <span style="font-size: 13px; color: #E9EDF7;">{{ n.what }}</span>
+                  <span style="font-size: 13px; color: #8C96AD;"> {{ n.why }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 780px; min-width: 700px; margin: 0 auto; animation: wRise .35s ease both;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 22px;">
+          <h1 style="font-size: 24px; letter-spacing: -0.028em; font-weight: 600; margin: 0;">Perguntar</h1>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #79839B;">1.284 work events indexados</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 18px; margin-bottom: 24px;">
+          <div style="align-self: flex-end; max-width: 78%; background: #1D9C4C; color: #F4F7FF; border-radius: 12px 12px 4px 12px; padding: 10px 14px; font-size: 13.5px; line-height: 1.5;">O que escorregou essa semana e por quê?</div>
+
+          <div style="max-width: 92%;">
+            <div style="border: 1px solid #212938; background: #121826; border-radius: 12px 12px 12px 4px; padding: 15px 16px;">
+              <p style="font-size: 13.5px; line-height: 1.6; color: #E9EDF7; margin: 0 0 12px 0;">Duas coisas. <span style="color: #9AA4BA;">A release mobile e a issue DEV-14 — e ambas voltam ao mesmo ponto: latência de review no repositório de connectors. Três PRs ficaram mais de 24h esperando alguém olhar, e a mais antiga é a #42, parada há dois dias com a Ana bloqueada atrás.</span></p>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 11px; border-top: 1px solid #1B2230;">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #79839B; margin-right: 3px;">baseado em</span>
+                <sc-for list="{{ citations }}" as="c" hint-placeholder-count="3">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #9AA4BA; border: 1px solid #212938; border-radius: 5px; padding: 3px 8px; cursor: pointer;" style-hover="border-color: #39435A; color: #E9EDF7;">
+                    <span style="width: 11px; height: 11px; display: block; background-image: {{ c.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>{{ c.label }}
+                  </span>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #2E3849; background: #121826; border-radius: 11px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px;">
+          <span style="font-size: 13.5px; color: #79839B;">Perguntar sobre o trabalho da semana…</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B; border: 1px solid #212938; border-radius: 5px; padding: 2px 7px;">↵</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: #79839B; margin-right: 3px;">tente</span>
+          <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+            <span style="font-size: 12.5px; color: #9AA4BA; border: 1px solid #212938; border-radius: 7px; padding: 6px 11px; cursor: pointer;" style-hover="border-color: #39435A; color: #E9EDF7;">{{ s }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+
+<div style="position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; background: rgba(14,19,32,.94); backdrop-filter: blur(8px); border: 1px solid #212938; border-radius: 11px; padding: 5px; box-shadow: 0 12px 30px -12px rgba(0,0,0,.7); z-index: 50;">
+  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #79839B; padding: 0 9px 0 7px;">onda 2</span>
+  <sc-for list="{{ rail }}" as="s" hint-placeholder-count="5">
+    <button onClick="{{ s.go }}" style="font-family: inherit; font-size: 12px; font-weight: 500; border: none; border-radius: 7px; padding: 6px 11px; cursor: pointer; background: {{ s.bg }}; color: {{ s.fg }};">{{ s.name }}</button>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { screen: 'pr', tlFilter: 'all' };
+
+  icon(slug, color) {
+    return 'url("https://api.iconify.design/simple-icons:' + slug + '.svg?color=%23' + color + '&height=32")';
+  }
+
+  renderVals() {
+    const s = this.state.screen;
+    const gh = (c) => this.icon('github', c || '9AA4BA');
+    const li = (c) => this.icon('linear', c || '9AA4BA');
+    const sl = (c) => this.icon('slack', c || '9AA4BA');
+    const no = (c) => this.icon('notion', c || '9AA4BA');
+
+    const allEvents = {
+      hoje: { label: 'Hoje · terça, 31 jul', count: '9 eventos', events: [
+        { time: '11:04', service: 'linear', title: 'DEV-18 marcada como bloqueada', summary: 'Ana · bloqueada pela PR #42', type: 'issue.blocked' },
+        { time: '10:20', service: 'github', title: 'Review pedida em Auth OAuth flow #42', summary: 'Guilherme foi adicionado como reviewer', type: 'review_requested' },
+        { time: '09:47', service: 'github', title: 'Checks falharam em retry-backoff #118', summary: '2 testes de integração · bersi/dev-os-connectors', type: 'checks.failed' },
+        { time: '09:12', service: 'slack', title: 'Rafa perguntou sobre política de retry', summary: '#dev-os-platform · 4 respostas', type: 'thread.started' },
+        { time: '08:30', service: 'github', title: 'Tainá aprovou #37', summary: 'bersi/dev-os-web · merge automático', type: 'review.submitted' }
+      ] },
+      ontem: { label: 'Ontem · segunda, 30 jul', count: '14 eventos', events: [
+        { time: '17:22', service: 'github', title: 'PR #44 aberta · Event dedupe', summary: 'Guilherme · bersi/dev-os-web', type: 'pull_request.opened' },
+        { time: '15:08', service: 'notion', title: 'RFC de deduplicação atualizada', summary: 'Tainá · 3 seções alteradas', type: 'page.updated' },
+        { time: '14:41', service: 'linear', title: 'DEV-21 atribuída a Guilherme', summary: 'Sprint 1 · prioridade média', type: 'issue.assigned' },
+        { time: '11:15', service: 'github', title: 'Deploy de produção concluído', summary: 'orchestrator · v0.14.2', type: 'deployment' }
+      ] }
+    };
+    const iconFor = { github: gh(), linear: li(), slack: sl(), notion: no() };
+    const tf = this.state.tlFilter;
+    const days = Object.values(allEvents).map(d => {
+      const evs = d.events.filter(e => tf === 'all' || e.service === tf);
+      return { label: d.label, count: evs.length + ' de ' + d.events.length, events: evs.map(e => ({ ...e, iconCss: iconFor[e.service] })) };
+    }).filter(d => d.events.length > 0);
+
+    const tlCount = (id) => Object.values(allEvents).reduce((a, d) => a + (id === 'all' ? d.events.length : d.events.filter(e => e.service === id).length), 0);
+
+    return {
+      isPr: s === 'pr', isIssue: s === 'issue', isTimeline: s === 'timeline', isWeekly: s === 'weekly', isChat: s === 'chat',
+      ghIcon: gh('8C96AD'), linIcon: li('8C96AD'),
+
+      tabs: [
+        { name: 'Hoje', badge: '8', id: 'today' },
+        { name: 'Fila', badge: '', id: 'queue' },
+        { name: 'Timeline', badge: '', id: 'timeline' },
+        { name: 'Semana', badge: '', id: 'weekly' },
+        { name: 'Chat', badge: '', id: 'chat' }
+      ].map(t => {
+        const on = t.id === s || (t.id === 'today' && (s === 'pr' || s === 'issue'));
+        return { name: t.name, badge: t.badge, go: () => this.setState({ screen: t.id === 'today' || t.id === 'queue' ? 'pr' : t.id }),
+          bg: on ? '#113022' : 'transparent', color: on ? '#7FE3A8' : '#8C96AD', weight: on ? '500' : '400', badgeColor: on ? '#4FD98C' : '#79839B' };
+      }),
+
+      files: [
+        { path: 'src/auth/oauth-flow.ts', note: 'lógica central', churn: '+186 −41', noteColor: '#4FD98C' },
+        { path: 'src/auth/token-store.ts', note: 'lógica central', churn: '+94 −12', noteColor: '#4FD98C' },
+        { path: 'src/auth/__tests__/oauth.test.ts', note: 'testes', churn: '+108 −0', noteColor: '#8C96AD' },
+        { path: 'src/types/connection.ts', note: 'tipos', churn: '+24 −34', noteColor: '#8C96AD' }
+      ],
+      thread: [
+        { tag: 'bloqueio', tagFg: '#FF8FA6', tagBg: '#22141C', tagBd: '#3A2130', who: 'Ana', age: 'há 2 dias',
+          text: 'Deixei o refresh token fora do escopo dessa PR. Se você achar que precisa entrar antes do release, eu abro em cima dessa branch — mas aí preciso saber hoje.' },
+        { tag: 'decisão', tagFg: '#D9B871', tagBg: '#231D12', tagBd: '#3A3220', who: 'Rafa', age: 'há 1 dia',
+          text: 'Concordo em deixar fora. O que não dá é mergear sem o teste de expiração — esse é o caso que quebrou em produção mês passado.' }
+      ],
+      chain: [
+        { title: 'PR #42 · esperando sua review', meta: 'bersi/dev-os-orchestrator · 2 dias', dot: '#1D9C4C', titleColor: '#E9EDF7', line: true },
+        { title: 'DEV-18 · bloqueada', meta: 'Ana · sem movimento desde terça', dot: '#4FD98C', titleColor: '#E9EDF7', line: true },
+        { title: 'Release mobile · sexta', meta: 'depende do merge de DEV-18', dot: '#39435A', titleColor: '#9AA4BA', line: false }
+      ],
+      people: [
+        { initials: 'an', name: 'Ana', role: 'autora · bloqueada', age: '2d', ageColor: '#FF8FA6' },
+        { initials: 'rf', name: 'Rafa', role: 'comentou, não revisou', age: '1d', ageColor: '#8C96AD' },
+        { initials: 'tn', name: 'Tainá', role: 'reviewer opcional', age: '—', ageColor: '#79839B' }
+      ],
+      checks: [
+        { name: 'unit', dot: '#1D9C4C', time: '2m 14s' },
+        { name: 'integration', dot: '#1D9C4C', time: '6m 02s' },
+        { name: 'e2e · auth', dot: '#D9B871', time: 'rodando' }
+      ],
+
+      issueLog: [
+        { when: 'ter 14:02', dot: '#FF6B8A', title: 'Marcada como bloqueada', meta: 'Ana · motivo: aguardando PR #42' },
+        { when: 'ter 13:58', dot: '#1D9C4C', title: 'PR #42 vinculada', meta: 'referência automática pelo branch' },
+        { when: 'seg 09:30', dot: '#39435A', title: 'Movida para Em progresso', meta: 'Ana · Sprint 1' },
+        { when: 'sex 16:10', dot: '#39435A', title: 'Criada', meta: 'Rafa · estimativa 3 pontos' }
+      ],
+      linked: [
+        { title: 'PR #42 · Auth OAuth flow', rel: 'bloqueia esta issue', age: '2d', iconCss: gh() },
+        { title: 'Release mobile 1.4', rel: 'depende desta issue', age: 'sexta', iconCss: li() },
+        { title: 'RFC de autenticação', rel: 'especificação', age: '2sem', iconCss: no() }
+      ],
+      issueMeta: [
+        { k: 'Responsável', v: 'Ana' }, { k: 'Ciclo', v: 'Sprint 1' },
+        { k: 'Estimativa', v: '3 pontos' }, { k: 'Criada', v: '25 jul' }
+      ],
+
+      tlFilters: [
+        { id: 'all', label: 'Tudo', hasIcon: false },
+        { id: 'github', label: 'GitHub', hasIcon: true, slug: 'github' },
+        { id: 'linear', label: 'Linear', hasIcon: true, slug: 'linear' },
+        { id: 'slack', label: 'Slack', hasIcon: true, slug: 'slack' },
+        { id: 'notion', label: 'Notion', hasIcon: true, slug: 'notion' }
+      ].map(f => ({
+        label: f.label, count: tlCount(f.id), hasIcon: f.hasIcon,
+        iconCss: f.slug ? this.icon(f.slug, tf === f.id ? 'E9EDF7' : '8C96AD') : 'none',
+        pick: () => this.setState({ tlFilter: f.id }),
+        bg: tf === f.id ? '#1A2130' : 'transparent',
+        bd: tf === f.id ? '#39435A' : '#212938',
+        fg: tf === f.id ? '#E9EDF7' : '#8C96AD',
+        countColor: tf === f.id ? '#9AA4BA' : '#79839B'
+      })),
+      days,
+
+      wkStats: [
+        { value: '7', label: 'PRs merged', delta: '2 a mais que a média', color: '#E9EDF7' },
+        { value: '12', label: 'issues fechadas', delta: 'no ritmo do ciclo', color: '#E9EDF7' },
+        { value: '31h', label: 'latência de review', delta: 'era 9h na semana passada', color: '#FF8FA6' },
+        { value: '3', label: 'decisões registradas', delta: 'todas em thread', color: '#E9EDF7' }
+      ],
+      shipped: [
+        { title: 'Normalizador de payloads do Linear', day: 'qua', iconCss: gh() },
+        { title: 'Deduplicação de eventos', day: 'qui', iconCss: gh() },
+        { title: 'DEV-12 · rate limit por conector', day: 'qui', iconCss: li() },
+        { title: 'v0.14.2 em produção', day: 'seg', iconCss: gh() }
+      ],
+      slipped: [
+        { title: 'Release mobile 1.4', why: 'PR #42 parada há 2 dias esperando review' },
+        { title: 'DEV-14 · estratégia de rate limit', why: 'aguardando review de infra desde segunda' },
+        { title: 'RFC de webhooks', why: 'decisão de retry ainda sem resposta' }
+      ],
+      nextWeek: [
+        { what: 'Definir um SLA de review de 12h para o repo de connectors.', why: 'É a causa comum das três coisas que escorregaram.' },
+        { what: 'Fechar a decisão de retry antes de segunda.', why: 'Dois engenheiros estão parados nela desde quinta.' },
+        { what: 'Reservar a manhã de segunda para a fila.', why: 'A semana começa com 3 itens bloqueando outras pessoas.' }
+      ],
+
+      citations: [
+        { label: 'PR #42', iconCss: gh('8C96AD') },
+        { label: 'DEV-14', iconCss: li('8C96AD') },
+        { label: '14 eventos', iconCss: gh('8C96AD') }
+      ],
+      suggestions: [
+        'Quem está esperando por mim agora?',
+        'O que a Ana entregou essa semana?',
+        'Alguma decisão sem resposta?',
+        'Qual repo está mais lento?'
+      ],
+
+      rail: [
+        ['PR detail', 'pr'], ['Issue', 'issue'], ['Timeline', 'timeline'], ['Semana', 'weekly'], ['Chat', 'chat']
+      ].map(([name, id]) => ({
+        name, go: () => this.setState({ screen: id }),
+        bg: s === id ? '#1D9C4C' : 'transparent',
+        fg: s === id ? '#F4F7FF' : '#79839B'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
