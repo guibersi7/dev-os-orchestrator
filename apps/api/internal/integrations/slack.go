@@ -67,22 +67,24 @@ func (c *SlackConnector) ListSelectableResources(ctx context.Context, _ domain.G
 
 	resources := make([]domain.SelectableResource, 0, len(channels))
 	for _, channel := range channels {
-		if channel.ID == "" || channel.Name == "" {
+		if channel.ID == "" {
 			continue
 		}
-		resourceType := "public_channel"
-		if channel.IsPrivate {
-			resourceType = "private_channel"
-		}
+		resourceType := slackResourceType(channel)
 		lastActivityAt := channelLastActivityAt(channel)
 		resources = append(resources, domain.SelectableResource{
 			ID:   channel.ID,
 			Type: resourceType,
-			Name: "#" + channel.Name,
+			Name: slackConversationName(channel),
 			Metadata: map[string]any{
 				"channelId":      channel.ID,
 				"channelName":    channel.Name,
+				"conversationId": channel.ID,
+				"conversation":   resourceType,
+				"userId":         channel.User,
 				"isPrivate":      channel.IsPrivate,
+				"isIm":           channel.IsIM,
+				"isMpim":         channel.IsMPIM,
 				"isMember":       channel.IsMember,
 				"isShared":       channel.IsShared,
 				"createdAt":      slackUnixTimestamp(channel.Created),
@@ -146,6 +148,9 @@ func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context,
 				}
 				return nil, scanned, err
 			}
+			if channel.Name == "" {
+				channel.Name = slackConversationName(channel)
+			}
 		}
 
 		messages, err := c.fetchHistory(ctx, accessToken, channel.ID, options.oldest)
@@ -187,6 +192,7 @@ func (c *SlackConnector) Normalize(records []domain.ExternalRecord) []domain.Wor
 		priority, _ := record.Payload["priority"].(string)
 		channelName, _ := record.Payload["channelName"].(string)
 		summary, _ := record.Payload["summary"].(string)
+		source := slackSourceLabel(channelName)
 
 		events = append(events, domain.WorkEvent{
 			ID:         "evt-" + record.ID,
@@ -194,7 +200,7 @@ func (c *SlackConnector) Normalize(records []domain.ExternalRecord) []domain.Wor
 			Service:    domain.ServiceSlack,
 			Type:       eventType,
 			Title:      record.Title,
-			Source:     "Slack · #" + channelName,
+			Source:     source,
 			Actor:      record.Actor,
 			Priority:   priority,
 			Summary:    summary,
@@ -247,7 +253,7 @@ func (c *SlackConnector) fetchChannels(ctx context.Context, token string) ([]sla
 		values := url.Values{
 			"exclude_archived": []string{"true"},
 			"limit":            []string{"200"},
-			"types":            []string{"public_channel,private_channel"},
+			"types":            []string{"public_channel,private_channel,im,mpim"},
 		}
 		if cursor != "" {
 			values.Set("cursor", cursor)
@@ -370,8 +376,11 @@ type slackChannel struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	IsPrivate bool   `json:"is_private"`
+	IsIM      bool   `json:"is_im"`
+	IsMPIM    bool   `json:"is_mpim"`
 	IsMember  bool   `json:"is_member"`
 	IsShared  bool   `json:"is_shared"`
+	User      string `json:"user"`
 	Created   int64  `json:"created"`
 	Updated   int64  `json:"updated"`
 }
@@ -536,7 +545,50 @@ func summarizeSlackTitle(eventType string, channelName string) string {
 	case "slack.mention":
 		prefix = "Slack mention detected"
 	}
-	return prefix + " in #" + channelName
+	return prefix + " in " + slackConversationDisplay(channelName)
+}
+
+func slackResourceType(channel slackChannel) string {
+	switch {
+	case channel.IsIM:
+		return "direct_message"
+	case channel.IsMPIM:
+		return "group_direct_message"
+	case channel.IsPrivate:
+		return "private_channel"
+	default:
+		return "public_channel"
+	}
+}
+
+func slackConversationName(channel slackChannel) string {
+	if channel.IsIM {
+		if channel.User != "" {
+			return "DM with " + channel.User
+		}
+		return "Direct message"
+	}
+	if channel.IsMPIM {
+		if channel.Name != "" {
+			return "Group DM " + channel.Name
+		}
+		return "Group DM"
+	}
+	if channel.Name != "" {
+		return "#" + channel.Name
+	}
+	return channel.ID
+}
+
+func slackConversationDisplay(name string) string {
+	if strings.HasPrefix(name, "#") || strings.HasPrefix(name, "DM ") || strings.HasPrefix(name, "Group DM") || strings.HasPrefix(name, "Direct message") {
+		return name
+	}
+	return "#" + name
+}
+
+func slackSourceLabel(name string) string {
+	return "Slack · " + slackConversationDisplay(name)
 }
 
 func extractLinkedRefs(text string) []string {
@@ -615,12 +667,15 @@ func selectedSlackChannels(selection domain.ResourceSelection) []slackChannel {
 	channels := []slackChannel{}
 	seen := map[string]bool{}
 	for _, resource := range selection.Resources {
-		if resource.Type != "" && resource.Type != "channel" && resource.Type != "public_channel" && resource.Type != "private_channel" {
+		if resource.Type != "" && resource.Type != "channel" && resource.Type != "public_channel" && resource.Type != "private_channel" && resource.Type != "direct_message" && resource.Type != "group_direct_message" && resource.Type != "im" && resource.Type != "mpim" {
 			continue
 		}
 
 		channelID := strings.TrimSpace(resource.ID)
 		if metadataID, ok := resource.Metadata["channelId"].(string); ok && strings.TrimSpace(metadataID) != "" {
+			channelID = strings.TrimSpace(metadataID)
+		}
+		if metadataID, ok := resource.Metadata["conversationId"].(string); ok && strings.TrimSpace(metadataID) != "" {
 			channelID = strings.TrimSpace(metadataID)
 		}
 		if channelID == "" || seen[channelID] {
@@ -632,10 +687,15 @@ func selectedSlackChannels(selection domain.ResourceSelection) []slackChannel {
 		if metadataName, ok := resource.Metadata["channelName"].(string); ok && strings.TrimSpace(metadataName) != "" {
 			channelName = strings.TrimSpace(metadataName)
 		}
+		if channelName == "" {
+			channelName = resource.Name
+		}
 		channels = append(channels, slackChannel{
 			ID:        channelID,
 			Name:      strings.TrimPrefix(channelName, "#"),
 			IsPrivate: resource.Type == "private_channel",
+			IsIM:      resource.Type == "direct_message" || resource.Type == "im",
+			IsMPIM:    resource.Type == "group_direct_message" || resource.Type == "mpim",
 		})
 	}
 	return channels

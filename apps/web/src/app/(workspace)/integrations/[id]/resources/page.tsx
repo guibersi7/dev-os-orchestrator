@@ -75,9 +75,9 @@ export default async function IntegrationResourcesPage({
 
       {paramsValue?.sync === "empty" ? (
         <Card className="border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
-          Slack connected and the sync ran, but no dashboard events were created. Make sure the selected channels contain
+          Slack connected and the sync ran, but no dashboard events were created. Make sure the selected conversations contain
           decisions, blockers, mentions, or threads with links in the selected time window, and that the Standup app has
-          been added to private channels.
+          access to private channels or DMs.
         </Card>
       ) : null}
 

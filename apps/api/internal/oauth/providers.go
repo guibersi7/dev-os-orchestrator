@@ -35,7 +35,7 @@ func ProviderFor(service domain.Service) (Provider, bool) {
 			ClientSecret: os.Getenv("SLACK_CLIENT_SECRET"),
 			AuthURL:      envOrDefault("SLACK_AUTH_URL", "https://slack.com/oauth/v2/authorize"),
 			TokenURL:     envOrDefault("SLACK_TOKEN_URL", "https://slack.com/api/oauth.v2.access"),
-			Scopes:       splitScopes(os.Getenv("SLACK_OAUTH_SCOPES"), []string{"channels:history", "channels:read", "groups:history", "groups:read", "users:read"}),
+			Scopes:       splitScopes(os.Getenv("SLACK_OAUTH_SCOPES"), []string{"channels:history", "channels:read", "groups:history", "groups:read", "im:history", "im:read", "mpim:history", "mpim:read", "users:read"}),
 		},
 		domain.ServiceLinear: {
 			Service:      domain.ServiceLinear,
