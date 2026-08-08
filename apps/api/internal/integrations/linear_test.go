@@ -82,6 +82,102 @@ func TestLinearListSelectableResourcesReturnsTeamsAndProjects(t *testing.T) {
 	}
 }
 
+func TestLinearListSelectableResourcesPaginatesTeamsAndProjects(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		query, _ := payload["query"].(string)
+		variables, _ := payload["variables"].(map[string]any)
+
+		if strings.Contains(query, "team(id: $teamId)") {
+			if variables["after"] != "project-cursor" {
+				t.Fatalf("expected project cursor, got %#v", variables["after"])
+			}
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"team": map[string]any{
+						"projects": map[string]any{
+							"nodes":    []map[string]any{{"id": "project-2", "name": "Second project page"}},
+							"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+						},
+					},
+				},
+			})
+			return
+		}
+
+		if variables["after"] == nil {
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"teams": map[string]any{
+						"nodes": []map[string]any{
+							{
+								"id":   "team-1",
+								"name": "Dev OS",
+								"key":  "DEV",
+								"projects": map[string]any{
+									"nodes":    []map[string]any{{"id": "project-1", "name": "First project page"}},
+									"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "project-cursor"},
+								},
+							},
+						},
+						"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "team-cursor"},
+					},
+				},
+			})
+			return
+		}
+
+		if variables["after"] != "team-cursor" {
+			t.Fatalf("expected team cursor, got %#v", variables["after"])
+		}
+		writeLinearJSON(t, w, map[string]any{
+			"data": map[string]any{
+				"teams": map[string]any{
+					"nodes": []map[string]any{
+						{
+							"id":   "team-2",
+							"name": "Ops",
+							"key":  "OPS",
+							"projects": map[string]any{
+								"nodes":    []map[string]any{},
+								"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+							},
+						},
+					},
+					"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	connector := &LinearConnector{
+		info:       NewLinearConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	resources, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if requests != 3 {
+		t.Fatalf("expected 3 paginated requests, got %d", requests)
+	}
+	if len(resources) != 4 {
+		t.Fatalf("expected 2 teams and 2 projects, got %d: %#v", len(resources), resources)
+	}
+	if resources[2].ID != "project-2" {
+		t.Fatalf("expected second project page in resources, got %#v", resources)
+	}
+}
+
 func TestLinearSyncFetchesAndNormalizesIssues(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -181,6 +277,81 @@ func TestLinearSyncFetchesAndNormalizesIssues(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
 		}
+	}
+}
+
+func TestLinearSyncPaginatesIssues(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		variables, _ := payload["variables"].(map[string]any)
+		after := variables["after"]
+
+		issue := map[string]any{
+			"id":            "issue-1",
+			"identifier":    "DEV-1",
+			"title":         "Paginated issue",
+			"url":           "https://linear.app/dev-os/issue/DEV-1/paginated",
+			"priority":      3,
+			"priorityLabel": "Medium",
+			"createdAt":     "2026-07-29T12:00:00Z",
+			"updatedAt":     "2026-07-29T12:30:00Z",
+			"completedAt":   nil,
+			"canceledAt":    nil,
+			"assignee":      nil,
+			"state":         map[string]any{"name": "Todo", "type": "unstarted"},
+			"team":          map[string]any{"id": "team-1", "name": "Dev-os", "key": "DEV"},
+			"project":       nil,
+			"cycle":         nil,
+			"comments":      map[string]any{"nodes": []map[string]any{}},
+		}
+		if after == nil {
+			writeLinearJSON(t, w, map[string]any{
+				"data": map[string]any{
+					"issues": map[string]any{
+						"nodes":    []map[string]any{issue},
+						"pageInfo": map[string]any{"hasNextPage": true, "endCursor": "issue-cursor"},
+					},
+				},
+			})
+			return
+		}
+		if after != "issue-cursor" {
+			t.Fatalf("expected issue cursor, got %#v", after)
+		}
+		issue["id"] = "issue-2"
+		issue["identifier"] = "DEV-2"
+		writeLinearJSON(t, w, map[string]any{
+			"data": map[string]any{
+				"issues": map[string]any{
+					"nodes":    []map[string]any{issue},
+					"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	connector := &LinearConnector{
+		info:       NewLinearConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	result, err := connector.Sync(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if requests != 2 {
+		t.Fatalf("expected 2 issue page requests, got %d", requests)
+	}
+	if result.EventsCreated != 2 {
+		t.Fatalf("expected 2 events, got %d", result.EventsCreated)
 	}
 }
 

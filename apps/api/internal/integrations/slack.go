@@ -74,14 +74,20 @@ func (c *SlackConnector) ListSelectableResources(ctx context.Context, _ domain.G
 		if channel.IsPrivate {
 			resourceType = "private_channel"
 		}
+		lastActivityAt := channelLastActivityAt(channel)
 		resources = append(resources, domain.SelectableResource{
 			ID:   channel.ID,
 			Type: resourceType,
 			Name: "#" + channel.Name,
 			Metadata: map[string]any{
-				"channelId":   channel.ID,
-				"channelName": channel.Name,
-				"isPrivate":   channel.IsPrivate,
+				"channelId":      channel.ID,
+				"channelName":    channel.Name,
+				"isPrivate":      channel.IsPrivate,
+				"isMember":       channel.IsMember,
+				"isShared":       channel.IsShared,
+				"createdAt":      slackUnixTimestamp(channel.Created),
+				"updatedAt":      slackUnixTimestamp(channel.Updated),
+				"lastActivityAt": lastActivityAt,
 			},
 		})
 	}
@@ -94,12 +100,12 @@ func (c *SlackConnector) SyncSelected(ctx context.Context, gatewayContext domain
 		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_auth", Events: []domain.WorkEvent{}}, nil
 	}
 
-	channelIDs := selectedSlackChannelIDs(selection)
-	if len(channelIDs) == 0 {
+	channels := selectedSlackChannels(selection)
+	if len(channels) == 0 {
 		return domain.SyncResult{Service: domain.ServiceSlack, Status: "needs_selection", Events: []domain.WorkEvent{}}, nil
 	}
 
-	records, err := c.fetchRecentRecordsForChannels(ctx, accessToken, channelIDs)
+	records, err := c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels)
 	if err != nil {
 		return domain.SyncResult{}, err
 	}
@@ -118,14 +124,25 @@ func (c *SlackConnector) SyncSelected(ctx context.Context, gatewayContext domain
 }
 
 func (c *SlackConnector) fetchRecentRecordsForChannels(ctx context.Context, accessToken string, channelIDs []string) ([]domain.ExternalRecord, error) {
-	records := []domain.ExternalRecord{}
+	channels := make([]slackChannel, 0, len(channelIDs))
 	for _, channelID := range channelIDs {
-		channel, err := c.fetchChannel(ctx, accessToken, channelID)
-		if err != nil {
-			return nil, err
+		channels = append(channels, slackChannel{ID: channelID})
+	}
+	return c.fetchRecentRecordsForSlackChannels(ctx, accessToken, channels)
+}
+
+func (c *SlackConnector) fetchRecentRecordsForSlackChannels(ctx context.Context, accessToken string, channels []slackChannel) ([]domain.ExternalRecord, error) {
+	records := []domain.ExternalRecord{}
+	for _, channel := range channels {
+		if channel.Name == "" {
+			var err error
+			channel, err = c.fetchChannel(ctx, accessToken, channel.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		messages, err := c.fetchHistory(ctx, accessToken, channelID)
+		messages, err := c.fetchHistory(ctx, accessToken, channel.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +150,7 @@ func (c *SlackConnector) fetchRecentRecordsForChannels(ctx context.Context, acce
 		for _, message := range messages {
 			replies := []slackMessage{}
 			if message.ReplyCount > 0 && message.ThreadTS != "" {
-				replies, err = c.fetchReplies(ctx, accessToken, channelID, message.ThreadTS)
+				replies, err = c.fetchReplies(ctx, accessToken, channel.ID, message.ThreadTS)
 				if err != nil {
 					return nil, err
 				}
@@ -301,16 +318,35 @@ func (c *SlackConnector) get(ctx context.Context, token string, method string, v
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return slackRateLimitError{Method: method, RetryAfter: retryAfterDuration(resp.Header.Get("retry-after"))}
+		}
 		return fmt.Errorf("slack api request failed: %s", resp.Status)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(output)
 }
 
+type slackRateLimitError struct {
+	Method     string
+	RetryAfter time.Duration
+}
+
+func (e slackRateLimitError) Error() string {
+	if e.RetryAfter > 0 {
+		return fmt.Sprintf("slack rate limit exceeded for %s; retry after %s", e.Method, e.RetryAfter.Round(time.Second))
+	}
+	return fmt.Sprintf("slack rate limit exceeded for %s", e.Method)
+}
+
 type slackChannel struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	IsPrivate bool   `json:"is_private"`
+	IsMember  bool   `json:"is_member"`
+	IsShared  bool   `json:"is_shared"`
+	Created   int64  `json:"created"`
+	Updated   int64  `json:"updated"`
 }
 
 type slackMessage struct {
@@ -440,7 +476,16 @@ func slackAccessToken(token *domain.ProviderToken) string {
 }
 
 func selectedSlackChannelIDs(selection domain.ResourceSelection) []string {
-	channelIDs := []string{}
+	channels := selectedSlackChannels(selection)
+	channelIDs := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		channelIDs = append(channelIDs, channel.ID)
+	}
+	return channelIDs
+}
+
+func selectedSlackChannels(selection domain.ResourceSelection) []slackChannel {
+	channels := []slackChannel{}
 	seen := map[string]bool{}
 	for _, resource := range selection.Resources {
 		if resource.Type != "" && resource.Type != "channel" && resource.Type != "public_channel" && resource.Type != "private_channel" {
@@ -456,9 +501,17 @@ func selectedSlackChannelIDs(selection domain.ResourceSelection) []string {
 		}
 
 		seen[channelID] = true
-		channelIDs = append(channelIDs, channelID)
+		channelName := strings.TrimPrefix(resource.Name, "#")
+		if metadataName, ok := resource.Metadata["channelName"].(string); ok && strings.TrimSpace(metadataName) != "" {
+			channelName = strings.TrimSpace(metadataName)
+		}
+		channels = append(channels, slackChannel{
+			ID:        channelID,
+			Name:      strings.TrimPrefix(channelName, "#"),
+			IsPrivate: resource.Type == "private_channel",
+		})
 	}
-	return channelIDs
+	return channels
 }
 
 func parseCSV(value string) []string {
@@ -480,4 +533,26 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func retryAfterDuration(value string) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func slackUnixTimestamp(value int64) string {
+	if value <= 0 {
+		return ""
+	}
+	return time.Unix(value, 0).UTC().Format(time.RFC3339)
+}
+
+func channelLastActivityAt(channel slackChannel) string {
+	if channel.Updated > 0 {
+		return slackUnixTimestamp(channel.Updated)
+	}
+	return slackUnixTimestamp(channel.Created)
 }

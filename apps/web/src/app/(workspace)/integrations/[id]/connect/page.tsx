@@ -49,7 +49,7 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
         <div className="mt-6 flex flex-wrap gap-3">
           <Button asChild>
             <a href={`/api/integrations/${integration.id}/connect`}>
-              {connect.continueLabel}
+              {connect.oauthCtaLabel}
               <ArrowRight className="h-4 w-4" />
             </a>
           </Button>

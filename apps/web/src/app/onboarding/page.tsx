@@ -191,6 +191,17 @@ export default async function OnboardingPage({
                     </p>
                   ) : null}
 
+                  {integration.connect?.permissionBullets.length ? (
+                    <div className="mt-4 rounded-md border border-brand-border bg-[#121826] p-3">
+                      <p className="text-xs font-medium text-brand-ink">{integration.connect.preConnectTitle}</p>
+                      <ul className="mt-2 space-y-1 text-xs leading-5 text-[#9AA4BA]">
+                        {integration.connect.permissionBullets.slice(0, 3).map((bullet) => (
+                          <li key={bullet}>- {bullet}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button asChild size="sm" variant={connected ? "secondary" : "default"}>
                       <a href={`/integrations/${integration.id}/connect`}>

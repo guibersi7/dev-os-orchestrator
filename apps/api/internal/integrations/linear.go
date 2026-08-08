@@ -189,19 +189,8 @@ func (c *LinearConnector) SyncSelected(ctx context.Context, gatewayContext domai
 }
 
 func (c *LinearConnector) fetchTeams(ctx context.Context, token string) ([]linearTeamResource, error) {
-	var response struct {
-		Data struct {
-			Teams struct {
-				Nodes []linearTeamResource `json:"nodes"`
-			} `json:"teams"`
-		} `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-
-	query := `query DeveloperOSTeams($first: Int!) {
-  teams(first: $first) {
+	query := `query DeveloperOSTeams($first: Int!, $after: String) {
+  teams(first: $first, after: $after) {
     nodes {
       id
       name
@@ -211,35 +200,52 @@ func (c *LinearConnector) fetchTeams(ctx context.Context, token string) ([]linea
           id
           name
         }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
       }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }`
 
-	if err := c.graphql(ctx, token, query, map[string]any{"first": 100}, &response); err != nil {
-		return nil, err
-	}
-	if len(response.Errors) > 0 {
-		return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
-	}
+	teams := []linearTeamResource{}
+	var after any
+	for {
+		var response linearTeamsResponse
+		if err := c.graphql(ctx, token, query, map[string]any{"first": 100, "after": after}, &response); err != nil {
+			return nil, err
+		}
+		if len(response.Errors) > 0 {
+			return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
+		}
 
-	return response.Data.Teams.Nodes, nil
+		for _, team := range response.Data.Teams.Nodes {
+			if team.Projects.PageInfo.HasNextPage {
+				projects, err := c.fetchTeamProjects(ctx, token, team.ID, team.Projects.PageInfo.EndCursor)
+				if err != nil {
+					return nil, err
+				}
+				team.Projects.Nodes = append(team.Projects.Nodes, projects...)
+				team.Projects.PageInfo = linearPageInfo{}
+			}
+			teams = append(teams, team)
+		}
+
+		if !response.Data.Teams.PageInfo.HasNextPage {
+			return teams, nil
+		}
+		after = response.Data.Teams.PageInfo.EndCursor
+	}
 }
 
 func (c *LinearConnector) fetchIssues(ctx context.Context, token string) ([]linearIssue, error) {
-	var response struct {
-		Data struct {
-			Issues struct {
-				Nodes []linearIssue `json:"nodes"`
-			} `json:"issues"`
-		} `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-
-	query := `query DeveloperOSIssues($first: Int!) {
-  issues(first: $first, orderBy: updatedAt) {
+	query := `query DeveloperOSIssues($first: Int!, $after: String) {
+  issues(first: $first, after: $after, orderBy: updatedAt) {
     nodes {
       id
       identifier
@@ -265,17 +271,68 @@ func (c *LinearConnector) fetchIssues(ctx context.Context, token string) ([]line
         }
       }
     }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
   }
 }`
 
-	if err := c.graphql(ctx, token, query, map[string]any{"first": 50}, &response); err != nil {
-		return nil, err
-	}
-	if len(response.Errors) > 0 {
-		return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
-	}
+	issues := []linearIssue{}
+	var after any
+	for {
+		var response linearIssuesResponse
+		if err := c.graphql(ctx, token, query, map[string]any{"first": 50, "after": after}, &response); err != nil {
+			return nil, err
+		}
+		if len(response.Errors) > 0 {
+			return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
+		}
 
-	return response.Data.Issues.Nodes, nil
+		issues = append(issues, response.Data.Issues.Nodes...)
+		if !response.Data.Issues.PageInfo.HasNextPage {
+			return issues, nil
+		}
+		after = response.Data.Issues.PageInfo.EndCursor
+	}
+}
+
+func (c *LinearConnector) fetchTeamProjects(ctx context.Context, token string, teamID string, after string) ([]linearProjectResource, error) {
+	query := `query DeveloperOSTeamProjects($teamId: String!, $first: Int!, $after: String) {
+  team(id: $teamId) {
+    projects(first: $first, after: $after) {
+      nodes {
+        id
+        name
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`
+
+	projects := []linearProjectResource{}
+	var cursor any = after
+	for {
+		var response linearTeamProjectsResponse
+		if err := c.graphql(ctx, token, query, map[string]any{"teamId": teamID, "first": 100, "after": cursor}, &response); err != nil {
+			return nil, err
+		}
+		if len(response.Errors) > 0 {
+			return nil, fmt.Errorf("linear graphql failed: %s", response.Errors[0].Message)
+		}
+		if response.Data.Team == nil {
+			return projects, nil
+		}
+
+		projects = append(projects, response.Data.Team.Projects.Nodes...)
+		if !response.Data.Team.Projects.PageInfo.HasNextPage {
+			return projects, nil
+		}
+		cursor = response.Data.Team.Projects.PageInfo.EndCursor
+	}
 }
 
 func (c *LinearConnector) graphql(ctx context.Context, token string, query string, variables map[string]any, output any) error {
@@ -356,13 +413,55 @@ type linearTeamResource struct {
 	Name     string `json:"name"`
 	Key      string `json:"key"`
 	Projects struct {
-		Nodes []linearProjectResource `json:"nodes"`
+		Nodes    []linearProjectResource `json:"nodes"`
+		PageInfo linearPageInfo          `json:"pageInfo"`
 	} `json:"projects"`
 }
 
 type linearProjectResource struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type linearPageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type linearGraphQLError struct {
+	Message string `json:"message"`
+}
+
+type linearTeamsResponse struct {
+	Data struct {
+		Teams struct {
+			Nodes    []linearTeamResource `json:"nodes"`
+			PageInfo linearPageInfo       `json:"pageInfo"`
+		} `json:"teams"`
+	} `json:"data"`
+	Errors []linearGraphQLError `json:"errors"`
+}
+
+type linearTeamProjectsResponse struct {
+	Data struct {
+		Team *struct {
+			Projects struct {
+				Nodes    []linearProjectResource `json:"nodes"`
+				PageInfo linearPageInfo          `json:"pageInfo"`
+			} `json:"projects"`
+		} `json:"team"`
+	} `json:"data"`
+	Errors []linearGraphQLError `json:"errors"`
+}
+
+type linearIssuesResponse struct {
+	Data struct {
+		Issues struct {
+			Nodes    []linearIssue  `json:"nodes"`
+			PageInfo linearPageInfo `json:"pageInfo"`
+		} `json:"issues"`
+	} `json:"data"`
+	Errors []linearGraphQLError `json:"errors"`
 }
 
 type linearSelectionScope struct {

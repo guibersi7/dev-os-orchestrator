@@ -197,10 +197,7 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 		jql = "project in (" + strings.Join(quoted, ",") + ") AND " + jql
 	}
 
-	var response struct {
-		Issues []jiraIssue `json:"issues"`
-	}
-	payload := map[string]any{
+	basePayload := map[string]any{
 		"jql":        jql,
 		"maxResults": 50,
 		"fields": []string{
@@ -218,20 +215,71 @@ func (c *JiraConnector) searchIssuesForProjectKeys(ctx context.Context, token st
 		},
 	}
 
-	if err := c.post(ctx, token, "/rest/api/3/search/jql", payload, &response); err != nil {
-		return nil, err
+	issues := []jiraIssue{}
+	startAt := 0
+	nextPageToken := ""
+	for {
+		payload := cloneMap(basePayload)
+		if nextPageToken != "" {
+			payload["nextPageToken"] = nextPageToken
+		} else {
+			payload["startAt"] = startAt
+		}
+
+		var response jiraSearchResponse
+		if err := c.post(ctx, token, "/rest/api/3/search/jql", payload, &response); err != nil {
+			return nil, err
+		}
+
+		issues = append(issues, response.Issues...)
+		if response.NextPageToken != "" {
+			nextPageToken = response.NextPageToken
+			continue
+		}
+		if response.Total == nil && response.IsLast == nil {
+			return issues, nil
+		}
+		if (response.IsLast != nil && *response.IsLast) || len(response.Issues) == 0 {
+			return issues, nil
+		}
+		if response.Total != nil && *response.Total > 0 && startAt+len(response.Issues) >= *response.Total {
+			return issues, nil
+		}
+
+		startAt += len(response.Issues)
 	}
-	return response.Issues, nil
 }
 
 func (c *JiraConnector) fetchProjects(ctx context.Context, token string) ([]jiraProject, error) {
-	var response struct {
-		Values []jiraProject `json:"values"`
+	projects := []jiraProject{}
+	startAt := 0
+	for {
+		var response jiraProjectSearchResponse
+		path := fmt.Sprintf("/rest/api/3/project/search?maxResults=100&startAt=%d", startAt)
+		if err := c.get(ctx, token, path, &response); err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, response.Values...)
+		if response.Total == nil && response.IsLast == nil {
+			return projects, nil
+		}
+		if (response.IsLast != nil && *response.IsLast) || len(response.Values) == 0 {
+			return projects, nil
+		}
+		if response.Total != nil && *response.Total > 0 && response.StartAt+len(response.Values) >= *response.Total {
+			return projects, nil
+		}
+		startAt = response.StartAt + len(response.Values)
 	}
-	if err := c.get(ctx, token, "/rest/api/3/project/search?maxResults=100", &response); err != nil {
-		return nil, err
+}
+
+func cloneMap(input map[string]any) map[string]any {
+	output := make(map[string]any, len(input))
+	for key, value := range input {
+		output[key] = value
 	}
-	return response.Values, nil
+	return output
 }
 
 func (c *JiraConnector) get(ctx context.Context, token string, path string, output any) error {
@@ -318,6 +366,23 @@ type jiraProject struct {
 	ID   string `json:"id"`
 	Key  string `json:"key"`
 	Name string `json:"name"`
+}
+
+type jiraSearchResponse struct {
+	Issues        []jiraIssue `json:"issues"`
+	StartAt       int         `json:"startAt"`
+	MaxResults    int         `json:"maxResults"`
+	Total         *int        `json:"total"`
+	IsLast        *bool       `json:"isLast"`
+	NextPageToken string      `json:"nextPageToken"`
+}
+
+type jiraProjectSearchResponse struct {
+	Values     []jiraProject `json:"values"`
+	StartAt    int           `json:"startAt"`
+	MaxResults int           `json:"maxResults"`
+	Total      *int          `json:"total"`
+	IsLast     *bool         `json:"isLast"`
 }
 
 type jiraUser struct {

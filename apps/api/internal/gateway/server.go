@@ -268,18 +268,29 @@ func (s *Server) listSelectableResources(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resources, err := lister.ListSelectableResources(r.Context(), ctx, &token)
-	if err != nil {
-		s.writeError(w, ctx, http.StatusBadGateway, "resources_fetch_failed", err.Error(), syncErrorDetails(service, err))
+	selection, selectionErr := s.store.GetResourceSelection(r.Context(), ctx, service)
+	selectedIDs := []string{}
+	if selectionErr == nil {
+		selectedIDs = selection.ResourceIDs
+	} else if !errors.Is(selectionErr, store.ErrResourceSelectionNotFound) {
+		s.writeError(w, ctx, http.StatusInternalServerError, "selection_read_failed", selectionErr.Error(), map[string]any{"service": service})
 		return
 	}
 
-	selection, err := s.store.GetResourceSelection(r.Context(), ctx, service)
-	selectedIDs := []string{}
-	if err == nil {
-		selectedIDs = selection.ResourceIDs
-	} else if !errors.Is(err, store.ErrResourceSelectionNotFound) {
-		s.writeError(w, ctx, http.StatusInternalServerError, "selection_read_failed", err.Error(), map[string]any{"service": service})
+	resources, err := lister.ListSelectableResources(r.Context(), ctx, &token)
+	if err != nil {
+		details := syncErrorDetails(service, err)
+		if details["type"] == "rate_limit" && selectionErr == nil && len(selection.Resources) > 0 {
+			s.write(w, ctx, http.StatusOK, map[string]any{
+				"service":             service,
+				"status":              "rate_limited",
+				"resources":           selection.Resources,
+				"selectedResourceIds": selectedIDs,
+				"warning":             details,
+			})
+			return
+		}
+		s.writeError(w, ctx, http.StatusBadGateway, "resources_fetch_failed", err.Error(), details)
 		return
 	}
 

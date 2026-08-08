@@ -90,6 +90,7 @@ export type SelectableResourcesPayload = {
   status: string;
   resources: SelectableResource[];
   selectedResourceIds: string[];
+  warning?: Record<string, unknown>;
 };
 
 export type OAuthStartResponse = {

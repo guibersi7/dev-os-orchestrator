@@ -63,7 +63,7 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 			writeSlackJSON(t, w, map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
-					{"id": "C123", "name": "eng"},
+					{"id": "C123", "name": "eng", "created": 1785320000, "updated": 1785326400, "is_member": true},
 				},
 				"response_metadata": map[string]any{"next_cursor": "page-2"},
 			})
@@ -74,8 +74,8 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 			writeSlackJSON(t, w, map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
-					{"id": "C999", "name": "release", "is_private": false},
-					{"id": "G999", "name": "leadership", "is_private": true},
+					{"id": "C999", "name": "release", "is_private": false, "is_shared": true, "created": 1785320100},
+					{"id": "G999", "name": "leadership", "is_private": true, "is_member": true, "created": 1785320200, "updated": 1785326500},
 				},
 				"response_metadata": map[string]any{"next_cursor": ""},
 			})
@@ -102,11 +102,20 @@ func TestSlackListSelectableResourcesReturnsChannels(t *testing.T) {
 	if resources[0].ID != "C123" || resources[0].Type != "public_channel" || resources[0].Name != "#eng" {
 		t.Fatalf("unexpected first resource: %#v", resources[0])
 	}
+	if resources[0].Metadata["lastActivityAt"] != "2026-07-29T12:00:00Z" || resources[0].Metadata["isMember"] != true {
+		t.Fatalf("unexpected first resource metadata: %#v", resources[0].Metadata)
+	}
 	if resources[1].ID != "C999" || resources[1].Type != "public_channel" || resources[1].Name != "#release" {
 		t.Fatalf("unexpected second resource: %#v", resources[1])
 	}
+	if resources[1].Metadata["lastActivityAt"] != "2026-07-29T10:15:00Z" || resources[1].Metadata["isShared"] != true {
+		t.Fatalf("unexpected second resource metadata: %#v", resources[1].Metadata)
+	}
 	if resources[2].ID != "G999" || resources[2].Type != "private_channel" || resources[2].Name != "#leadership" {
 		t.Fatalf("unexpected third resource: %#v", resources[2])
+	}
+	if resources[2].Metadata["lastActivityAt"] != "2026-07-29T12:01:40Z" || resources[2].Metadata["isPrivate"] != true {
+		t.Fatalf("unexpected third resource metadata: %#v", resources[2].Metadata)
 	}
 	if requests != 2 {
 		t.Fatalf("expected 2 paginated requests, got %d", requests)
@@ -275,6 +284,83 @@ func TestSlackSyncSelectedUsesOnlySelectedChannels(t *testing.T) {
 	}
 	if !seenChannels["C999"] {
 		t.Fatal("sync did not use selected channel")
+	}
+}
+
+func TestSlackSyncSelectedUsesSelectedChannelMetadataWithoutInfoLookup(t *testing.T) {
+	seenInfo := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.info":
+			seenInfo = true
+			t.Fatalf("conversations.info should not be called when channel metadata is selected")
+		case "/conversations.history":
+			if r.URL.Query().Get("channel") != "C999" {
+				t.Fatalf("unexpected selected channel %s", r.URL.Query().Get("channel"))
+			}
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U2",
+						"text": "Blocked waiting on GitHub checks",
+						"ts":   "1785326500.000000",
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "C999", Type: "public_channel", Name: "#release", Metadata: map[string]any{"channelId": "C999", "channelName": "release"}},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if seenInfo {
+		t.Fatal("sync looked up selected channel info")
+	}
+	if result.Status != "connected" || result.EventsCreated != 1 {
+		t.Fatalf("unexpected sync result: %#v", result)
+	}
+	if result.Events[0].Source != "Slack · #release" {
+		t.Fatalf("expected selected channel source, got %q", result.Events[0].Source)
+	}
+}
+
+func TestSlackRateLimitErrorIncludesRetryAfter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("retry-after", "42")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	_, err := connector.ListSelectableResources(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"})
+	if err == nil {
+		t.Fatal("expected rate limit error")
+	}
+	if err.Error() != "slack rate limit exceeded for conversations.list; retry after 42s" {
+		t.Fatalf("unexpected error: %q", err.Error())
 	}
 }
 
