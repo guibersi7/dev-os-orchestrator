@@ -206,7 +206,7 @@ export function ResourceSelectionForm({ integration, resources, selectedResource
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-border bg-[#121826] p-4">
           <Button type="submit">{resourceConfig?.firstSyncLabel ?? "Save selection"}</Button>
           <Button asChild variant="secondary">
-            <Link href={`/integrations/${integration.id}`}>Open connector details</Link>
+            <Link href={`/integrations/${integration.id}`} prefetch={false}>Open connector details</Link>
           </Button>
         </div>
       </Card>
