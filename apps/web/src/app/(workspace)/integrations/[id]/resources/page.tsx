@@ -12,7 +12,7 @@ export default async function IntegrationResourcesPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ connected?: string }>;
+  searchParams?: Promise<{ connected?: string; selectionError?: string; sync?: string; syncError?: string }>;
 }) {
   const { id } = await params;
   const paramsValue = await searchParams;
@@ -60,6 +60,26 @@ export default async function IntegrationResourcesPage({
       </Card>
 
       {resourcesState.error ? <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">{resourcesState.error}</Card> : null}
+
+      {paramsValue?.selectionError ? (
+        <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">
+          {decodeURIComponent(paramsValue.selectionError)}
+        </Card>
+      ) : null}
+
+      {paramsValue?.syncError ? (
+        <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">
+          {decodeURIComponent(paramsValue.syncError)}
+        </Card>
+      ) : null}
+
+      {paramsValue?.sync === "empty" ? (
+        <Card className="border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">
+          Slack connected and the sync ran, but no dashboard events were created. Make sure the selected channels contain
+          decisions, blockers, mentions, or threads with links in the selected time window, and that the Standup app has
+          been added to private channels.
+        </Card>
+      ) : null}
 
       {payload?.status === "rate_limited" ? (
         <Card className="border-[#4A3A18] bg-[#241F14] p-4 text-sm leading-6 text-[#F6C66A]">

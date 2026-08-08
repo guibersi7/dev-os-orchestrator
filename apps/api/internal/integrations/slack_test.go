@@ -398,6 +398,109 @@ func TestSlackSyncSelectedSkipsChannelsWithoutAccess(t *testing.T) {
 	}
 }
 
+func TestSlackSyncSelectedRespectsExtractionTypesAndSyncWindow(t *testing.T) {
+	seenOldest := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			if r.URL.Query().Get("channel") != "C999" {
+				t.Fatalf("unexpected selected channel %s", r.URL.Query().Get("channel"))
+			}
+			if r.URL.Query().Get("oldest") == "" {
+				t.Fatal("expected oldest query for selected sync window")
+			}
+			seenOldest = true
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U1",
+						"text": "Decision: this should be ignored when decisions are not selected",
+						"ts":   "1785326400.000000",
+					},
+					{
+						"user": "U2",
+						"text": "Can <@U999> take a look?",
+						"ts":   "1785326500.000000",
+					},
+					{
+						"user":        "U3",
+						"text":        "Follow-up thread",
+						"ts":          "1785326600.000000",
+						"thread_ts":   "1785326600.000000",
+						"reply_count": 1,
+					},
+				},
+			})
+		case "/conversations.replies":
+			writeSlackJSON(t, w, map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{
+						"user": "U3",
+						"text": "Follow-up thread",
+						"ts":   "1785326600.000000",
+					},
+					{
+						"user": "U4",
+						"text": "Context: https://example.com/spec",
+						"ts":   "1785326610.000000",
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	connector := &SlackConnector{
+		info:       NewSlackConnector().Info(),
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+	}
+
+	selection := domain.ResourceSelection{
+		Service: domain.ServiceSlack,
+		Resources: []domain.SelectableResource{
+			{ID: "C999", Type: "public_channel", Name: "#release", Metadata: map[string]any{"channelId": "C999", "channelName": "release"}},
+		},
+		Settings: map[string]any{
+			"slack": map[string]any{
+				"extractionTypes": []any{"mentions", "threads_with_links"},
+				"syncWindow":      "last_7_days",
+			},
+		},
+	}
+	result, err := connector.SyncSelected(context.Background(), domain.GatewayContext{}, &domain.ProviderToken{AccessToken: "token"}, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !seenOldest {
+		t.Fatal("sync did not pass selected sync window to Slack history")
+	}
+	if result.RecordsScanned != 3 {
+		t.Fatalf("expected 3 scanned Slack messages, got %d", result.RecordsScanned)
+	}
+	if result.EventsCreated != 2 {
+		t.Fatalf("expected mention and thread link events, got %d", result.EventsCreated)
+	}
+
+	eventTypes := map[string]bool{}
+	for _, event := range result.Events {
+		eventTypes[event.Type] = true
+	}
+	if eventTypes["slack.decision"] {
+		t.Fatal("decision event should not be created when decisions are not selected")
+	}
+	for _, eventType := range []string{"slack.mention", "slack.thread_with_link"} {
+		if !eventTypes[eventType] {
+			t.Fatalf("expected event type %q in %#v", eventType, eventTypes)
+		}
+	}
+}
+
 func TestSlackRateLimitErrorIncludesRetryAfter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("retry-after", "42")
@@ -421,7 +524,7 @@ func TestSlackRateLimitErrorIncludesRetryAfter(t *testing.T) {
 }
 
 func TestClassifySlackTextPrefersBlockersOverDecisions(t *testing.T) {
-	eventType, priority, _, ok := classifySlackText("Decision is approved but blocked waiting on staging")
+	eventType, priority, _, ok := classifySlackText("Decision is approved but blocked waiting on staging", false, defaultSlackSyncOptions())
 	if !ok {
 		t.Fatal("expected text to be classified")
 	}
