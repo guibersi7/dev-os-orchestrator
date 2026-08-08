@@ -23,6 +23,7 @@ export default function RepositorySelectionPage() {
             <Link
               key={integration.id}
               href={`/integrations/${integration.id}`}
+              prefetch={false}
               className="flex flex-wrap items-center justify-between gap-4 border-b border-[#212938] p-4 transition-colors last:border-b-0 hover:bg-[#0B0F1A]"
             >
               <div className="flex items-center gap-3">

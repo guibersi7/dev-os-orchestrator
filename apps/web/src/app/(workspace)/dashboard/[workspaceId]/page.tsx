@@ -87,7 +87,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                     </p>
                   ) : null}
                   {reviewQueue.map((pr) => (
-                    <Link key={pr.id} href={`/integrations/${pr.service}`} className="block py-4 first:pt-0 last:pb-0">
+                    <Link key={pr.id} href={`/integrations/${pr.service}`} prefetch={false} className="block py-4 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">{pr.title}</p>
@@ -117,6 +117,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                       <Link
                         key={integration.id}
                         href={`/integrations/${integration.id}`}
+                        prefetch={false}
                         className="flex items-center justify-between gap-3 rounded-md p-2 transition-colors hover:bg-accent"
                       >
                         <div>
@@ -169,6 +170,7 @@ export default async function DashboardWorkspacePage({ params }: DashboardWorksp
                     <Link
                       key={issue.id}
                       href={`/integrations/${issue.service}`}
+                      prefetch={false}
                       className="block rounded-md border border-border p-3 transition-colors hover:bg-accent"
                     >
                       <p className="text-sm font-medium">{issue.title}</p>

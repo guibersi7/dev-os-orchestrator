@@ -177,7 +177,7 @@ export default async function SettingsPage({
                     </Button>
                   </form>
                   <Button asChild size="sm" variant="ghost">
-                    <Link href={`/integrations/${integration.id}`}>
+                    <Link href={`/integrations/${integration.id}`} prefetch={false}>
                       <ExternalLink className="h-4 w-4" />
                       Details
                     </Link>
