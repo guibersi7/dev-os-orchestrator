@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { getSupabaseAuthConfig, isSupabaseAuthConfigured, sanitizeAuthRedirect } from "@/lib/auth/config";
+import { getSupabaseAuthConfig, isSupabaseAuthConfigured } from "@/lib/auth/config";
 import { ACTIVE_WORKSPACE_COOKIE, activeWorkspaceCookieOptions, workspaceIdFromDashboardPath } from "@/lib/workspace-session";
 
 const protectedPathPrefixes = [
@@ -14,6 +14,8 @@ const protectedPathPrefixes = [
   "/settings",
   "/setup",
   "/today",
+  "/timeline",
+  "/weekly",
 ];
 
 function isProtectedPath(pathname: string) {
@@ -33,6 +35,11 @@ function persistDashboardWorkspace(request: NextRequest, response: NextResponse)
 
 export async function updateAuthSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const isProtected = isProtectedPath(request.nextUrl.pathname);
+
+  if (!isProtected) {
+    return persistDashboardWorkspace(request, response);
+  }
 
   if (!isSupabaseAuthConfigured()) {
     return persistDashboardWorkspace(request, response);
@@ -58,16 +65,11 @@ export async function updateAuthSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && isProtectedPath(request.nextUrl.pathname)) {
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirect", `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return persistDashboardWorkspace(request, NextResponse.redirect(loginUrl));
-  }
-
-  if (user && request.nextUrl.pathname === "/login") {
-    const redirectTo = sanitizeAuthRedirect(request.nextUrl.searchParams.get("redirect"));
-    return persistDashboardWorkspace(request, NextResponse.redirect(new URL(redirectTo, request.url)));
   }
 
   return persistDashboardWorkspace(request, response);

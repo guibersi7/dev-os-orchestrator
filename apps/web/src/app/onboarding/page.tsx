@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { getIntegrationCatalogItem, integrationCatalog } from "@/features/integrations/catalog";
 import { type ConnectionStatus, getConnectionsState } from "@/lib/api-client";
+import { getInitialAuthSession } from "@/lib/auth-session";
 import { formatRelativeTime } from "@/lib/dashboard-view-model";
 import { syncConnectionAction } from "@/app/(workspace)/settings/actions";
 
@@ -28,7 +29,7 @@ export default async function OnboardingPage({
   searchParams?: Promise<{ connectionError?: string; service?: string; missing?: string; reason?: string }>;
 }) {
   const params = await searchParams;
-  const connectionsState = await getConnectionsState();
+  const [connectionsState, authSession] = await Promise.all([getConnectionsState(), getInitialAuthSession()]);
   const connections = connectionByService(connectionsState.data?.connections);
   const connectedCount = integrationCatalog.filter((integration) => connections.get(integration.id)?.hasToken).length;
   const configuredCount = integrationCatalog.filter((integration) => {
@@ -86,7 +87,7 @@ export default async function OnboardingPage({
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a href="/dashboard">Open dashboard</a>
             </Button>
-            <HeaderAuthControl />
+            <HeaderAuthControl session={authSession} />
           </div>
         </header>
 

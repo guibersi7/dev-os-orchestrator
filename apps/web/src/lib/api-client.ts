@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { getGatewayUserId } from "@/lib/auth/server";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace-session";
 
@@ -291,15 +292,15 @@ async function captureGatewayState<T>(request: () => Promise<T>): Promise<Gatewa
   }
 }
 
-export function getDashboardState(workspaceId?: string) {
+export const getDashboardState = cache(function getDashboardState(workspaceId?: string) {
   return captureGatewayState(() =>
     requestGateway<{ gateway: string; dashboard: DashboardPayload }>("/v1/dashboard", { workspaceId }),
   );
-}
+});
 
-export function getWorkspacesState(workspaceId?: string) {
+export const getWorkspacesState = cache(function getWorkspacesState(workspaceId?: string) {
   return captureGatewayState(() => requestGateway<WorkspacesPayload>("/v1/workspaces", { workspaceId }));
-}
+});
 
 export function createWorkspace(name: string, slug?: string, workspaceId?: string) {
   return captureGatewayState(() =>
@@ -316,13 +317,13 @@ export function createWorkspace(name: string, slug?: string, workspaceId?: strin
   );
 }
 
-export function getConfigState() {
+export const getConfigState = cache(function getConfigState() {
   return captureGatewayState(() => requestGateway<{ config: UserConfig }>("/v1/config"));
-}
+});
 
-export function getConnectionsState() {
+export const getConnectionsState = cache(function getConnectionsState() {
   return captureGatewayState(() => requestGateway<{ connections: ConnectionStatus[] }>("/v1/connections"));
-}
+});
 
 export function disconnectConnection(service: Service) {
   return captureGatewayState(() =>
@@ -332,11 +333,11 @@ export function disconnectConnection(service: Service) {
   );
 }
 
-export function getSelectableResourcesState(service: Service) {
+export const getSelectableResourcesState = cache(function getSelectableResourcesState(service: Service) {
   return captureGatewayState(() =>
     requestGateway<SelectableResourcesPayload>(`/v1/connections/${service}/resources`),
   );
-}
+});
 
 export function saveResourceSelection(service: Service, resources: SelectableResource[], settings?: Record<string, unknown>) {
   return captureGatewayState(() =>
