@@ -2,17 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { siGithub, siGooglecalendar, siJira, siLinear, siNotion, siTrello } from "simple-icons";
+import { BrandIcon } from "@/features/integrations/icons";
+import type { Service } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-
-type OrbitIcon = {
-  title: string;
-  path?: string;
-};
 
 type OrbitPill = {
   name: string;
-  icon: OrbitIcon;
+  service: Service;
   ring: "inner" | "middle" | "outer";
   angle: number;
   period: number;
@@ -32,13 +28,13 @@ const colorByRing = {
 };
 
 const pills: OrbitPill[] = [
-  { name: "GitHub", icon: siGithub, ring: "inner", angle: -38, period: 74, direction: 1 },
-  { name: "Linear", icon: siLinear, ring: "inner", angle: 34, period: 74, direction: 1 },
-  { name: "Slack", icon: { title: "Slack" }, ring: "middle", angle: -64, period: 98, direction: -1 },
-  { name: "Notion", icon: siNotion, ring: "middle", angle: 12, period: 98, direction: -1 },
-  { name: "Calendar", icon: siGooglecalendar, ring: "middle", angle: 78, period: 98, direction: -1 },
-  { name: "Jira", icon: siJira, ring: "outer", angle: -26, period: 132, direction: 1 },
-  { name: "Trello", icon: siTrello, ring: "outer", angle: 48, period: 132, direction: 1 },
+  { name: "GitHub", service: "github", ring: "inner", angle: -38, period: 74, direction: 1 },
+  { name: "Linear", service: "linear", ring: "inner", angle: 34, period: 74, direction: 1 },
+  { name: "Slack", service: "slack", ring: "middle", angle: -64, period: 98, direction: -1 },
+  { name: "Notion", service: "notion", ring: "middle", angle: 12, period: 98, direction: -1 },
+  { name: "Calendar", service: "calendar", ring: "middle", angle: 78, period: 98, direction: -1 },
+  { name: "Jira", service: "jira", ring: "outer", angle: -26, period: 132, direction: 1 },
+  { name: "Trello", service: "trello", ring: "outer", angle: 48, period: 132, direction: 1 },
 ];
 
 export function OrbitSection() {
@@ -132,7 +128,7 @@ function OrbitPill({ pill }: { pill: OrbitPill }) {
     >
       <div className="orbit-pill-frame absolute left-0 top-0">
         <div className="orbit-pill-inner">
-          <ServicePill icon={pill.icon} name={pill.name} color={color} />
+          <ServicePill service={pill.service} name={pill.name} color={color} />
         </div>
       </div>
     </div>
@@ -140,21 +136,16 @@ function OrbitPill({ pill }: { pill: OrbitPill }) {
 }
 
 function StaticPill({ pill }: { pill: OrbitPill }) {
-  return <ServicePill icon={pill.icon} name={pill.name} color={colorByRing[pill.ring]} className="justify-center" />;
+  return <ServicePill service={pill.service} name={pill.name} color={colorByRing[pill.ring]} className="justify-center" />;
 }
 
-function ServicePill({ icon, name, color, className }: { icon: OrbitIcon; name: string; color: string; className?: string }) {
+function ServicePill({ service, name, color, className }: { service: Service; name: string; color: string; className?: string }) {
   return (
     <div className={cn("inline-flex h-10 items-center gap-2 rounded-full border border-line-soft bg-surface px-3 text-[12.5px] font-medium text-[#E9EDF7]", className)}>
-      {icon.path ? (
-        <svg aria-hidden="true" className="h-4 w-4" fill={color} role="img" viewBox="0 0 24 24">
-          <path d={icon.path} />
-        </svg>
-      ) : (
-        <span className="font-mono text-[11px]" style={{ color }}>
-          {name.slice(0, 2)}
-        </span>
-      )}
+      {/* Depth tint is the caller's business; BrandIcon inherits currentColor. */}
+      <span style={{ color }}>
+        <BrandIcon service={service} size={16} />
+      </span>
       <span>{name}</span>
     </div>
   );

@@ -3,9 +3,11 @@ package integrations
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,7 +130,15 @@ func TestGitHubSyncFetchesAndNormalizesRepositoryEvents(t *testing.T) {
 					"id":         51,
 					"user":       map[string]any{"login": "reviewer"},
 					"created_at": now.Add(-19 * time.Hour).Format(time.RFC3339),
+					"body":       "This blocks the release until the token refresh is fixed.",
+					"path":       "internal/oauth/state.go",
+					"html_url":   "https://github.com/owner/repo/pull/42#discussion_r51",
 				},
+			})
+		case "/repos/owner/repo/pulls/42/files":
+			writeJSON(t, w, []map[string]any{
+				{"filename": "internal/oauth/state.go", "status": "modified", "additions": 42, "deletions": 3, "changes": 45},
+				{"filename": "docs/setup.md", "status": "modified", "additions": 4, "deletions": 0, "changes": 4},
 			})
 		case "/repos/owner/repo/commits/abc123/check-runs":
 			writeJSON(t, w, map[string]any{
@@ -264,5 +274,82 @@ func writeJSON(t *testing.T, w http.ResponseWriter, payload any) {
 	w.Header().Set("content-type", "application/json")
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGitHubPullRequestRecordCarriesFilesAndComments(t *testing.T) {
+	now := time.Now().UTC()
+	pull := githubPullRequest{
+		Number:    42,
+		State:     "open",
+		Title:     "Refresh OAuth tokens",
+		HTMLURL:   "https://github.com/owner/repo/pull/42",
+		User:      githubUser{Login: "guilherme"},
+		CreatedAt: now.Add(-48 * time.Hour),
+		UpdatedAt: now.Add(-1 * time.Hour),
+	}
+	comments := []githubPullReviewComment{{
+		User:      githubUser{Login: "reviewer"},
+		CreatedAt: now.Add(-2 * time.Hour),
+		Body:      "This blocks the release.",
+		Path:      "internal/oauth/state.go",
+		HTMLURL:   "https://github.com/owner/repo/pull/42#discussion_r1",
+	}}
+	files := []githubPullFile{
+		{Filename: "internal/oauth/state.go", Status: "modified", Additions: 42, Deletions: 3, Changes: 45},
+		{Filename: "docs/setup.md", Status: "modified", Additions: 4, Changes: 4},
+	}
+
+	record := pull.toRecord("owner/repo", nil, comments, files)
+
+	storedFiles, ok := record.Payload["files"].([]map[string]any)
+	if !ok || len(storedFiles) != 2 {
+		t.Fatalf("expected 2 stored files, got %v", record.Payload["files"])
+	}
+	if storedFiles[0]["filename"] != "internal/oauth/state.go" {
+		t.Fatalf("unexpected first file: %v", storedFiles[0])
+	}
+
+	storedComments, ok := record.Payload["comments"].([]map[string]any)
+	if !ok || len(storedComments) != 1 {
+		t.Fatalf("expected 1 stored comment, got %v", record.Payload["comments"])
+	}
+	if storedComments[0]["body"] != "This blocks the release." {
+		t.Fatalf("comment body was not carried: %v", storedComments[0])
+	}
+
+	metrics := record.Payload["metrics"].(map[string]any)
+	if metrics["fileCount"] != 2 {
+		t.Fatalf("expected fileCount 2, got %v", metrics["fileCount"])
+	}
+}
+
+func TestGitHubPullRequestRecordBoundsStoredPayload(t *testing.T) {
+	files := make([]githubPullFile, githubMaxStoredFiles+15)
+	for i := range files {
+		files[i] = githubPullFile{Filename: fmt.Sprintf("file-%d.go", i)}
+	}
+	comments := make([]githubPullReviewComment, githubMaxStoredComments+5)
+	for i := range comments {
+		comments[i] = githubPullReviewComment{Body: strings.Repeat("x", githubMaxCommentBody+200)}
+	}
+
+	record := githubPullRequest{Number: 1}.toRecord("owner/repo", nil, comments, files)
+
+	if got := len(record.Payload["files"].([]map[string]any)); got != githubMaxStoredFiles {
+		t.Fatalf("expected files capped at %d, got %d", githubMaxStoredFiles, got)
+	}
+	if got := len(record.Payload["comments"].([]map[string]any)); got != githubMaxStoredComments {
+		t.Fatalf("expected comments capped at %d, got %d", githubMaxStoredComments, got)
+	}
+
+	metrics := record.Payload["metrics"].(map[string]any)
+	if metrics["fileCount"] != len(files) {
+		t.Fatalf("fileCount should report the true total, got %v", metrics["fileCount"])
+	}
+
+	body := record.Payload["comments"].([]map[string]any)[0]["body"].(string)
+	if len(body) != githubMaxCommentBody {
+		t.Fatalf("expected comment body truncated to %d, got %d", githubMaxCommentBody, len(body))
 	}
 }

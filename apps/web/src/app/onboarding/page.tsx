@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2, PlugZap, RefreshCw, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BrandIcon } from "@/features/integrations/icons";
 import { Card } from "@/components/ui/card";
 import { HeaderAuthControl } from "@/components/auth/header-auth-control";
 import { getIntegrationCatalogItem, integrationCatalog } from "@/features/integrations/catalog";
@@ -155,14 +156,13 @@ export default async function OnboardingPage({
               const connection = connections.get(integration.id);
               const status = connection?.status ?? "available";
               const connected = status === "connected" || status === "syncing";
-              const Icon = integration.icon;
-
+  
               return (
                 <Card key={integration.id} className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-surface text-brand-primary">
-                        <Icon className="h-5 w-5" />
+                        <BrandIcon service={integration.id} size={18} />
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold">{integration.name}</p>

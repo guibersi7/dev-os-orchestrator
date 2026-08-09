@@ -72,13 +72,51 @@ function githubReason(event: WorkEvent, now: number): string {
   return "";
 }
 
+function linearReason(event: WorkEvent, now: number): string {
+  const age = agePhrase(event, now);
+  const cycle = metadataString(event.metadata, "cycle");
+  const project = metadataString(event.metadata, "project");
+  const state = metadataString(event.metadata, "state");
+  const priorityLabel = metadataString(event.metadata, "priorityLabel");
+  const linkedRefs = Array.isArray(event.metadata.linkedRefs) ? event.metadata.linkedRefs.length : 0;
+
+  if (event.type === "linear.issue.blocked") {
+    return fitReason([
+      linkedRefs > 0 && cycle
+        ? `Parada ${age} em ${cycle}, com ${linkedRefs} ${linkedRefs === 1 ? "referência ligada" : "referências ligadas"}.`
+        : "",
+      cycle ? `Parada ${age} e o ciclo ${cycle} segue correndo.` : "",
+      `Parada ${age} esperando uma dependência.`,
+    ]);
+  }
+
+  if (event.type === "linear.issue.prioritized") {
+    return fitReason([
+      priorityLabel && cycle ? `${priorityLabel} em ${cycle}, sem movimento ${age}.` : "",
+      priorityLabel ? `${priorityLabel}, sem movimento ${age}.` : "",
+      `Priorizada, sem movimento ${age}.`,
+    ]);
+  }
+
+  if (event.type === "linear.issue.started") {
+    return fitReason([
+      project && state ? `Em ${state} no projeto ${project} ${age}.` : "",
+      state ? `Em ${state} ${age}.` : "",
+      `Movida para trabalho ativo ${age}.`,
+    ]);
+  }
+
+  return "";
+}
+
 /**
  * Falls back to the connector's own summary rather than inventing a sentence.
  * A row that cannot say why it is on screen does not belong on screen, so an
  * empty reason is a signal to the caller to drop the item.
  */
 export function buildReason(event: WorkEvent, now: number = Date.now()): string {
-  const specific = event.service === "github" ? githubReason(event, now) : "";
+  const specific =
+    event.service === "github" ? githubReason(event, now) : event.service === "linear" ? linearReason(event, now) : "";
   if (specific) {
     return specific;
   }

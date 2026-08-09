@@ -17,10 +17,12 @@ const TERMINAL_TYPES = new Set([
   "pull_request.closed",
   "issue.closed",
   "issue.completed",
+  "linear.issue.completed",
+  "linear.issue.canceled",
 ]);
 
 /** Event types that carry no obligation on their own. */
-const AMBIENT_TYPES = new Set(["issue.updated", "pull_request.reviewed"]);
+const AMBIENT_TYPES = new Set(["issue.updated", "pull_request.reviewed", "linear.issue.updated"]);
 
 export function isTerminal(event: WorkEvent): boolean {
   return TERMINAL_TYPES.has(event.type);

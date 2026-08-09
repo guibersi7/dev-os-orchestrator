@@ -143,7 +143,11 @@ func (c *GitHubConnector) fetchRecentRecordsForRepositories(ctx context.Context,
 			if err != nil {
 				return nil, err
 			}
-			records = append(records, pull.toRecord(repository, reviews, reviewComments))
+			files, err := c.fetchPullFiles(ctx, accessToken, repository, pull.Number)
+			if err != nil {
+				return nil, err
+			}
+			records = append(records, pull.toRecord(repository, reviews, reviewComments, files))
 
 			checkRuns, err := c.fetchCheckRuns(ctx, accessToken, repository, pull.Head.SHA)
 			if err != nil {
@@ -372,6 +376,22 @@ func (c *GitHubConnector) fetchPullReviews(ctx context.Context, token string, re
 	return reviews, nil
 }
 
+func (c *GitHubConnector) fetchPullFiles(ctx context.Context, token string, repository string, pullNumber int) ([]githubPullFile, error) {
+	files := []githubPullFile{}
+	for page := 1; page <= c.maxPages; page++ {
+		var pageFiles []githubPullFile
+		path := fmt.Sprintf("repos/%s/pulls/%d/files?per_page=100&page=%d", repository, pullNumber, page)
+		if err := c.get(ctx, token, path, &pageFiles); err != nil {
+			return nil, err
+		}
+		files = append(files, pageFiles...)
+		if len(pageFiles) < 100 {
+			break
+		}
+	}
+	return files, nil
+}
+
 func (c *GitHubConnector) fetchPullReviewComments(ctx context.Context, token string, repository string, pullNumber int) ([]githubPullReviewComment, error) {
 	comments := []githubPullReviewComment{}
 	for page := 1; page <= c.maxPages; page++ {
@@ -475,9 +495,70 @@ type githubPullReviewComment struct {
 	ID        int64      `json:"id"`
 	User      githubUser `json:"user"`
 	CreatedAt time.Time  `json:"created_at"`
+	Body      string     `json:"body"`
+	Path      string     `json:"path"`
+	HTMLURL   string     `json:"html_url"`
 }
 
-func (p githubPullRequest) toRecord(repository string, reviews []githubPullReview, reviewComments []githubPullReviewComment) domain.ExternalRecord {
+type githubPullFile struct {
+	Filename  string `json:"filename"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Changes   int    `json:"changes"`
+}
+
+// The detail screen shows a handful of files and comments and states how many
+// it left out, so the payload carries a bounded sample rather than everything.
+const (
+	githubMaxStoredFiles    = 40
+	githubMaxStoredComments = 20
+	githubMaxCommentBody    = 600
+)
+
+// githubFilePayload keeps only what the briefing renders, so the stored payload
+// does not grow with the diff itself.
+func githubFilePayload(files []githubPullFile) []map[string]any {
+	out := make([]map[string]any, 0, len(files))
+	for i, file := range files {
+		if i >= githubMaxStoredFiles {
+			break
+		}
+		out = append(out, map[string]any{
+			"filename":  file.Filename,
+			"status":    file.Status,
+			"additions": file.Additions,
+			"deletions": file.Deletions,
+			"changes":   file.Changes,
+		})
+	}
+	return out
+}
+
+func githubCommentPayload(comments []githubPullReviewComment) []map[string]any {
+	out := make([]map[string]any, 0, len(comments))
+	for i, comment := range comments {
+		if i >= githubMaxStoredComments {
+			break
+		}
+
+		body := comment.Body
+		if len(body) > githubMaxCommentBody {
+			body = body[:githubMaxCommentBody]
+		}
+
+		out = append(out, map[string]any{
+			"author":    comment.User.Login,
+			"body":      body,
+			"path":      comment.Path,
+			"url":       comment.HTMLURL,
+			"createdAt": comment.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return out
+}
+
+func (p githubPullRequest) toRecord(repository string, reviews []githubPullReview, reviewComments []githubPullReviewComment, files []githubPullFile) domain.ExternalRecord {
 	eventType := "pull_request.opened"
 	priority := "medium"
 	summary := "A pull request changed and may need attention."
@@ -517,6 +598,8 @@ func (p githubPullRequest) toRecord(repository string, reviews []githubPullRevie
 			"number":     p.Number,
 			"state":      p.State,
 			"url":        p.HTMLURL,
+			"files":      githubFilePayload(files),
+			"comments":   githubCommentPayload(reviewComments),
 			"metrics": map[string]any{
 				"reviewCount":            len(reviews),
 				"reviewCommentCount":     len(reviewComments),
@@ -524,6 +607,10 @@ func (p githubPullRequest) toRecord(repository string, reviews []githubPullRevie
 				"reviewers":              reviewers,
 				"leadTimeHours":          leadTimeHours,
 				"timeToFirstReviewHours": timeToFirstReviewHours,
+				// Totals stay separate from the stored sample so the UI can say
+				// how much it is not showing.
+				"fileCount":       len(files),
+				"storedFileCount": min(len(files), githubMaxStoredFiles),
 			},
 		},
 	}
