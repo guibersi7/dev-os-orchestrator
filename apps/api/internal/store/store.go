@@ -165,9 +165,11 @@ func (s *MemoryStore) GetDashboard(_ context.Context, ctx domain.GatewayContext)
 
 func (s *MemoryStore) GetAgentContext(_ context.Context, ctx domain.GatewayContext, query string) (domain.AgentContext, error) {
 	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	analysis := analyzeAgentQuery(query)
 	return domain.AgentContext{
-		Events:         rankWorkEvents(s.events[ctx.WorkspaceID], query, 20),
-		DocumentChunks: rankDocumentChunks(s.documentChunks[ctx.WorkspaceID], query, 10),
+		QueryUnderstanding: analysis.domain(),
+		Events:             rankWorkEvents(s.events[ctx.WorkspaceID], analysis, 20),
+		DocumentChunks:     rankDocumentChunks(s.documentChunks[ctx.WorkspaceID], analysis, 10),
 	}, nil
 }
 
@@ -575,6 +577,7 @@ func (s *SupabaseStore) GetDashboard(ctx context.Context, gatewayCtx domain.Gate
 }
 
 func (s *SupabaseStore) GetAgentContext(ctx context.Context, gatewayCtx domain.GatewayContext, query string) (domain.AgentContext, error) {
+	analysis := analyzeAgentQuery(query)
 	var eventRows []struct {
 		ID         string         `json:"id"`
 		ExternalID string         `json:"external_id"`
@@ -623,7 +626,10 @@ func (s *SupabaseStore) GetAgentContext(ctx context.Context, gatewayCtx domain.G
 	}
 	chunkPath := "document_chunks?select=id,external_id,service,title,source,url,content,metadata,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&order=updated_at.desc&limit=50"
 	if err := s.rest(ctx, http.MethodGet, chunkPath, nil, &chunkRows); err != nil {
-		return domain.AgentContext{Events: rankWorkEvents(events, query, 20)}, nil
+		return domain.AgentContext{
+			QueryUnderstanding: analysis.domain(),
+			Events:             rankWorkEvents(events, analysis, 20),
+		}, nil
 	}
 
 	chunks := make([]domain.DocumentChunk, 0, len(chunkRows))
@@ -642,8 +648,9 @@ func (s *SupabaseStore) GetAgentContext(ctx context.Context, gatewayCtx domain.G
 	}
 
 	return domain.AgentContext{
-		Events:         rankWorkEvents(events, query, 20),
-		DocumentChunks: rankDocumentChunks(chunks, query, 10),
+		QueryUnderstanding: analysis.domain(),
+		Events:             rankWorkEvents(events, analysis, 20),
+		DocumentChunks:     rankDocumentChunks(chunks, analysis, 10),
 	}, nil
 }
 
@@ -1382,13 +1389,42 @@ func allServices() []domain.Service {
 	}
 }
 
-func rankWorkEvents(events []domain.WorkEvent, query string, limit int) []domain.WorkEvent {
-	terms := searchTerms(query)
-	serviceIntent := detectServiceIntent(query)
+type agentQueryAnalysis struct {
+	terms       []string
+	services    map[domain.Service]bool
+	serviceMode string
+	intents     map[string]bool
+	timeWindow  string
+	language    string
+}
+
+func (a agentQueryAnalysis) domain() domain.AgentQueryUnderstanding {
+	services := make([]domain.Service, 0, len(a.services))
+	for _, service := range allServices() {
+		if a.services[service] {
+			services = append(services, service)
+		}
+	}
+	intents := make([]string, 0, len(a.intents))
+	for _, intent := range []string{"summary", "decision", "blocker", "failed_check", "review", "pull_request", "issue", "release", "meeting", "recent"} {
+		if a.intents[intent] {
+			intents = append(intents, intent)
+		}
+	}
+	return domain.AgentQueryUnderstanding{
+		Services:    services,
+		ServiceMode: a.serviceMode,
+		Intents:     intents,
+		TimeWindow:  a.timeWindow,
+		Language:    a.language,
+	}
+}
+
+func rankWorkEvents(events []domain.WorkEvent, analysis agentQueryAnalysis, limit int) []domain.WorkEvent {
 	ranked := append([]domain.WorkEvent(nil), events...)
 	sort.SliceStable(ranked, func(i, j int) bool {
-		left := scoreWorkEvent(terms, serviceIntent, ranked[i])
-		right := scoreWorkEvent(terms, serviceIntent, ranked[j])
+		left := scoreWorkEvent(analysis, ranked[i])
+		right := scoreWorkEvent(analysis, ranked[j])
 		if left != right {
 			return left > right
 		}
@@ -1400,13 +1436,11 @@ func rankWorkEvents(events []domain.WorkEvent, query string, limit int) []domain
 	return ranked
 }
 
-func rankDocumentChunks(chunks []domain.DocumentChunk, query string, limit int) []domain.DocumentChunk {
-	terms := searchTerms(query)
-	serviceIntent := detectServiceIntent(query)
+func rankDocumentChunks(chunks []domain.DocumentChunk, analysis agentQueryAnalysis, limit int) []domain.DocumentChunk {
 	ranked := append([]domain.DocumentChunk(nil), chunks...)
 	sort.SliceStable(ranked, func(i, j int) bool {
-		left := scoreDocumentChunk(terms, serviceIntent, ranked[i])
-		right := scoreDocumentChunk(terms, serviceIntent, ranked[j])
+		left := scoreDocumentChunk(analysis, ranked[i])
+		right := scoreDocumentChunk(analysis, ranked[j])
 		if left != right {
 			return left > right
 		}
@@ -1433,26 +1467,23 @@ func searchTerms(query string) []string {
 	return terms
 }
 
-func scoreWorkEvent(terms []string, serviceIntent map[domain.Service]bool, event domain.WorkEvent) int {
-	score := scoreText(terms, event.Title+" "+event.Summary+" "+event.Type+" "+event.Source)
-	if len(serviceIntent) == 0 {
-		return score
+func scoreWorkEvent(analysis agentQueryAnalysis, event domain.WorkEvent) int {
+	score := scoreText(analysis.terms, event.Title+" "+event.Summary+" "+event.Type+" "+event.Source)
+	score += scoreService(analysis, event.Service)
+	score += scoreIntent(analysis, event.Type+" "+event.Title+" "+event.Summary)
+	score += scoreTimeWindow(analysis, event.OccurredAt)
+	if event.Priority == "high" && (analysis.intents["blocker"] || analysis.intents["failed_check"] || analysis.intents["release"]) {
+		score += 6
 	}
-	if serviceIntent[event.Service] {
-		return score + 100
-	}
-	return score - 25
+	return score
 }
 
-func scoreDocumentChunk(terms []string, serviceIntent map[domain.Service]bool, chunk domain.DocumentChunk) int {
-	score := scoreText(terms, chunk.Title+" "+chunk.Content+" "+chunk.Source)
-	if len(serviceIntent) == 0 {
-		return score
-	}
-	if serviceIntent[chunk.Service] {
-		return score + 100
-	}
-	return score - 25
+func scoreDocumentChunk(analysis agentQueryAnalysis, chunk domain.DocumentChunk) int {
+	score := scoreText(analysis.terms, chunk.Title+" "+chunk.Content+" "+chunk.Source)
+	score += scoreService(analysis, chunk.Service)
+	score += scoreIntent(analysis, chunk.Title+" "+chunk.Content)
+	score += scoreTimeWindow(analysis, chunk.UpdatedAt)
+	return score
 }
 
 func scoreText(terms []string, text string) int {
@@ -1469,7 +1500,8 @@ func scoreText(terms []string, text string) int {
 	return score
 }
 
-func detectServiceIntent(query string) map[domain.Service]bool {
+func analyzeAgentQuery(query string) agentQueryAnalysis {
+	terms := searchTerms(query)
 	normalized := strings.ToLower(query)
 	normalized = strings.NewReplacer("-", " ", "_", " ", ".", " ", ",", " ", "?", " ", "!", " ", ":", " ").Replace(normalized)
 	words := map[string]bool{}
@@ -1477,17 +1509,165 @@ func detectServiceIntent(query string) map[domain.Service]bool {
 		words[word] = true
 	}
 
-	intents := map[domain.Service]bool{}
+	services := map[domain.Service]bool{}
 	for _, service := range allServices() {
 		if words[string(service)] {
-			intents[service] = true
+			services[service] = true
 		}
 	}
 	if words["github"] || words["git"] || words["pr"] || words["prs"] || words["pull"] {
-		intents[domain.ServiceGitHub] = true
+		services[domain.ServiceGitHub] = true
 	}
 	if words["meet"] || words["meeting"] || words["calendar"] || words["agenda"] || words["calendario"] || words["calendário"] {
-		intents[domain.ServiceCalendar] = true
+		services[domain.ServiceCalendar] = true
+	}
+
+	return agentQueryAnalysis{
+		terms:       terms,
+		services:    services,
+		serviceMode: detectServiceMode(normalized, services),
+		intents:     detectIntentWords(words, normalized),
+		timeWindow:  detectTimeWindow(words, normalized),
+		language:    detectLanguage(normalized),
+	}
+}
+
+func detectServiceMode(normalized string, services map[domain.Service]bool) string {
+	if len(services) == 0 {
+		return "none"
+	}
+	for _, service := range allServices() {
+		if !services[service] {
+			continue
+		}
+		name := string(service)
+		for _, marker := range []string{"sobre " + name, "relacionado a " + name, "relacionados a " + name, "que mencionam " + name, "mention " + name, "about " + name} {
+			if strings.Contains(normalized, marker) {
+				return "topic"
+			}
+		}
+	}
+	return "source"
+}
+
+func detectIntentWords(words map[string]bool, normalized string) map[string]bool {
+	intents := map[string]bool{}
+	if words["resumo"] || words["sumario"] || words["sumário"] || words["summary"] || strings.Contains(normalized, "o que aconteceu") {
+		intents["summary"] = true
+	}
+	if words["decisao"] || words["decisão"] || words["decisoes"] || words["decisões"] || words["decision"] || words["decided"] {
+		intents["decision"] = true
+	}
+	if words["bloqueio"] || words["bloqueado"] || words["bloqueia"] || words["blocker"] || words["blocked"] {
+		intents["blocker"] = true
+	}
+	if words["falhou"] || words["falhando"] || words["failed"] || words["check"] || words["checks"] || words["ci"] {
+		intents["failed_check"] = true
+	}
+	if words["review"] || words["revisao"] || words["revisão"] || words["aprovar"] || words["approval"] {
+		intents["review"] = true
+	}
+	if words["pr"] || words["prs"] || strings.Contains(normalized, "pull request") {
+		intents["pull_request"] = true
+	}
+	if words["issue"] || words["issues"] || words["ticket"] || words["tickets"] {
+		intents["issue"] = true
+	}
+	if words["release"] || words["deploy"] || words["producao"] || words["produção"] {
+		intents["release"] = true
+	}
+	if words["meeting"] || words["reuniao"] || words["reunião"] || words["agenda"] {
+		intents["meeting"] = true
+	}
+	if words["recente"] || words["recentes"] || words["latest"] || words["ultimo"] || words["último"] {
+		intents["recent"] = true
 	}
 	return intents
+}
+
+func detectTimeWindow(words map[string]bool, normalized string) string {
+	switch {
+	case words["hoje"] || words["today"]:
+		return "today"
+	case words["ontem"] || words["yesterday"]:
+		return "yesterday"
+	case words["semana"] || strings.Contains(normalized, "this week") || strings.Contains(normalized, "essa semana"):
+		return "week"
+	case words["mes"] || words["mês"] || words["month"]:
+		return "month"
+	default:
+		return "recent"
+	}
+}
+
+func detectLanguage(normalized string) string {
+	if strings.Contains(normalized, " o ") || strings.Contains(normalized, " que ") || strings.Contains(normalized, " no ") || strings.Contains(normalized, " hoje") {
+		return "pt-BR"
+	}
+	return "auto"
+}
+
+func scoreService(analysis agentQueryAnalysis, service domain.Service) int {
+	if len(analysis.services) == 0 || analysis.serviceMode == "topic" {
+		return 0
+	}
+	if analysis.services[service] {
+		return 100
+	}
+	return -30
+}
+
+func scoreIntent(analysis agentQueryAnalysis, text string) int {
+	text = strings.ToLower(text)
+	score := 0
+	matches := map[string][]string{
+		"decision":     {"decision", "decisão", "decisao", "decided", "slack.decision", "notion.decision"},
+		"blocker":      {"blocked", "blocker", "bloqueado", "bloqueio", "dependency"},
+		"failed_check": {"check.failed", "failed", "failure", "ci", "checks"},
+		"review":       {"review", "review_requested", "approval", "aprovar", "revisão", "revisao"},
+		"pull_request": {"pull_request", "pr ", "merge"},
+		"issue":        {"issue", "ticket", "linear.issue", "jira.ticket"},
+		"release":      {"release", "deploy", "produção", "producao"},
+		"meeting":      {"calendar", "meeting", "reunião", "reuniao"},
+	}
+	for intent, needles := range matches {
+		if !analysis.intents[intent] {
+			continue
+		}
+		for _, needle := range needles {
+			if strings.Contains(text, needle) {
+				score += 12
+				break
+			}
+		}
+	}
+	return score
+}
+
+func scoreTimeWindow(analysis agentQueryAnalysis, occurredAt time.Time) int {
+	if occurredAt.IsZero() {
+		return 0
+	}
+	age := time.Since(occurredAt)
+	switch analysis.timeWindow {
+	case "today":
+		if age >= 0 && age <= 24*time.Hour {
+			return 20
+		}
+		return -10
+	case "yesterday":
+		if age >= 24*time.Hour && age <= 48*time.Hour {
+			return 20
+		}
+		return -5
+	case "week":
+		if age >= 0 && age <= 7*24*time.Hour {
+			return 10
+		}
+	case "month":
+		if age >= 0 && age <= 31*24*time.Hour {
+			return 6
+		}
+	}
+	return 0
 }

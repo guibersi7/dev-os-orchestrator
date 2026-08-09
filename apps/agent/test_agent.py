@@ -5,7 +5,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from agent.server import AgentHandler
-from agent.service import _chat_completions_url, _rank_citations, create_response
+from agent.service import _chat_completions_url, _clean_answer, _rank_citations, create_response
 
 
 class AgentServiceTest(unittest.TestCase):
@@ -14,7 +14,7 @@ class AgentServiceTest(unittest.TestCase):
 
         self.assertEqual(response["confidence"], "low")
         self.assertEqual(response["citations"], [])
-        self.assertIn("did not find enough", response["answer"])
+        self.assertIn("não encontrei contexto suficiente", response["answer"].lower())
 
     def test_fallback_returns_ranked_citation(self) -> None:
         response = create_response(
@@ -137,6 +137,38 @@ class AgentServiceTest(unittest.TestCase):
         )
 
         self.assertEqual(citations[0]["service"], "slack")
+
+    def test_rank_citations_allows_topic_queries_across_services(self) -> None:
+        citations = _rank_citations(
+            "o que temos sobre Slack Connect?",
+            [
+                {
+                    "id": "jira-1",
+                    "service": "jira",
+                    "title": "Plano sobre Slack Connect",
+                    "summary": "Ticket com detalhes do rollout.",
+                    "source": "Jira",
+                    "occurredAt": "2026-08-08T12:05:00Z",
+                },
+                {
+                    "id": "slack-1",
+                    "service": "slack",
+                    "title": "Mensagem operacional",
+                    "summary": "Sem relação direta.",
+                    "source": "#ops",
+                    "occurredAt": "2026-08-08T12:00:00Z",
+                },
+            ],
+            [],
+        )
+
+        self.assertEqual(citations[0]["id"], "jira-1")
+
+    def test_clean_answer_removes_boilerplate_and_clips_long_output(self) -> None:
+        answer = _clean_answer("Com base no contexto fornecido, " + ("detalhe " * 100))
+
+        self.assertNotIn("Com base no contexto fornecido", answer)
+        self.assertLessEqual(len(answer), 450)
 
 
 class AgentHandlerTest(unittest.TestCase):

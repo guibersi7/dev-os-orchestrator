@@ -291,7 +291,16 @@ type AgentChatResponse struct {
 	Model            string                 `json:"model"`
 }
 
+type AgentQueryUnderstanding struct {
+	Services    []Service `json:"services"`
+	ServiceMode string    `json:"serviceMode"`
+	Intents     []string  `json:"intents"`
+	TimeWindow  string    `json:"timeWindow"`
+	Language    string    `json:"language"`
+}
+
 type AgentContext struct {
-	Events         []WorkEvent     `json:"events"`
-	DocumentChunks []DocumentChunk `json:"documentChunks"`
+	QueryUnderstanding AgentQueryUnderstanding `json:"queryUnderstanding"`
+	Events             []WorkEvent             `json:"events"`
+	DocumentChunks     []DocumentChunk         `json:"documentChunks"`
 }
