@@ -98,19 +98,36 @@ function substantial(comments: ReviewComment[]): ReviewComment[] {
   return [...comments].sort((a, b) => b.body.length - a.body.length).slice(0, 3);
 }
 
+/**
+ * The stable identity of the external item behind an event. Each connector
+ * names it differently — GitHub by repository and number, Linear by issue
+ * identifier — so adding a source means adding a key here, not a new screen.
+ */
+export function itemKey(event: WorkEvent): string | null {
+  const identifier = metadataString(event.metadata, "identifier");
+  if (identifier) {
+    return `${event.service}:${identifier}`;
+  }
+
+  const repository = metadataString(event.metadata, "repository");
+  const number = metadataNumber(event.metadata, "number") ?? metadataNumber(event.metadata, "pullNumber");
+  if (repository && number !== undefined) {
+    return `${event.service}:${repository}#${number}`;
+  }
+
+  // Without a stable key the event stands alone rather than being lumped in
+  // with everything else that also lacks one.
+  return null;
+}
+
 /** Events about the same PR, issue or card, regardless of which event type produced them. */
 export function relatedEvents(events: WorkEvent[], subject: WorkEvent): WorkEvent[] {
-  const repository = metadataString(subject.metadata, "repository");
-  const number = metadataNumber(subject.metadata, "number") ?? metadataNumber(subject.metadata, "pullNumber");
+  const key = itemKey(subject);
 
   return events
     .filter((event) => {
       if (event.id === subject.id) return true;
-      if (event.service !== subject.service) return false;
-      if (metadataString(event.metadata, "repository") !== repository) return false;
-
-      const candidate = metadataNumber(event.metadata, "number") ?? metadataNumber(event.metadata, "pullNumber");
-      return candidate !== undefined && candidate === number;
+      return key !== null && itemKey(event) === key;
     })
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 }

@@ -18,9 +18,12 @@ export type QueueItem = {
 
 const SEVERITY: Record<string, number> = {
   "check.failed": 100,
+  "linear.issue.blocked": 90,
   "review.requested": 60,
   "pull_request.opened": 45,
   "issue.assigned": 40,
+  "linear.issue.prioritized": 40,
+  "linear.issue.started": 25,
 };
 
 const PRIORITY_WEIGHT: Record<WorkEventPriority, number> = { high: 20, medium: 10, low: 0 };

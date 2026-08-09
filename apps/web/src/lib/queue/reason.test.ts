@@ -72,3 +72,51 @@ describe("fitReason", () => {
     expect(fitReason(["", "  ", "válido"])).toBe("válido");
   });
 });
+
+describe("buildReason for Linear", () => {
+  function linear(overrides: Partial<WorkEvent> = {}): WorkEvent {
+    return event({
+      service: "linear",
+      type: "linear.issue.blocked",
+      title: "DEV-18 Rate limit strategy",
+      summary: "A Linear issue appears blocked or waiting on a dependency.",
+      source: "Linear · DEV",
+      metadata: { identifier: "DEV-18", cycle: "Sprint 1", state: "Blocked" },
+      ...overrides,
+    });
+  }
+
+  it("names the cycle a blocked issue is holding up", () => {
+    expect(buildReason(linear(), NOW)).toBe("Parada há 2d e o ciclo Sprint 1 segue correndo.");
+  });
+
+  it("counts linked references when the connector found them", () => {
+    const reason = buildReason(
+      linear({ metadata: { identifier: "DEV-18", cycle: "Sprint 1", linkedRefs: ["#42", "#44"] } }),
+      NOW,
+    );
+    expect(reason).toBe("Parada há 2d em Sprint 1, com 2 referências ligadas.");
+  });
+
+  it("degrades when there is no cycle", () => {
+    expect(buildReason(linear({ metadata: { identifier: "DEV-18" } }), NOW)).toBe(
+      "Parada há 2d esperando uma dependência.",
+    );
+  });
+
+  it("uses the priority label for a prioritized issue", () => {
+    const reason = buildReason(
+      linear({
+        type: "linear.issue.prioritized",
+        metadata: { identifier: "DEV-21", priorityLabel: "Urgent", cycle: "Sprint 1" },
+      }),
+      NOW,
+    );
+    expect(reason).toBe("Urgent em Sprint 1, sem movimento há 2d.");
+  });
+
+  it("never falls back to the connector's English summary", () => {
+    const reason = buildReason(linear(), NOW);
+    expect(reason).not.toContain("Linear issue");
+  });
+});
