@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import type { CommandItem } from "@/features/command/search";
 import { KIND_LABELS, groupByKind, searchCommands } from "@/features/command/search";
+import { loadQueueCommands } from "@/app/(workspace)/queue-commands";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,7 +18,20 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
+  // Queue rows arrive after the first paint, so ⌘K never waits on the gateway.
+  const [queueItems, setQueueItems] = useState<CommandItem[]>([]);
+  const requested = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  function loadQueue() {
+    if (requested.current) return;
+    requested.current = true;
+    // A palette without queue rows is still a working palette, so a failure
+    // here is silent rather than an error state over the navigation.
+    void loadQueueCommands()
+      .then(setQueueItems)
+      .catch(() => setQueueItems([]));
+  }
 
   // Opening always starts from a clean query, so the reset lives with the
   // action rather than in an effect watching `open`.
@@ -25,6 +39,7 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
     setQuery("");
     setCursor(0);
     setOpen(true);
+    loadQueue();
   }
 
   useEffect(() => {
@@ -35,6 +50,7 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
           if (current) return false;
           setQuery("");
           setCursor(0);
+          loadQueue();
           return true;
         });
         return;
@@ -49,7 +65,8 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const results = useMemo(() => searchCommands(items, query), [items, query]);
+  const all = useMemo(() => [...items, ...queueItems], [items, queueItems]);
+  const results = useMemo(() => searchCommands(all, query), [all, query]);
   const rows = useMemo(() => {
     // Free text always has somewhere to go: the last row hands it to chat.
     if (!query.trim()) return results;

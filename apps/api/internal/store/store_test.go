@@ -41,6 +41,53 @@ func TestMemoryStoreDeduplicatesWorkEventsByServiceAndExternalID(t *testing.T) {
 	}
 }
 
+func TestAgentContextPrioritizesExplicitServiceIntent(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	now := time.Now().UTC()
+	events := []domain.WorkEvent{
+		{
+			ID:         "jira-slack-mention",
+			ExternalID: "jira-slack-mention",
+			Service:    domain.ServiceJira,
+			Type:       "jira.ticket.updated",
+			Title:      "Ticket mentions Slack rollout",
+			Source:     "Jira",
+			Actor:      "Jira",
+			Priority:   "medium",
+			Summary:    "This Jira ticket contains the word Slack several times.",
+			OccurredAt: now.Add(2 * time.Minute),
+		},
+		{
+			ID:         "slack-decision",
+			ExternalID: "slack-decision",
+			Service:    domain.ServiceSlack,
+			Type:       "slack.decision",
+			Title:      "Release scope decision",
+			Source:     "#release",
+			Actor:      "Ana",
+			Priority:   "high",
+			Summary:    "The team decided to hold release scope.",
+			OccurredAt: now,
+		},
+	}
+	if err := store.SaveWorkEvents(context.Background(), ctx, events); err != nil {
+		t.Fatal(err)
+	}
+
+	agentContext, err := store.GetAgentContext(context.Background(), ctx, "o que foi decidido no Slack?")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(agentContext.Events) < 2 {
+		t.Fatalf("expected agent context events, got %#v", agentContext.Events)
+	}
+	if agentContext.Events[0].Service != domain.ServiceSlack {
+		t.Fatalf("expected explicit Slack intent to rank Slack first, got %#v", agentContext.Events[:2])
+	}
+}
+
 func TestMemoryStorePersistsSyncResult(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
