@@ -86,6 +86,101 @@ func TestAgentContextPrioritizesExplicitServiceIntent(t *testing.T) {
 	if agentContext.Events[0].Service != domain.ServiceSlack {
 		t.Fatalf("expected explicit Slack intent to rank Slack first, got %#v", agentContext.Events[:2])
 	}
+	if agentContext.QueryUnderstanding.ServiceMode != "source" {
+		t.Fatalf("expected Slack to be understood as a source query, got %#v", agentContext.QueryUnderstanding)
+	}
+}
+
+func TestAgentContextTreatsAboutServiceAsTopicIntent(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	now := time.Now().UTC()
+	if err := store.SaveWorkEvents(context.Background(), ctx, []domain.WorkEvent{
+		{
+			ID:         "jira-slack-topic",
+			ExternalID: "jira-slack-topic",
+			Service:    domain.ServiceJira,
+			Type:       "jira.ticket.updated",
+			Title:      "Plano sobre Slack Connect",
+			Source:     "Jira",
+			Actor:      "Rafa",
+			Priority:   "medium",
+			Summary:    "Ticket descreve impacto sobre Slack Connect.",
+			OccurredAt: now,
+		},
+		{
+			ID:         "slack-unrelated",
+			ExternalID: "slack-unrelated",
+			Service:    domain.ServiceSlack,
+			Type:       "slack.message",
+			Title:      "Mensagem operacional",
+			Source:     "#ops",
+			Actor:      "Ana",
+			Priority:   "low",
+			Summary:    "Sem relação com Slack Connect.",
+			OccurredAt: now.Add(-time.Hour),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	agentContext, err := store.GetAgentContext(context.Background(), ctx, "o que temos sobre Slack Connect?")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if agentContext.QueryUnderstanding.ServiceMode != "topic" {
+		t.Fatalf("expected topic service mode, got %#v", agentContext.QueryUnderstanding)
+	}
+	if agentContext.Events[0].ID != "jira-slack-topic" {
+		t.Fatalf("expected topic query to allow non-Slack result first, got %#v", agentContext.Events[:2])
+	}
+}
+
+func TestAgentContextPrioritizesIntentAndTimeWindow(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := domain.GatewayContext{WorkspaceID: "workspace", UserID: "user"}
+	now := time.Now().UTC()
+	if err := store.SaveWorkEvents(context.Background(), ctx, []domain.WorkEvent{
+		{
+			ID:         "old-decision",
+			ExternalID: "old-decision",
+			Service:    domain.ServiceSlack,
+			Type:       "slack.decision",
+			Title:      "Old decision",
+			Source:     "#release",
+			Actor:      "Ana",
+			Priority:   "medium",
+			Summary:    "Decision from last week.",
+			OccurredAt: now.AddDate(0, 0, -8),
+		},
+		{
+			ID:         "today-decision",
+			ExternalID: "today-decision",
+			Service:    domain.ServiceSlack,
+			Type:       "slack.decision",
+			Title:      "Today release decision",
+			Source:     "#release",
+			Actor:      "Ana",
+			Priority:   "high",
+			Summary:    "Decision made today.",
+			OccurredAt: now.Add(-2 * time.Hour),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	agentContext, err := store.GetAgentContext(context.Background(), ctx, "quais decisões do Slack hoje?")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if agentContext.QueryUnderstanding.TimeWindow != "today" {
+		t.Fatalf("expected today time window, got %#v", agentContext.QueryUnderstanding)
+	}
+	if agentContext.Events[0].ID != "today-decision" {
+		t.Fatalf("expected today's decision first, got %#v", agentContext.Events[:2])
+	}
 }
 
 func TestMemoryStorePersistsSyncResult(t *testing.T) {

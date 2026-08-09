@@ -10,13 +10,14 @@ def create_response(payload: dict[str, Any]) -> dict[str, Any]:
     context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
     events = _list(context.get("events"))
     chunks = _list(context.get("documentChunks"))
+    understanding = context.get("queryUnderstanding") if isinstance(context.get("queryUnderstanding"), dict) else {}
     citations = _rank_citations(message, events, chunks)
 
-    model_response = _call_model(message, events, chunks, citations)
+    model_response = _call_model(message, events, chunks, citations, understanding)
     if model_response:
         return _normalize_model_response(model_response, citations)
 
-    return _fallback_response(message, citations)
+    return _fallback_response(message, citations, understanding)
 
 
 def _call_model(
@@ -24,6 +25,7 @@ def _call_model(
     events: list[dict[str, Any]],
     chunks: list[dict[str, Any]],
     citations: list[dict[str, Any]],
+    understanding: dict[str, Any],
 ) -> dict[str, Any] | None:
     base_url = os.getenv("AGENT_MODEL_BASE_URL", "").rstrip("/")
     if not base_url:
@@ -35,10 +37,16 @@ def _call_model(
     prompt = {
         "role": "user",
         "content": (
-            "Answer the user's workspace question using only the supplied context. "
-            "If evidence is insufficient, say that clearly. Return compact JSON with "
-            "answer, citations, suggestedActions, confidence, and model.\n\n"
-            f"Question: {message}\n\n"
+            "Responda à pergunta usando somente o contexto fornecido. "
+            "Siga a queryUnderstanding: serviceMode='source' significa buscar eventos da fonte citada; "
+            "serviceMode='topic' significa buscar itens sobre o assunto, mesmo em outras ferramentas. "
+            "Responda em pt-BR quando a pergunta estiver em português. Seja amigável, direto e conciso. "
+            "O campo answer deve ter no máximo 450 caracteres, com 2 a 4 frases curtas. "
+            "Não use frases como 'com base no contexto fornecido'. "
+            "Se faltarem evidências, diga o que está faltando sincronizar ou confirmar. "
+            "Retorne apenas JSON compacto com answer, citations, suggestedActions, confidence e model.\n\n"
+            f"Pergunta: {message}\n\n"
+            f"QueryUnderstanding: {json.dumps(understanding, default=str)}\n\n"
             f"Context: {json.dumps({'events': events, 'documentChunks': chunks}, default=str)}\n\n"
             f"Allowed citations: {json.dumps(citations, default=str)}"
         ),
@@ -48,7 +56,10 @@ def _call_model(
         "messages": [
             {
                 "role": "system",
-                "content": "You are the Developer OS workspace agent. Never invent facts or citations.",
+                "content": (
+                    "Você é o agente do Standup. Fale como um assistente de trabalho: claro, humano e objetivo. "
+                    "Nunca invente fatos, fontes ou ações executadas. A UI exibirá as citações separadamente."
+                ),
             },
             prompt,
         ],
@@ -96,7 +107,7 @@ def _normalize_model_response(response: dict[str, Any], allowed_citations: list[
         citations = allowed_citations[:3]
 
     return {
-        "answer": str(response.get("answer") or "I did not find enough workspace context to answer that.").strip(),
+        "answer": _clean_answer(str(response.get("answer") or "Não encontrei contexto suficiente para responder com segurança.").strip()),
         "citations": citations,
         "suggestedActions": _suggested_actions(response.get("suggestedActions")),
         "confidence": str(response.get("confidence") or ("medium" if citations else "low")),
@@ -104,19 +115,21 @@ def _normalize_model_response(response: dict[str, Any], allowed_citations: list[
     }
 
 
-def _fallback_response(message: str, citations: list[dict[str, Any]]) -> dict[str, Any]:
+def _fallback_response(message: str, citations: list[dict[str, Any]], understanding: dict[str, Any]) -> dict[str, Any]:
     if not citations:
         return {
-            "answer": "I did not find enough workspace context to answer that yet. Sync connected tools and try again.",
+            "answer": "Ainda não encontrei contexto suficiente para responder com segurança. Sincronize as integrações relevantes e tente de novo.",
             "citations": [],
-            "suggestedActions": [{"label": "Sync connected integrations", "kind": "sync"}],
+            "suggestedActions": [{"label": "Sincronizar integrações", "kind": "sync"}],
             "confidence": "low",
             "model": "deterministic-fallback",
         }
 
-    top_titles = ", ".join(item["title"] for item in citations[:3])
+    top_titles = ", ".join(item["title"] for item in citations[:2])
+    service_mode = str(understanding.get("serviceMode", "none"))
+    qualifier = "na fonte citada" if service_mode == "source" else "sobre esse assunto"
     return {
-        "answer": f"Based on the available workspace context, the strongest related signals are: {top_titles}.",
+        "answer": f"Encontrei sinais {qualifier}: {top_titles}. Vale abrir essas fontes antes de cravar a conclusão.",
         "citations": citations[:3],
         "suggestedActions": [{"label": _action_label(message, citations[0]), "kind": "inspect"}],
         "confidence": "medium",
@@ -127,13 +140,14 @@ def _fallback_response(message: str, citations: list[dict[str, Any]]) -> dict[st
 def _rank_citations(message: str, events: list[dict[str, Any]], chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     terms = _terms(message)
     service_intents = _service_intents(message)
+    service_mode = _service_mode(message, service_intents)
     scored = []
     for event in events:
         text = " ".join(str(event.get(key, "")) for key in ("title", "summary", "type", "source"))
-        scored.append((_score(terms, text) + _service_score(service_intents, event.get("service")), event.get("occurredAt", ""), _event_citation(event)))
+        scored.append((_score(terms, text) + _service_score(service_intents, service_mode, event.get("service")), event.get("occurredAt", ""), _event_citation(event)))
     for chunk in chunks:
         text = " ".join(str(chunk.get(key, "")) for key in ("title", "content", "source"))
-        scored.append((_score(terms, text) + _service_score(service_intents, chunk.get("service")), chunk.get("updatedAt", ""), _chunk_citation(chunk)))
+        scored.append((_score(terms, text) + _service_score(service_intents, service_mode, chunk.get("service")), chunk.get("updatedAt", ""), _chunk_citation(chunk)))
 
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     citations = [item[2] for item in scored if item[2]["id"]]
@@ -183,10 +197,12 @@ def _suggested_actions(value: Any) -> list[dict[str, str]]:
 def _action_label(message: str, citation: dict[str, Any]) -> str:
     lowered = message.lower()
     if "block" in lowered or "bloque" in lowered:
-        return "Inspect blocker evidence"
+        return "Abrir evidências do bloqueio"
     if "decision" in lowered or "decis" in lowered:
-        return "Review decision context"
-    return f"Open {citation['service']} context"
+        return "Revisar decisão"
+    if "check" in lowered or "ci" in lowered or "falh" in lowered:
+        return "Ver checks falhando"
+    return f"Abrir contexto em {citation['service']}"
 
 
 def _terms(message: str) -> list[str]:
@@ -208,10 +224,33 @@ def _service_intents(message: str) -> set[str]:
     return intents
 
 
-def _service_score(service_intents: set[str], service: Any) -> int:
+def _service_mode(message: str, service_intents: set[str]) -> str:
     if not service_intents:
+        return "none"
+    normalized = message.lower()
+    for service in service_intents:
+        if f"sobre {service}" in normalized or f"about {service}" in normalized or f"relacionado a {service}" in normalized:
+            return "topic"
+    return "source"
+
+
+def _service_score(service_intents: set[str], service_mode: str, service: Any) -> int:
+    if not service_intents or service_mode == "topic":
         return 0
     return 100 if str(service).lower() in service_intents else -25
+
+
+def _clean_answer(answer: str) -> str:
+    answer = re.sub(r"\s+", " ", answer).strip()
+    for prefix in ("Com base no contexto fornecido, ", "Based on the provided context, "):
+        if answer.startswith(prefix):
+            answer = answer[len(prefix):].strip()
+    if len(answer) <= 450:
+        return answer
+    clipped = answer[:447].rstrip()
+    if "." in clipped:
+        clipped = clipped[: clipped.rfind(".") + 1]
+    return clipped or answer[:447].rstrip() + "..."
 
 
 def _list(value: Any) -> list[dict[str, Any]]:
