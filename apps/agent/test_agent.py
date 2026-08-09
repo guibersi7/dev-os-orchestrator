@@ -5,7 +5,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from agent.server import AgentHandler
-from agent.service import create_response
+from agent.service import _chat_completions_url, create_response
 
 
 class AgentServiceTest(unittest.TestCase):
@@ -50,7 +50,14 @@ class AgentServiceTest(unittest.TestCase):
             "model": "unit-model",
         }
 
-        with patch.dict("os.environ", {"AGENT_MODEL_BASE_URL": "http://model.test", "AGENT_MODEL": "unit-model"}):
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_MODEL_BASE_URL": "https://api.groq.com/openai/v1",
+                "AGENT_MODEL": "unit-model",
+                "AGENT_MODEL_API_KEY": "model-secret",
+            },
+        ):
             with patch("urllib.request.urlopen") as urlopen:
                 urlopen.return_value.__enter__.return_value.read.return_value = json.dumps(
                     {"choices": [{"message": {"content": json.dumps(model_response)}}]}
@@ -74,8 +81,11 @@ class AgentServiceTest(unittest.TestCase):
                         },
                     }
                 )
+                request = urlopen.call_args.args[0]
 
         self.assertEqual(response["model"], "unit-model")
+        self.assertEqual(request.full_url, "https://api.groq.com/openai/v1/chat/completions")
+        self.assertEqual(request.headers["Authorization"], "Bearer model-secret")
         self.assertEqual(response["citations"], [{
             "type": "work_event",
             "id": "evt-1",
@@ -83,6 +93,16 @@ class AgentServiceTest(unittest.TestCase):
             "title": "Auth checks failed",
             "url": "",
         }])
+
+    def test_chat_completions_url_supports_v1_and_root_base_urls(self) -> None:
+        self.assertEqual(
+            _chat_completions_url("https://api.groq.com/openai/v1"),
+            "https://api.groq.com/openai/v1/chat/completions",
+        )
+        self.assertEqual(
+            _chat_completions_url("http://localhost:11434"),
+            "http://localhost:11434/v1/chat/completions",
+        )
 
 
 class AgentHandlerTest(unittest.TestCase):
