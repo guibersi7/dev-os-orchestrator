@@ -1,23 +1,29 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type User } from "@supabase/supabase-js";
 import { getSupabaseAdminConfig, getSupabaseAuthConfig, isSupabaseAuthConfigured } from "@/lib/auth/config";
 
 const FALLBACK_USER_ID = process.env.NEXT_PUBLIC_USER_ID ?? "00000000-0000-4000-8000-000000000002";
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
-export async function createServerSupabaseClient() {
+function hasSupabaseAuthCookie(cookieStore: CookieStore) {
+  return cookieStore.getAll().some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token"));
+}
+
+export async function createServerSupabaseClient(cookieStore?: CookieStore) {
   const { url, publishableKey } = getSupabaseAuthConfig();
-  const cookieStore = await cookies();
+  const resolvedCookieStore = cookieStore ?? (await cookies());
 
   return createServerClient(url, publishableKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return resolvedCookieStore.getAll();
       },
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
+            resolvedCookieStore.set(name, value, options);
           });
         } catch {
           // Server Components cannot always set cookies. Middleware refreshes sessions.
@@ -51,12 +57,17 @@ export function createOtpSupabaseClient() {
   });
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   if (!isSupabaseAuthConfigured()) {
     return null;
   }
 
-  const supabase = await createServerSupabaseClient();
+  const cookieStore = await cookies();
+  if (!hasSupabaseAuthCookie(cookieStore)) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient(cookieStore);
   const { data, error } = await supabase.auth.getUser();
 
   if (error) {
@@ -64,9 +75,9 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   return data.user;
-}
+});
 
-export async function getGatewayUserId() {
+export const getGatewayUserId = cache(async function getGatewayUserId() {
   const user = await getCurrentUser();
   return user?.id ?? FALLBACK_USER_ID;
-}
+});

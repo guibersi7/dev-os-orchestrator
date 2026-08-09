@@ -6,5 +6,18 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.svg|icon-|og.svg|manifest.webmanifest).*)"],
+  matcher: [
+    "/chat/:path*",
+    "/dashboard/:path*",
+    "/integrations/:path*",
+    "/issues/:path*",
+    "/onboarding/:path*",
+    "/pull-requests/:path*",
+    "/repositories/:path*",
+    "/settings/:path*",
+    "/setup/:path*",
+    "/today/:path*",
+    "/timeline/:path*",
+    "/weekly/:path*",
+  ],
 };

@@ -4,10 +4,15 @@ import { LogOut, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signOutAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useOptionalAuth } from "@/components/auth/auth-provider";
+import type { AuthSession } from "@/lib/auth-session";
 
-export function HeaderAuthControl() {
-  const { isAuthenticated, session } = useAuth();
+const unauthenticatedSession: AuthSession = { status: "unauthenticated", user: null };
+
+export function HeaderAuthControl({ session: sessionProp }: { session?: AuthSession }) {
+  const auth = useOptionalAuth();
+  const session = sessionProp ?? auth?.session ?? unauthenticatedSession;
+  const isAuthenticated = session.status === "authenticated";
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const user = session.user;

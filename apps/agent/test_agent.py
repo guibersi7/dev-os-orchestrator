@@ -1,5 +1,6 @@
 import json
 import unittest
+from datetime import datetime, timezone, timedelta
 from http import HTTPStatus
 from io import BytesIO
 from unittest.mock import patch
@@ -40,6 +41,78 @@ class AgentServiceTest(unittest.TestCase):
         self.assertEqual(response["citations"][0]["id"], "evt-1")
         self.assertEqual(response["citations"][0]["type"], "work_event")
         self.assertEqual(response["confidence"], "medium")
+        self.assertIn("Não consegui fechar uma resposta direta", response["answer"])
+        self.assertEqual(response["suggestedActions"], [])
+
+    def test_computed_response_counts_merged_prs_today(self) -> None:
+        now = datetime.now(timezone.utc)
+        response = create_response(
+            {
+                "message": "quantas PRs mergeamos hoje?",
+                "context": {
+                    "queryUnderstanding": {
+                        "services": ["github"],
+                        "serviceMode": "source",
+                        "intents": ["pull_request"],
+                        "timeWindow": "today",
+                        "language": "pt-BR",
+                    },
+                    "events": [
+                        {
+                            "id": "merged-1",
+                            "service": "github",
+                            "type": "pull_request.merged",
+                            "title": "#19 Configure Groq model provider",
+                            "summary": "A pull request was merged into the codebase.",
+                            "source": "GitHub",
+                            "occurredAt": now.isoformat(),
+                        },
+                        {
+                            "id": "merged-2",
+                            "service": "github",
+                            "type": "pull_request.merged",
+                            "title": "#18 Build detail timeline",
+                            "summary": "A pull request was merged into the codebase.",
+                            "source": "GitHub",
+                            "occurredAt": (now - timedelta(hours=2)).isoformat(),
+                        },
+                        {
+                            "id": "old-merged",
+                            "service": "github",
+                            "type": "pull_request.merged",
+                            "title": "#17 Rebuild Today",
+                            "summary": "A pull request was merged into the codebase.",
+                            "source": "GitHub",
+                            "occurredAt": (now - timedelta(days=2)).isoformat(),
+                        },
+                    ],
+                    "documentChunks": [],
+                },
+            }
+        )
+
+        self.assertEqual(response["model"], "computed-agent")
+        self.assertEqual(response["answer"], "Hoje, 2 PRs foram mergeadas.")
+        self.assertEqual([citation["id"] for citation in response["citations"]], ["merged-1", "merged-2"])
+
+    def test_computed_response_reports_zero_merged_prs(self) -> None:
+        response = create_response(
+            {
+                "message": "quantas PRs mergeamos hoje?",
+                "context": {
+                    "queryUnderstanding": {
+                        "intents": ["pull_request"],
+                        "timeWindow": "today",
+                    },
+                    "events": [],
+                    "documentChunks": [],
+                },
+            }
+        )
+
+        self.assertEqual(response["model"], "computed-agent")
+        self.assertIn("não encontrei PRs mergeadas", response["answer"])
+        self.assertEqual(response["citations"], [])
 
     def test_model_response_citations_are_constrained_to_context(self) -> None:
         model_response = {
