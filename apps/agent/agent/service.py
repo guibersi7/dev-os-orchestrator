@@ -2,6 +2,7 @@ import json
 import os
 import re
 import urllib.request
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 
@@ -13,11 +14,61 @@ def create_response(payload: dict[str, Any]) -> dict[str, Any]:
     understanding = context.get("queryUnderstanding") if isinstance(context.get("queryUnderstanding"), dict) else {}
     citations = _rank_citations(message, events, chunks)
 
+    computed_response = _computed_response(message, events, chunks, citations, understanding)
+    if computed_response:
+        return computed_response
+
     model_response = _call_model(message, events, chunks, citations, understanding)
     if model_response:
         return _normalize_model_response(model_response, citations)
 
     return _fallback_response(message, citations, understanding)
+
+
+def _computed_response(
+    message: str,
+    events: list[dict[str, Any]],
+    chunks: list[dict[str, Any]],
+    citations: list[dict[str, Any]],
+    understanding: dict[str, Any],
+) -> dict[str, Any] | None:
+    del chunks
+    lowered = message.lower()
+    if not _asks_count(lowered):
+        return None
+
+    intents = set(_list_of_strings(understanding.get("intents")))
+    time_window = str(understanding.get("timeWindow") or _message_time_window(lowered))
+    matching_events = events
+
+    if "pull_request" in intents or "pr" in lowered or "prs" in lowered:
+        matching_events = [event for event in matching_events if _is_pull_request_event(event)]
+    if _mentions_merged(lowered):
+        matching_events = [event for event in matching_events if _is_merged_pull_request(event)]
+    if time_window != "recent":
+        matching_events = [event for event in matching_events if _matches_time_window(event.get("occurredAt"), time_window)]
+
+    if not matching_events and ("pull_request" in intents or "pr" in lowered or "prs" in lowered):
+        return {
+            "answer": _count_answer(0, lowered, time_window),
+            "citations": [],
+            "suggestedActions": [{"label": "Sincronizar GitHub", "kind": "sync"}],
+            "confidence": "medium",
+            "model": "computed-agent",
+        }
+
+    if not matching_events:
+        return None
+
+    allowed_ids = {str(event.get("id", "")) for event in matching_events}
+    scoped_citations = [citation for citation in citations if citation["id"] in allowed_ids][:3]
+    return {
+        "answer": _count_answer(len(matching_events), lowered, time_window),
+        "citations": scoped_citations,
+        "suggestedActions": [{"label": "Ver PRs mergeadas", "kind": "inspect"}],
+        "confidence": "high",
+        "model": "computed-agent",
+    }
 
 
 def _call_model(
@@ -125,13 +176,13 @@ def _fallback_response(message: str, citations: list[dict[str, Any]], understand
             "model": "deterministic-fallback",
         }
 
-    top_titles = ", ".join(item["title"] for item in citations[:2])
     service_mode = str(understanding.get("serviceMode", "none"))
-    qualifier = "na fonte citada" if service_mode == "source" else "sobre esse assunto"
+    qualifier = "nessa fonte" if service_mode == "source" else "sobre esse assunto"
+    topic = _question_topic(message)
     return {
-        "answer": f"Encontrei sinais {qualifier}: {top_titles}. Vale abrir essas fontes antes de cravar a conclusão.",
+        "answer": f"Não consegui fechar uma resposta direta sobre {topic}. Encontrei {len(citations[:3])} fontes {qualifier} que parecem relacionadas.",
         "citations": citations[:3],
-        "suggestedActions": [{"label": _action_label(message, citations[0]), "kind": "inspect"}],
+        "suggestedActions": [],
         "confidence": "medium",
         "model": "deterministic-fallback",
     }
@@ -205,6 +256,24 @@ def _action_label(message: str, citation: dict[str, Any]) -> str:
     return f"Abrir contexto em {citation['service']}"
 
 
+def _question_topic(message: str) -> str:
+    lowered = message.lower().strip(" ?!.")
+    replacements = [
+        ("quantas ", ""),
+        ("quantos ", ""),
+        ("quanto ", ""),
+        ("o que ", ""),
+        ("quais ", ""),
+        ("qual ", ""),
+        ("me diga ", ""),
+    ]
+    topic = lowered
+    for source, target in replacements:
+        if topic.startswith(source):
+            topic = target + topic[len(source):]
+    return topic or "isso"
+
+
 def _terms(message: str) -> list[str]:
     return [part for part in re.findall(r"[a-zA-Z0-9_#-]{3,}", message.lower())]
 
@@ -251,6 +320,86 @@ def _clean_answer(answer: str) -> str:
     if "." in clipped:
         clipped = clipped[: clipped.rfind(".") + 1]
     return clipped or answer[:447].rstrip() + "..."
+
+
+def _asks_count(lowered: str) -> bool:
+    return any(term in lowered for term in ("quantas", "quantos", "quanto", "how many", "count", "total"))
+
+
+def _mentions_merged(lowered: str) -> bool:
+    return any(term in lowered for term in ("mergeamos", "mergeadas", "mergeados", "merged", "integradas", "integrados"))
+
+
+def _is_pull_request_event(event: dict[str, Any]) -> bool:
+    text = " ".join(str(event.get(key, "")) for key in ("type", "title", "summary")).lower()
+    return "pull_request" in text or re.search(r"\bpr[s]?\b", text) is not None
+
+
+def _is_merged_pull_request(event: dict[str, Any]) -> bool:
+    text = " ".join(str(event.get(key, "")) for key in ("type", "title", "summary")).lower()
+    return "pull_request.merged" in text or "merged" in text or "mergeada" in text or "integrada" in text
+
+
+def _message_time_window(lowered: str) -> str:
+    if "hoje" in lowered or "today" in lowered:
+        return "today"
+    if "ontem" in lowered or "yesterday" in lowered:
+        return "yesterday"
+    if "semana" in lowered or "week" in lowered:
+        return "week"
+    if "mês" in lowered or "mes" in lowered or "month" in lowered:
+        return "month"
+    return "recent"
+
+
+def _matches_time_window(value: Any, time_window: str) -> bool:
+    occurred_at = _parse_datetime(value)
+    if not occurred_at:
+        return False
+    now = datetime.now(timezone.utc)
+    delta = now - occurred_at
+    if delta < timedelta(0):
+        return False
+    if time_window == "today":
+        return occurred_at.date() == now.date()
+    if time_window == "yesterday":
+        return occurred_at.date() == (now - timedelta(days=1)).date()
+    if time_window == "week":
+        return delta <= timedelta(days=7)
+    if time_window == "month":
+        return delta <= timedelta(days=31)
+    return True
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _count_answer(count: int, lowered: str, time_window: str) -> str:
+    period = {
+        "today": "hoje",
+        "yesterday": "ontem",
+        "week": "esta semana",
+        "month": "este mês",
+    }.get(time_window, "no período sincronizado")
+    if "pr" in lowered or "pull request" in lowered:
+        unit = "PR" if count == 1 else "PRs"
+        verb = "foi mergeada" if count == 1 else "foram mergeadas"
+        if count == 0:
+            return f"{period.capitalize()}, não encontrei PRs mergeadas no contexto sincronizado."
+        return f"{period.capitalize()}, {count} {unit} {verb}."
+    return f"{period.capitalize()}, encontrei {count} itens no contexto sincronizado."
+
+
+def _list_of_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
 
 
 def _list(value: Any) -> list[dict[str, Any]]:

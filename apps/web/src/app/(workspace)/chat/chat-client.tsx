@@ -11,10 +11,10 @@ import { sendChatMessage } from "./actions";
 import type { ChatState } from "./chat-state";
 
 const prompts = [
-  "What changed this week?",
-  "Which work blocks the release?",
-  "What did Guilherme work on?",
-  "What decisions were made in Slack and Notion?",
+  "O que mudou esta semana?",
+  "O que está bloqueando o release?",
+  "Quantas PRs mergeamos hoje?",
+  "Quais decisões apareceram no Slack?",
 ];
 
 export function ChatClient({ initialState }: { initialState: ChatState }) {
@@ -41,10 +41,6 @@ export function ChatClient({ initialState }: { initialState: ChatState }) {
               <p className="whitespace-pre-wrap">{message.content}</p>
               {message.role === "assistant" && (
                 <div className="mt-3 space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {message.model ? <Badge tone="blue">{message.model}</Badge> : null}
-                    {message.confidence ? <Badge tone="neutral">Confidence {message.confidence}</Badge> : null}
-                  </div>
                   {message.citations?.length ? (
                     <div className="space-y-2 border-t border-border pt-3">
                       {message.citations.map((citation) => {
@@ -92,7 +88,7 @@ export function ChatClient({ initialState }: { initialState: ChatState }) {
           <div className="flex justify-start">
             <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Reading workspace context
+              Buscando no workspace
             </div>
           </div>
         ) : null}
@@ -122,7 +118,7 @@ export function ChatClient({ initialState }: { initialState: ChatState }) {
         <Input
           className="h-10 flex-1"
           name="message"
-          placeholder="Ask about PRs, tickets, decisions, blockers, docs, meetings, or releases"
+          placeholder="Pergunte sobre PRs, tickets, decisões, bloqueios, docs, reuniões ou releases"
           disabled={pending}
           autoComplete="off"
         />
