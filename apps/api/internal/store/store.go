@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ type Store interface {
 	SaveSyncResult(context.Context, domain.GatewayContext, domain.SyncResult) error
 	SaveSyncFailure(context.Context, domain.GatewayContext, domain.Service, error) error
 	GetDashboard(context.Context, domain.GatewayContext) (domain.DashboardPayload, error)
+	GetAgentContext(context.Context, domain.GatewayContext, string) (domain.AgentContext, error)
 	SaveDashboardSnapshot(context.Context, domain.GatewayContext, domain.DashboardPayload) error
 	GetUserConfig(context.Context, domain.GatewayContext) (domain.UserConfig, error)
 	UpsertUserConfig(context.Context, domain.GatewayContext, domain.UserConfig) error
@@ -159,6 +161,14 @@ func (s *MemoryStore) SaveSyncFailure(_ context.Context, ctx domain.GatewayConte
 func (s *MemoryStore) GetDashboard(_ context.Context, ctx domain.GatewayContext) (domain.DashboardPayload, error) {
 	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
 	return intelligence.BuildDashboard(ctx, s.events[ctx.WorkspaceID], s.memorySourceHealth(ctx), time.Now().UTC()), nil
+}
+
+func (s *MemoryStore) GetAgentContext(_ context.Context, ctx domain.GatewayContext, query string) (domain.AgentContext, error) {
+	s.ensureMemoryWorkspace(ctx, "Developer OS Workspace")
+	return domain.AgentContext{
+		Events:         rankWorkEvents(s.events[ctx.WorkspaceID], query, 20),
+		DocumentChunks: rankDocumentChunks(s.documentChunks[ctx.WorkspaceID], query, 10),
+	}, nil
 }
 
 func (s *MemoryStore) SaveDashboardSnapshot(_ context.Context, _ domain.GatewayContext, _ domain.DashboardPayload) error {
@@ -562,6 +572,79 @@ func (s *SupabaseStore) GetDashboard(ctx context.Context, gatewayCtx domain.Gate
 	}
 
 	return intelligence.BuildDashboard(gatewayCtx, events, sourceHealth, time.Now().UTC()), nil
+}
+
+func (s *SupabaseStore) GetAgentContext(ctx context.Context, gatewayCtx domain.GatewayContext, query string) (domain.AgentContext, error) {
+	var eventRows []struct {
+		ID         string         `json:"id"`
+		ExternalID string         `json:"external_id"`
+		Service    domain.Service `json:"service"`
+		Type       string         `json:"type"`
+		Title      string         `json:"title"`
+		Source     string         `json:"source"`
+		Actor      string         `json:"actor"`
+		Priority   string         `json:"priority"`
+		Summary    string         `json:"summary"`
+		OccurredAt time.Time      `json:"occurred_at"`
+		Raw        map[string]any `json:"raw"`
+	}
+	eventPath := "work_events?select=id,external_id,service,type,title,source,actor,priority,summary,occurred_at,raw&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&order=occurred_at.desc&limit=80"
+	if err := s.rest(ctx, http.MethodGet, eventPath, nil, &eventRows); err != nil {
+		return s.fallback.GetAgentContext(ctx, gatewayCtx, query)
+	}
+
+	events := make([]domain.WorkEvent, 0, len(eventRows))
+	for _, row := range eventRows {
+		events = append(events, domain.WorkEvent{
+			ID:         row.ID,
+			ExternalID: row.ExternalID,
+			Service:    row.Service,
+			Type:       row.Type,
+			Title:      row.Title,
+			Source:     row.Source,
+			Actor:      row.Actor,
+			Priority:   row.Priority,
+			Summary:    row.Summary,
+			OccurredAt: row.OccurredAt,
+			Raw:        row.Raw,
+		})
+	}
+
+	var chunkRows []struct {
+		ID         string         `json:"id"`
+		ExternalID string         `json:"external_id"`
+		Service    domain.Service `json:"service"`
+		Title      string         `json:"title"`
+		Source     string         `json:"source"`
+		URL        string         `json:"url"`
+		Content    string         `json:"content"`
+		Metadata   map[string]any `json:"metadata"`
+		UpdatedAt  time.Time      `json:"updated_at"`
+	}
+	chunkPath := "document_chunks?select=id,external_id,service,title,source,url,content,metadata,updated_at&workspace_id=eq." + url.QueryEscape(gatewayCtx.WorkspaceID) + "&order=updated_at.desc&limit=50"
+	if err := s.rest(ctx, http.MethodGet, chunkPath, nil, &chunkRows); err != nil {
+		return domain.AgentContext{Events: rankWorkEvents(events, query, 20)}, nil
+	}
+
+	chunks := make([]domain.DocumentChunk, 0, len(chunkRows))
+	for _, row := range chunkRows {
+		chunks = append(chunks, domain.DocumentChunk{
+			ID:         row.ID,
+			ExternalID: row.ExternalID,
+			Service:    row.Service,
+			Title:      row.Title,
+			Source:     row.Source,
+			URL:        row.URL,
+			Content:    row.Content,
+			Metadata:   row.Metadata,
+			UpdatedAt:  row.UpdatedAt,
+		})
+	}
+
+	return domain.AgentContext{
+		Events:         rankWorkEvents(events, query, 20),
+		DocumentChunks: rankDocumentChunks(chunks, query, 10),
+	}, nil
 }
 
 func (s *SupabaseStore) SaveSyncResult(ctx context.Context, gatewayCtx domain.GatewayContext, result domain.SyncResult) error {
@@ -1297,4 +1380,67 @@ func allServices() []domain.Service {
 		domain.ServiceNotion,
 		domain.ServiceCalendar,
 	}
+}
+
+func rankWorkEvents(events []domain.WorkEvent, query string, limit int) []domain.WorkEvent {
+	terms := searchTerms(query)
+	ranked := append([]domain.WorkEvent(nil), events...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		left := scoreText(terms, ranked[i].Title+" "+ranked[i].Summary+" "+ranked[i].Type+" "+ranked[i].Source)
+		right := scoreText(terms, ranked[j].Title+" "+ranked[j].Summary+" "+ranked[j].Type+" "+ranked[j].Source)
+		if left != right {
+			return left > right
+		}
+		return ranked[i].OccurredAt.After(ranked[j].OccurredAt)
+	})
+	if len(ranked) > limit {
+		return ranked[:limit]
+	}
+	return ranked
+}
+
+func rankDocumentChunks(chunks []domain.DocumentChunk, query string, limit int) []domain.DocumentChunk {
+	terms := searchTerms(query)
+	ranked := append([]domain.DocumentChunk(nil), chunks...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		left := scoreText(terms, ranked[i].Title+" "+ranked[i].Content+" "+ranked[i].Source)
+		right := scoreText(terms, ranked[j].Title+" "+ranked[j].Content+" "+ranked[j].Source)
+		if left != right {
+			return left > right
+		}
+		return ranked[i].UpdatedAt.After(ranked[j].UpdatedAt)
+	})
+	if len(ranked) > limit {
+		return ranked[:limit]
+	}
+	return ranked
+}
+
+func searchTerms(query string) []string {
+	parts := strings.Fields(strings.ToLower(query))
+	terms := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, part := range parts {
+		part = strings.Trim(part, ".,;:!?()[]{}'\"")
+		if len(part) < 3 || seen[part] {
+			continue
+		}
+		seen[part] = true
+		terms = append(terms, part)
+	}
+	return terms
+}
+
+func scoreText(terms []string, text string) int {
+	if len(terms) == 0 {
+		return 0
+	}
+	text = strings.ToLower(text)
+	score := 0
+	for _, term := range terms {
+		if strings.Contains(text, term) {
+			score++
+		}
+	}
+	return score
 }

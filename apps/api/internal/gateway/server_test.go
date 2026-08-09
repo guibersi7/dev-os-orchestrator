@@ -145,6 +145,122 @@ func TestWorkspaceDataIsIsolatedByWorkspaceID(t *testing.T) {
 	}
 }
 
+func TestAgentChatRequiresConfiguredAgentBaseURL(t *testing.T) {
+	server := NewServer(Config{
+		Registry: integrations.NewRegistry(),
+		Store:    store.NewMemoryStore(),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", strings.NewReader(`{"message":"What is blocked?"}`))
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "agent_not_configured") {
+		t.Fatalf("expected agent_not_configured error, got %s", res.Body.String())
+	}
+}
+
+func TestNormalizeAgentBaseURLAcceptsRenderHostPort(t *testing.T) {
+	if got := normalizeAgentBaseURL("standup-agent:10000/"); got != "http://standup-agent:10000" {
+		t.Fatalf("expected hostport to gain http scheme, got %q", got)
+	}
+	if got := normalizeAgentBaseURL("https://agent.example.com/"); got != "https://agent.example.com" {
+		t.Fatalf("expected https URL to be preserved, got %q", got)
+	}
+}
+
+func TestAgentChatSendsWorkspaceScopedContextAndReturnsCitations(t *testing.T) {
+	memoryStore := store.NewMemoryStore()
+	ctxA := domain.GatewayContext{WorkspaceID: "workspace-a", UserID: "user-1"}
+	ctxB := domain.GatewayContext{WorkspaceID: "workspace-b", UserID: "user-1"}
+	now := time.Now().UTC()
+
+	if err := memoryStore.SaveWorkEvents(context.Background(), ctxA, []domain.WorkEvent{{
+		ID:         "event-a",
+		ExternalID: "event-a",
+		Service:    domain.ServiceGitHub,
+		Type:       "check.failed",
+		Title:      "Workspace A checks failed",
+		Source:     "repo-a",
+		Actor:      "GitHub Actions",
+		Priority:   "high",
+		Summary:    "Only workspace A should be sent to the agent.",
+		OccurredAt: now,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := memoryStore.SaveWorkEvents(context.Background(), ctxB, []domain.WorkEvent{{
+		ID:         "event-b",
+		ExternalID: "event-b",
+		Service:    domain.ServiceSlack,
+		Type:       "slack.decision",
+		Title:      "Workspace B decision",
+		Source:     "#release",
+		Actor:      "Slack",
+		Priority:   "medium",
+		Summary:    "Workspace B must not be sent.",
+		OccurredAt: now,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			WorkspaceID string              `json:"workspaceId"`
+			Context     domain.AgentContext `json:"context"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.WorkspaceID != ctxA.WorkspaceID {
+			t.Fatalf("expected workspace %s, got %s", ctxA.WorkspaceID, payload.WorkspaceID)
+		}
+		if len(payload.Context.Events) != 1 || payload.Context.Events[0].ID != "event-a" {
+			t.Fatalf("expected only workspace A context, got %#v", payload.Context.Events)
+		}
+		_ = json.NewEncoder(w).Encode(domain.AgentChatResponse{
+			Answer: "Checks are blocked by Workspace A checks failed.",
+			Citations: []domain.AgentCitation{{
+				Type:    "work_event",
+				ID:      "event-a",
+				Service: domain.ServiceGitHub,
+				Title:   "Workspace A checks failed",
+			}},
+			SuggestedActions: []domain.AgentSuggestedAction{{Label: "Open failed checks", Kind: "inspect"}},
+			Confidence:       "high",
+			Model:            "test-agent",
+		})
+	}))
+	defer agentServer.Close()
+
+	server := NewServer(Config{
+		Registry:     integrations.NewRegistry(),
+		Store:        memoryStore,
+		AgentBaseURL: agentServer.URL,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/chat", strings.NewReader(`{"message":"What checks failed?"}`))
+	req.Header.Set("x-workspace-id", ctxA.WorkspaceID)
+	req.Header.Set("x-user-id", ctxA.UserID)
+	res := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "Workspace A checks failed") || !strings.Contains(res.Body.String(), "event-a") {
+		t.Fatalf("expected agent citation response, got %s", res.Body.String())
+	}
+	if strings.Contains(res.Body.String(), "Workspace B") {
+		t.Fatalf("agent response leaked workspace B data: %s", res.Body.String())
+	}
+}
+
 func TestSyncRejectsUnsupportedService(t *testing.T) {
 	server := NewServer(Config{
 		Registry: integrations.NewRegistry(),

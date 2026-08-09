@@ -9,11 +9,13 @@
     "dev": "npm run dev:web",
     "dev:web": "npm run dev --workspace @devos/web",
     "dev:api": "cd apps/api && go run ./cmd/api",
+    "dev:agent": "cd apps/agent && python3 -m agent",
     "build": "npm run build:web",
     "build:web": "npm run build --workspace @devos/web",
     "lint": "npm run lint:web",
     "lint:web": "npm run lint --workspace @devos/web",
     "test:api": "cd apps/api && go test ./...",
+    "test:agent": "cd apps/agent && python3 -m unittest",
     "test:web": "npm run test --workspace @devos/web"
   },
   "optionalDependencies": {
