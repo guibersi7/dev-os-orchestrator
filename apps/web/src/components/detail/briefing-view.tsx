@@ -71,6 +71,54 @@ export function BriefingView({
 
       <div className="mt-7 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-6">
+          {briefing.changedFiles.length > 0 ? (
+            <Card className="border-[#212938] p-[18px]">
+              <h2 className="text-[13.5px] font-semibold">O que mudou</h2>
+              <p className="mt-1 text-[12.5px] leading-[1.45] text-[#8C96AD]">
+                {briefing.changedFiles.length} de {briefing.totalFiles}{" "}
+                {briefing.totalFiles === 1 ? "arquivo carrega" : "arquivos carregam"} lógica.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {briefing.changedFiles.map((file) => (
+                  <li key={file.filename} className="flex items-baseline justify-between gap-3">
+                    <span className="font-mono truncate text-[12px] text-[#E9EDF7]">{file.filename}</span>
+                    <span className="font-mono shrink-0 text-[11px] text-[#79839B]">
+                      {file.status} · {file.changes}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
+          {briefing.comments.length > 0 ? (
+            <Card className="border-[#212938] p-[18px]">
+              <h2 className="text-[13.5px] font-semibold">A conversa que importa</h2>
+              <p className="mt-1 text-[12.5px] leading-[1.45] text-[#8C96AD]">
+                {briefing.comments.length} de {briefing.totalComments}{" "}
+                {briefing.totalComments === 1 ? "comentário" : "comentários"}.
+              </p>
+              <ul className="mt-3 space-y-3">
+                {briefing.comments.map((comment) => (
+                  <li key={`${comment.author}-${comment.body.slice(0, 24)}`} className="border-l-2 border-[#212938] pl-3">
+                    <p className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-[12.5px] font-medium text-[#E9EDF7]">{comment.author}</span>
+                      {comment.path ? (
+                        <span className="font-mono truncate text-[11px] text-[#79839B]">{comment.path}</span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 text-[13px] leading-[1.45] text-[#9AA4BA]">{comment.body}</p>
+                    {comment.url ? (
+                      <a className="mt-1 inline-block text-[11.5px] text-[var(--standup-accent-text)]" href={comment.url}>
+                        ver no GitHub
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           <Card className="border-[#212938] p-[18px]">
             <h2 className="text-[13.5px] font-semibold">O que Standup registrou</h2>
             <p className="mt-1 text-[12.5px] leading-[1.45] text-[#8C96AD]">

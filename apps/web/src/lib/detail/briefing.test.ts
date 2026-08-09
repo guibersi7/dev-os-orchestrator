@@ -63,10 +63,45 @@ describe("buildBriefing", () => {
     expect(briefing.checks).toEqual([{ name: "integration", conclusion: "failure", age: "1h" }]);
   });
 
-  it("states that review comments exist but are not synced", () => {
-    const subject = event({ metadata: { repository: "acme/api", number: 42, metrics: { reviewCommentCount: 14 } } });
+  it("keeps only the files that carry logic and counts the rest", () => {
+    const subject = event({
+      metadata: {
+        repository: "acme/api",
+        number: 42,
+        files: [
+          { filename: "internal/oauth/state.go", status: "modified", changes: 45 },
+          { filename: "docs/setup.md", status: "modified", changes: 4 },
+          { filename: "package-lock.json", status: "modified", changes: 900 },
+        ],
+        metrics: { fileCount: 3 },
+      },
+    });
+
     const briefing = buildBriefing([subject], subject, { now: NOW });
-    expect(briefing.omissions).toContain("14 comentários de review foram contados, mas o conteúdo não é sincronizado.");
+    expect(briefing.changedFiles.map((file) => file.filename)).toEqual(["internal/oauth/state.go"]);
+    expect(briefing.omissions).toContain("2 arquivos sem lógica foram omitidos — docs, fixtures e assets.");
+  });
+
+  it("shows the substantial comments and declares the omitted ones", () => {
+    const subject = event({
+      metadata: {
+        repository: "acme/api",
+        number: 42,
+        comments: [
+          { author: "taina", body: "Isto bloqueia a release até o refresh de token ser corrigido." },
+          { author: "rafa", body: "nit" },
+          { author: "ana", body: "Decidimos segurar o escopo até sexta." },
+          { author: "leo", body: "ok" },
+        ],
+        metrics: { reviewCommentCount: 14 },
+      },
+    });
+
+    const briefing = buildBriefing([subject], subject, { now: NOW });
+    expect(briefing.comments).toHaveLength(3);
+    expect(briefing.comments[0].author).toBe("taina");
+    expect(briefing.totalComments).toBe(14);
+    expect(briefing.omissions).toContain("11 comentários mais curtos foram omitidos.");
   });
 
   it("says nobody was assigned when an old item has no reviewers", () => {

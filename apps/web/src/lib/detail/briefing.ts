@@ -16,6 +16,21 @@ export type WaitingParty = {
   since: string;
 };
 
+export type ChangedFile = {
+  filename: string;
+  status: string;
+  changes: number;
+  /** Files that carry logic, as opposed to docs, lockfiles and fixtures. */
+  carriesLogic: boolean;
+};
+
+export type ReviewComment = {
+  author: string;
+  body: string;
+  path?: string;
+  url?: string;
+};
+
 export type Briefing = {
   subject: WorkEvent;
   lane: Lane;
@@ -26,10 +41,62 @@ export type Briefing = {
   waitingOn: WaitingParty[];
   checks: { name: string; conclusion: string; age: string }[];
   metrics: { label: string; value: string }[];
-  /** Facts the connector does not currently supply, stated out loud. */
+  /** Only the files that carry logic; the rest are counted in `omissions`. */
+  changedFiles: ChangedFile[];
+  totalFiles: number;
+  /** The comments worth reading, not all of them. */
+  comments: ReviewComment[];
+  totalComments: number;
+  /** Facts the briefing deliberately left out, stated out loud. */
   omissions: string[];
   externalUrl?: string;
 };
+
+const NON_LOGIC = /\.(md|mdx|txt|lock|snap|svg|png|jpg|jpeg|gif|ico|csv|ya?ml|json)$|^(docs|fixtures|testdata)\//i;
+
+export function carriesLogic(filename: string): boolean {
+  return !NON_LOGIC.test(filename);
+}
+
+function toChangedFiles(metadata: Record<string, unknown>): ChangedFile[] {
+  const raw = Array.isArray(metadata.files) ? metadata.files : [];
+
+  return raw
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .map((entry) => {
+      const filename = typeof entry.filename === "string" ? entry.filename : "";
+      return {
+        filename,
+        status: typeof entry.status === "string" ? entry.status : "modified",
+        changes: typeof entry.changes === "number" ? entry.changes : 0,
+        carriesLogic: carriesLogic(filename),
+      };
+    })
+    .filter((file) => file.filename.length > 0);
+}
+
+/**
+ * A blocking comment or a decision is what the reader needs; a nit is not.
+ * Length is the only signal available, so it stands in for substance — and the
+ * count of what was dropped is always stated.
+ */
+function toComments(metadata: Record<string, unknown>): ReviewComment[] {
+  const raw = Array.isArray(metadata.comments) ? metadata.comments : [];
+
+  return raw
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .map((entry) => ({
+      author: typeof entry.author === "string" ? entry.author : "",
+      body: typeof entry.body === "string" ? entry.body.trim() : "",
+      path: typeof entry.path === "string" ? entry.path : undefined,
+      url: typeof entry.url === "string" ? entry.url : undefined,
+    }))
+    .filter((comment) => comment.body.length > 0);
+}
+
+function substantial(comments: ReviewComment[]): ReviewComment[] {
+  return [...comments].sort((a, b) => b.body.length - a.body.length).slice(0, 3);
+}
 
 /** Events about the same PR, issue or card, regardless of which event type produced them. */
 export function relatedEvents(events: WorkEvent[], subject: WorkEvent): WorkEvent[] {
@@ -127,12 +194,28 @@ export function buildBriefing(
       age: formatAge(event.occurredAt, now),
     }));
 
+  const allFiles = toChangedFiles(subject.metadata);
+  const logicFiles = allFiles.filter((file) => file.carriesLogic);
+  const totalFiles = metadataNumber(metrics, "fileCount") ?? allFiles.length;
+
+  const allComments = toComments(subject.metadata);
+  const shownComments = substantial(allComments);
+  const totalComments = metadataNumber(metrics, "reviewCommentCount") ?? allComments.length;
+
+  // Stating what was hidden is a feature; silently truncating is not.
   const omissions: string[] = [];
-  const reviewComments = metadataNumber(metrics, "reviewCommentCount") ?? 0;
-  if (reviewComments > 0) {
-    // Stating what was hidden is a feature; silently truncating is not.
+
+  const skippedFiles = totalFiles - logicFiles.length;
+  if (logicFiles.length > 0 && skippedFiles > 0) {
     omissions.push(
-      `${reviewComments} ${reviewComments === 1 ? "comentário de review foi contado" : "comentários de review foram contados"}, mas o conteúdo não é sincronizado.`,
+      `${skippedFiles} ${skippedFiles === 1 ? "arquivo sem lógica foi omitido" : "arquivos sem lógica foram omitidos"} — docs, fixtures e assets.`,
+    );
+  }
+
+  const skippedComments = totalComments - shownComments.length;
+  if (skippedComments > 0) {
+    omissions.push(
+      `${skippedComments} ${skippedComments === 1 ? "comentário mais curto foi omitido" : "comentários mais curtos foram omitidos"}.`,
     );
   }
 
@@ -148,6 +231,10 @@ export function buildBriefing(
     waitingOn,
     checks,
     metrics: buildMetrics(subject),
+    changedFiles: logicFiles,
+    totalFiles,
+    comments: shownComments,
+    totalComments,
     omissions,
     externalUrl: subject.externalUrl,
   };
