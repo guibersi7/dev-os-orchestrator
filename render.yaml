@@ -15,11 +15,13 @@ services:
       - key: AGENT_SERVICE_SECRET
         generateValue: true
       - key: AGENT_MODEL_BASE_URL
-        sync: false
+        value: https://api.groq.com/openai/v1
       - key: AGENT_MODEL
-        value: local-agent
+        value: openai/gpt-oss-20b
+      - key: AGENT_MODEL_API_KEY
+        sync: false
       - key: AGENT_TIMEOUT_SECONDS
-        value: "20"
+        value: "30"
 
   - type: web
     name: standup-api

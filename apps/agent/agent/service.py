@@ -29,7 +29,8 @@ def _call_model(
     if not base_url:
         return None
 
-    model = os.getenv("AGENT_MODEL", "local-agent")
+    model = os.getenv("AGENT_MODEL", "openai/gpt-oss-20b")
+    api_key = os.getenv("AGENT_MODEL_API_KEY", "").strip()
     timeout = float(os.getenv("AGENT_TIMEOUT_SECONDS", "20"))
     prompt = {
         "role": "user",
@@ -55,10 +56,13 @@ def _call_model(
     }
 
     body = json.dumps(request_payload).encode("utf-8")
+    headers = {"content-type": "application/json"}
+    if api_key:
+        headers["authorization"] = "Bearer " + api_key
     request = urllib.request.Request(
-        base_url + "/v1/chat/completions",
+        _chat_completions_url(base_url),
         data=body,
-        headers={"content-type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -96,7 +100,7 @@ def _normalize_model_response(response: dict[str, Any], allowed_citations: list[
         "citations": citations,
         "suggestedActions": _suggested_actions(response.get("suggestedActions")),
         "confidence": str(response.get("confidence") or ("medium" if citations else "low")),
-        "model": str(response.get("model") or os.getenv("AGENT_MODEL", "local-agent")),
+        "model": str(response.get("model") or os.getenv("AGENT_MODEL", "openai/gpt-oss-20b")),
     }
 
 
@@ -205,3 +209,10 @@ def _strip_json_fence(content: str) -> str:
         content = re.sub(r"^```(?:json)?", "", content).strip()
         content = re.sub(r"```$", "", content).strip()
     return content
+
+
+def _chat_completions_url(base_url: str) -> str:
+    base_url = base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return base_url + "/chat/completions"
+    return base_url + "/v1/chat/completions"
