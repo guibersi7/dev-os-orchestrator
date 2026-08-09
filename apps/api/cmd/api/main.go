@@ -26,6 +26,8 @@ func main() {
 		Store:            persistence,
 		GatewaySecret:    os.Getenv("API_GATEWAY_SECRET"),
 		OAuthStateSecret: os.Getenv("OAUTH_STATE_SECRET"),
+		AgentBaseURL:     os.Getenv("AGENT_BASE_URL"),
+		AgentSecret:      os.Getenv("AGENT_SERVICE_SECRET"),
 		Logger:           slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 	})
 

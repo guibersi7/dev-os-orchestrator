@@ -264,3 +264,34 @@ type DocumentChunk struct {
 	Metadata   map[string]any `json:"metadata,omitempty"`
 	UpdatedAt  time.Time      `json:"updatedAt"`
 }
+
+type AgentChatRequest struct {
+	Message        string `json:"message"`
+	ConversationID string `json:"conversationId,omitempty"`
+}
+
+type AgentCitation struct {
+	Type    string  `json:"type"`
+	ID      string  `json:"id"`
+	Service Service `json:"service"`
+	Title   string  `json:"title"`
+	URL     string  `json:"url,omitempty"`
+}
+
+type AgentSuggestedAction struct {
+	Label string `json:"label"`
+	Kind  string `json:"kind"`
+}
+
+type AgentChatResponse struct {
+	Answer           string                 `json:"answer"`
+	Citations        []AgentCitation        `json:"citations"`
+	SuggestedActions []AgentSuggestedAction `json:"suggestedActions"`
+	Confidence       string                 `json:"confidence"`
+	Model            string                 `json:"model"`
+}
+
+type AgentContext struct {
+	Events         []WorkEvent     `json:"events"`
+	DocumentChunks []DocumentChunk `json:"documentChunks"`
+}

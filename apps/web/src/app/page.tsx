@@ -139,7 +139,7 @@ export default function LandingPage() {
       <footer className="flex flex-col gap-4 border-t border-[#212938] px-5 py-7 text-xs text-[#9AA4BA] sm:flex-row sm:items-center sm:justify-between sm:px-10">
         <span className="flex items-center gap-2">
           <BrandMark />
-          Standup · the developer OS · read-only by design
+          Standup · ranks what needs you · read-only by design
         </span>
         <span className="flex gap-5">Security · Docs · Changelog</span>
       </footer>

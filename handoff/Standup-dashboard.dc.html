@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #080C15; }
+  body { font-family: Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; color: #E9EDF7; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  a { color: #4FD98C; text-decoration: none; }
+  a:hover { color: #7FE3A8; }
+  ::selection { background: rgba(29,156,76,.35); color: #F4F7FF; }
+  @keyframes dRise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  @keyframes dPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: #080C15;">
+
+  <sc-if value="{{ isIcons }}" hint-placeholder-val="{{ false }}">
+    <div style="width: 56px; flex: none; border-right: 1px solid #1C2432; background: #0B0F1A; display: flex; flex-direction: column; align-items: center; padding: 14px 0 12px 0; gap: 4px;">
+      <span style="width: 22px; height: 22px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6px; margin-bottom: 14px;">
+        <span style="width: 11px; height: 2px; border-radius: 1px; background: #EEF3FF;"></span>
+        <span style="width: 8px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></span>
+        <span style="width: 5px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></span>
+      </span>
+      <sc-for list="{{ navIcons }}" as="n" hint-placeholder-count="6">
+        <div title="{{ n.name }}" style="width: 34px; height: 34px; border-radius: 9px; background: {{ n.bg }}; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;" style-hover="background: #161C2B;">
+          <span style="width: 17px; height: 17px; display: block; background-image: {{ n.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+          <sc-if value="{{ n.dot }}" hint-placeholder-val="{{ false }}">
+            <span style="position: absolute; top: 6px; right: 6px; width: 5px; height: 5px; border-radius: 999px; background: #4FD98C; border: 1.5px solid #0B0F1A;"></span>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="margin-top: auto; position: relative;">
+        <span onClick="{{ toggleMenu }}" style="width: 26px; height: 26px; border-radius: 999px; background: {{ avatarBg }}; border: 1px solid {{ avatarBd }}; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9AA4BA; cursor: pointer;">gb</span>
+        <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position: absolute; bottom: 0; left: 34px; width: 244px; border: 1px solid #212938; background: #121826; border-radius: 11px; box-shadow: 0 18px 44px -20px rgba(0,0,0,.9); padding: 6px; z-index: 60;">
+            <div style="padding: 9px 10px 10px 10px; border-bottom: 1px solid #1B2230; margin-bottom: 5px;">
+              <div style="font-size: 12.5px; font-weight: 500; margin-bottom: 2px;">Guilherme Bersi</div>
+              <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B;">guilherme@bersi.dev</div>
+            </div>
+            <sc-for list="{{ menu }}" as="m" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 7px; cursor: pointer;" style-hover="background: #1A2130;">
+                <span style="display: flex; align-items: center; gap: 9px;">
+                  <span style="width: 14px; height: 14px; display: block; background-image: {{ m.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                  <span style="font-size: 12.5px; color: {{ m.color }};">{{ m.name }}</span>
+                </span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ m.metaColor }};">{{ m.meta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <sc-if value="{{ isTabs }}" hint-placeholder-val="{{ false }}">
+      <div style="height: 52px; flex: none; border-bottom: 1px solid #1C2432; background: #0B0F1A; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 24px;">
+        <div style="display: flex; align-items: center; gap: 18px; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <span style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5px;">
+              <span style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></span>
+              <span style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></span>
+              <span style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></span>
+            </span>
+            <span style="font-size: 13px; font-weight: 600; letter-spacing: -0.01em;">Standup</span>
+            <span style="font-size: 12.5px; color: #4A5468;">/</span>
+            <span style="font-size: 12.5px; color: #9AA4BA; cursor: pointer;" style-hover="color: #E9EDF7;">Bersi Labs</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 2px;">
+            <sc-for list="{{ navTabs }}" as="t" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 7px; cursor: pointer; background: {{ t.bg }};" style-hover="background: #131A28;">
+                <span style="font-size: 13px; color: {{ t.color }}; font-weight: {{ t.weight }};">{{ t.name }}</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ t.badgeColor }};">{{ t.badge }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #212938; background: #121826; border-radius: 8px; padding: 5px 9px; cursor: pointer;" style-hover="border-color: #2E3849;">
+            <span style="font-size: 12.5px; color: #79839B;">Buscar ou perguntar…</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">⌘K</span>
+          </div>
+          <div style="position: relative; flex: none;">
+            <span onClick="{{ toggleMenu }}" style="width: 26px; height: 26px; border-radius: 999px; background: {{ avatarBg }}; border: 1px solid {{ avatarBd }}; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9AA4BA; cursor: pointer;">gb</span>
+            <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position: absolute; top: 34px; right: 0; width: 244px; border: 1px solid #212938; background: #121826; border-radius: 11px; box-shadow: 0 18px 44px -20px rgba(0,0,0,.9); padding: 6px; z-index: 60;">
+                <div style="padding: 9px 10px 10px 10px; border-bottom: 1px solid #1B2230; margin-bottom: 5px;">
+                  <div style="font-size: 12.5px; font-weight: 500; margin-bottom: 2px;">Guilherme Bersi</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B;">guilherme@bersi.dev</div>
+                </div>
+                <sc-for list="{{ menu }}" as="m" hint-placeholder-count="5">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 7px; cursor: pointer;" style-hover="background: #1A2130;">
+                    <span style="display: flex; align-items: center; gap: 9px;">
+                      <span style="width: 14px; height: 14px; display: block; background-image: {{ m.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                      <span style="font-size: 12.5px; color: {{ m.color }};">{{ m.name }}</span>
+                    </span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ m.metaColor }};">{{ m.meta }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCommand }}" hint-placeholder-val="{{ true }}">
+      <div style="flex: none; padding: 16px 20px 0 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+          <div style="display: flex; align-items: center; gap: 9px; flex: none;">
+            <span style="width: 20px; height: 20px; border-radius: 6px; background: #1D9C4C; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5px;">
+              <span style="width: 10px; height: 2px; border-radius: 1px; background: #EEF3FF;"></span>
+              <span style="width: 7px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.62);"></span>
+              <span style="width: 4px; height: 2px; border-radius: 1px; background: rgba(238,243,255,.34);"></span>
+            </span>
+            <span style="font-size: 12.5px; color: #9AA4BA;">Bersi Labs</span>
+          </div>
+          <div style="flex: 1; max-width: 520px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #212938; background: #121826; border-radius: 9px; padding: 8px 12px; cursor: pointer; box-shadow: 0 8px 24px -18px rgba(0,0,0,.9);" style-hover="border-color: #39435A; background: #141B2A;">
+            <span style="display: flex; align-items: center; gap: 9px;">
+              <span style="width: 14px; height: 14px; display: block; background-image: {{ searchIconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+              <span style="font-size: 13px; color: #79839B;">Ir para, filtrar ou perguntar sobre o trabalho…</span>
+            </span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B; border: 1px solid #212938; border-radius: 5px; padding: 2px 6px;">⌘K</span>
+          </div>
+<div style="position: relative; flex: none;">
+            <span onClick="{{ toggleMenu }}" style="width: 26px; height: 26px; border-radius: 999px; background: {{ avatarBg }}; border: 1px solid {{ avatarBd }}; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9AA4BA; cursor: pointer;">gb</span>
+            <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position: absolute; top: 34px; right: 0; width: 244px; border: 1px solid #212938; background: #121826; border-radius: 11px; box-shadow: 0 18px 44px -20px rgba(0,0,0,.9); padding: 6px; z-index: 60;">
+                <div style="padding: 9px 10px 10px 10px; border-bottom: 1px solid #1B2230; margin-bottom: 5px;">
+                  <div style="font-size: 12.5px; font-weight: 500; margin-bottom: 2px;">Guilherme Bersi</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B;">guilherme@bersi.dev</div>
+                </div>
+                <sc-for list="{{ menu }}" as="m" hint-placeholder-count="5">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 7px; cursor: pointer;" style-hover="background: #1A2130;">
+                    <span style="display: flex; align-items: center; gap: 9px;">
+                      <span style="width: 14px; height: 14px; display: block; background-image: {{ m.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                      <span style="font-size: 12.5px; color: {{ m.color }};">{{ m.name }}</span>
+                    </span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: {{ m.metaColor }};">{{ m.meta }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="padding: {{ contentPad }}; overflow-x: auto; flex: 1;">
+    <div style="max-width: 1240px; min-width: 900px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; align-items: start;">
+
+      <div style="grid-column: 1 / -1; animation: dRise .35s ease both;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+          <span style="font-size: 13px; font-weight: 500; color: #9AA4BA;">{{ workspaceName }}</span>
+          <span style="width: 3px; height: 3px; border-radius: 999px; background: #2E3849;"></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: {{ syncDot }}; animation: dPulse 2.6s ease-in-out infinite;"></span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: {{ syncColor }};">{{ syncLabel }}</span>
+          </span>
+        </div>
+
+        <h1 style="font-size: 26px; line-height: 1.28; letter-spacing: -0.028em; font-weight: 600; margin: 0 0 14px 0; max-width: 860px; text-wrap: pretty;">{{ headlineLead }}<span style="color: #6A7489;">{{ headlineTail }}</span></h1>
+
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; line-height: 1.5;">
+          <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="4">
+            <span style="display: inline-flex; align-items: baseline; gap: 6px; border-bottom: 1px solid {{ m.rule }}; padding-bottom: 2px; cursor: {{ m.cursor }};" style-hover="border-color: #4FD98C;">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 14px; color: {{ m.valueColor }};">{{ m.value }}</span>
+              <span style="color: #E9EDF7;">{{ m.label }}</span>
+              <span style="color: #6A7489;">{{ m.consequence }}</span>
+            </span>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ viewerUnresolved }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 14px; display: flex; align-items: center; gap: 9px; border-left: 2px solid #D9B871; padding: 2px 0 2px 11px;">
+            <span style="font-size: 12.5px; color: #9AA4BA; line-height: 1.45;">Standup não reconheceu você nas fontes conectadas — mostrando o workspace inteiro. <span style="color: #4FD98C;">Vincular contas</span></span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="animation: dRise .4s .04s ease both;">
+        <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 12px 16px;">
+            <div style="display: flex; align-items: baseline; gap: 9px;">
+              <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">Fila</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #6A7489;">{{ queueMeta }}</span>
+            </div>
+            <span style="font-size: 11.5px; color: #79839B;">ordenada por quem está esperando</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px; padding: 0 16px 13px 16px; flex-wrap: wrap;">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.pick }}" style="font-family: inherit; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; border: 1px solid {{ f.bd }}; background: {{ f.bg }}; color: {{ f.fg }}; border-radius: 7px; padding: 5px 10px; cursor: pointer;" style-hover="border-color: #39435A;">
+                {{ f.label }}<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: {{ f.countColor }};">{{ f.count }}</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="border-top: 1px solid #1B2230;">
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 14px 16px 14px {{ r.padLeft }}; border-bottom: 1px solid #161C2B; border-left: {{ r.accent }}; background: #121826; cursor: pointer;" style-hover="background: #141B2A;">
+                <div style="min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap;">
+                    <span style="font-size: 10.5px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: {{ r.laneFg }}; background: {{ r.laneBg }}; border: 1px solid {{ r.laneBd }}; border-radius: 5px; padding: 2px 6px;">{{ r.laneLabel }}</span>
+                    <span style="display: inline-flex; align-items: center; gap: 5px;">
+                      <span style="width: 12px; height: 12px; display: block; background-image: {{ r.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8C96AD;">{{ r.source }}</span>
+                    </span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">· {{ r.age }}</span>
+                  </div>
+                  <div style="font-size: 14px; font-weight: 500; letter-spacing: -0.011em; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.title }}</div>
+                  <div style="font-size: 12.5px; color: #8C96AD; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ r.reason }}</div>
+                </div>
+                <button style="font-family: inherit; font-size: 12.5px; font-weight: 500; border-radius: 7px; padding: 7px 13px; cursor: pointer; white-space: nowrap; background: {{ r.btnBg }}; color: {{ r.btnFg }}; border: 1px solid {{ r.btnBd }};" style-hover="border-color: #39435A;">{{ r.actionLabel }}</button>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 30px 16px 32px 16px;">
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 5px;">{{ emptyTitle }}</div>
+                <div style="font-size: 12.5px; color: #8C96AD; line-height: 1.5; max-width: 460px;">{{ emptyBody }}</div>
+                <sc-if value="{{ emptyHasReset }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ resetFilter }}" style="font-family: inherit; margin-top: 12px; font-size: 12.5px; font-weight: 500; color: #4FD98C; background: transparent; border: 1px solid #1C4A31; border-radius: 7px; padding: 6px 11px; cursor: pointer;" style-hover="background: #0E2418;">Ver a fila completa</button>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="padding: 11px 16px; background: #0F1421; border-top: 1px solid #161C2B;">
+            <span style="font-size: 12px; color: #8C96AD;">{{ trailingNote }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; animation: dRise .45s .08s ease both;">
+
+        <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230;">
+            <span style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Sinal recente</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">últimas 24h</span>
+          </div>
+          <sc-for list="{{ signals }}" as="g" hint-placeholder-count="2">
+            <div style="padding: 12px 15px; border-bottom: 1px solid #161C2B;">
+              <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 9px; cursor: pointer;">
+                <span style="width: 13px; height: 13px; display: block; background-image: {{ g.iconCss }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></span>
+                <span style="font-size: 12.5px; font-weight: 500; color: #9AA4BA;">{{ g.name }}</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B;">{{ g.count }}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 9px;">
+                <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="2">
+                  <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: baseline; cursor: {{ i.cursor }};">
+                    <div style="min-width: 0;">
+                      <div style="font-size: 12.5px; color: {{ i.titleColor }}; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ i.title }}</div>
+                      <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ i.summary }}</div>
+                    </div>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #79839B;">{{ i.age }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noSignal }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 18px 15px;">
+              <span style="font-size: 12.5px; color: #8C96AD; line-height: 1.5;">Nenhum evento novo desde a última sync.</span>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 13px 15px 11px 15px; border-bottom: 1px solid #1B2230;">
+            <span style="font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">Semana</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">seg — hoje</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid #161C2B;">
+            <sc-for list="{{ weekly }}" as="w" hint-placeholder-count="3">
+              <div style="padding: 13px 15px; border-right: 1px solid #161C2B;">
+                <div style="font-family: 'Geist Mono', monospace; font-size: 19px; letter-spacing: -0.02em; color: #E9EDF7; margin-bottom: 3px;">{{ w.value }}</div>
+                <div style="font-size: 11.5px; color: #8C96AD; line-height: 1.3;">{{ w.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding: 12px 15px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px;">
+              <span style="font-size: 12px; color: #8C96AD;">Em andamento</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #E9EDF7;">{{ activeWork }}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ risks }}" as="r" hint-placeholder-count="2">
+                <div style="display: grid; grid-template-columns: 3px minmax(0, 1fr); gap: 10px; align-items: start;">
+                  <span style="width: 3px; height: 14px; border-radius: 2px; background: #D9B871; margin-top: 2px;"></span>
+                  <span style="font-size: 12.5px; color: #9AA4BA; line-height: 1.45;">{{ r }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ noRisks }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size: 12.5px; color: #8C96AD; line-height: 1.5;">Nenhum risco de alta prioridade na última sync.</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <details style="border: 1px solid #212938; border-radius: 12px; background: #121826; overflow: hidden;">
+          <summary style="list-style: none; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;">
+            <span>Toda a atividade</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #79839B;">1.284</span>
+          </summary>
+          <div style="border-top: 1px solid #1B2230; padding: 13px 15px;">
+            <span style="font-size: 12.5px; color: #8C96AD; line-height: 1.5;">Timeline completa dos work events normalizados, em ordem cronológica.</span>
+          </div>
+        </details>
+
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div style="position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; background: rgba(14,19,32,.94); backdrop-filter: blur(8px); border: 1px solid #212938; border-radius: 11px; padding: 5px; box-shadow: 0 12px 30px -12px rgba(0,0,0,.7); z-index: 50;">
+  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #79839B; padding: 0 8px 0 7px;">nav</span>
+  <sc-for list="{{ navRail }}" as="s" hint-placeholder-count="3">
+    <button onClick="{{ s.go }}" style="font-family: inherit; font-size: 12px; font-weight: 500; border: none; border-radius: 7px; padding: 6px 11px; cursor: pointer; background: {{ s.bg }}; color: {{ s.fg }};">{{ s.name }}</button>
+  </sc-for>
+  <span style="width: 1px; height: 18px; background: #212938; margin: 0 6px;"></span>
+  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #79839B; padding: 0 8px 0 0;">estado</span>
+  <sc-for list="{{ stateRail }}" as="s" hint-placeholder-count="4">
+    <button onClick="{{ s.go }}" style="font-family: inherit; font-size: 12px; font-weight: 500; border: none; border-radius: 7px; padding: 6px 11px; cursor: pointer; background: {{ s.bg }}; color: {{ s.fg }};">{{ s.name }}</button>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940}}">
+class Component extends DCLogic {
+  state = { lane: 'all', mode: 'full', nav: 'command', menu: false };
+
+  icon(slug, color) {
+    return 'url("https://api.iconify.design/simple-icons:' + slug + '.svg?color=%23' + color + '&height=32")';
+  }
+
+  slugs = { github: 'github', slack: 'slack', linear: 'linear', jira: 'jira', trello: 'trello', notion: 'notion', calendar: 'googlecalendar' };
+
+  items = [
+    { id: '1', service: 'github', lane: 'blocked', priority: 'high', age: '40m', source: 'bersi/dev-os-connectors',
+      title: 'Checks falhando · retry-backoff #118',
+      reason: 'Dois testes de integração quebraram no seu último push. Ninguém mais está nessa branch.',
+      action: { label: 'Ver run', primary: true } },
+    { id: '2', service: 'github', lane: 'action', priority: 'high', age: '2d', source: 'bersi/dev-os-orchestrator',
+      title: 'Review pedido · Auth OAuth flow #42',
+      reason: 'Ana pediu na segunda e não entregou nada desde então. DEV-18 e a release mobile estão atrás desse merge.',
+      action: { label: 'Revisar', primary: true } },
+    { id: '3', service: 'linear', lane: 'blocked', priority: 'high', age: '2d', source: 'DEV · Platform',
+      title: 'DEV-18 bloqueada pela OAuth PR',
+      reason: 'Sprint 1 fecha sexta. O desbloqueio depende só do merge de #42.',
+      action: { label: 'Abrir', primary: false } },
+    { id: '4', service: 'slack', lane: 'action', priority: 'medium', age: '4h', source: '#dev-os-platform',
+      title: 'Política de retry dos webhooks',
+      reason: 'Rafa fez uma pergunta direta. Dois engenheiros pararam esperando a decisão.',
+      action: { label: 'Responder', primary: true } },
+    { id: '5', service: 'linear', lane: 'action', priority: 'medium', age: '3h', source: 'DEV · Platform',
+      title: 'DEV-21 atribuída a você',
+      reason: 'Entrou no ciclo hoje. Sua primeira janela livre é às 14:00.',
+      action: { label: 'Abrir', primary: false } },
+    { id: '6', service: 'github', lane: 'waiting', priority: 'medium', age: '1d', source: 'bersi/dev-os-web',
+      title: 'PR #39 · Normalize Linear payloads',
+      reason: 'Aguardando review da Tainá desde ontem. Nada a fazer até ela responder.',
+      action: { label: 'Cutucar', primary: false } },
+    { id: '7', service: 'notion', lane: 'action', priority: 'low', age: '6h', source: 'RFCs',
+      title: 'RFC de deduplicação de eventos',
+      reason: 'Marcado para sua revisão. Sem data limite declarada.',
+      action: { label: 'Ler', primary: false } },
+    { id: '8', service: 'github', lane: 'waiting', priority: 'low', age: '20m', source: 'bersi/dev-os-web',
+      title: 'PR #44 · Event dedupe',
+      reason: 'Aprovada, esperando CI. Merge automático quando passar.',
+      action: { label: 'Ver run', primary: false } }
+  ];
+
+  lanes = {
+    action: { label: 'ação', fg: '#4FD98C', bg: '#0E2418', bd: '#1C4A31' },
+    waiting: { label: 'esperando', fg: '#79839B', bg: '#161C2B', bd: '#212938' },
+    blocked: { label: 'bloqueado', fg: '#FF8FA6', bg: '#22141C', bd: '#3A2130' }
+  };
+
+  renderVals() {
+    const lucide = (slug, color) => 'url("https://api.iconify.design/lucide:' + slug + '.svg?color=%23' + color + '&height=32")';
+    const mode = this.state.mode;
+    const lane = mode === 'filtroVazio' ? 'blocked' : this.state.lane;
+    const all = mode === 'filaVazia' ? [] : (mode === 'filtroVazio' ? this.items.filter(i => i.lane === 'action') : this.items);
+    const shown = lane === 'all' ? all : all.filter(i => i.lane === lane);
+    const count = (l) => (l === 'all' ? all.length : all.filter(i => i.lane === l).length);
+
+    const brandIcon = (s, c) => this.icon(this.slugs[s], c || '6A7489');
+
+    return {
+      workspaceName: 'Bersi Labs',
+      syncLabel: mode === 'semViewer' ? 'Sync há 41m' : 'Sync há 2m',
+      syncDot: mode === 'semViewer' ? '#D9B871' : '#1D9C4C',
+      syncColor: mode === 'semViewer' ? '#D9B871' : '#4FD98C',
+      viewerUnresolved: mode === 'semViewer',
+
+      headlineLead: mode === 'filaVazia'
+        ? 'Nada exige sua ação agora. '
+        : 'Duas pessoas estão paradas atrás de você, e a release de sexta depende de um merge. ',
+      headlineTail: mode === 'filaVazia'
+        ? 'A sprint segue no prazo e ninguém está bloqueado.'
+        : 'Sua primeira janela livre é às 14:00.',
+
+
+
+      metrics: [
+        { n: count('blocked'),
+          one: ['bloqueador', 'travando outra pessoa'],
+          many: ['bloqueadores', 'travando outra pessoa'] },
+        { n: all.filter(i => i.lane === 'action' && i.service === 'github').length,
+          one: ['review', 'esperando você'],
+          many: ['reviews', 'esperando você'] },
+        { n: all.filter(i => i.lane === 'action' && i.service === 'slack').length,
+          one: ['decisão', 'parada há 4h'],
+          many: ['decisões', 'paradas há 4h'] },
+        { n: null, value: '3/7', one: ['fontes', 'conectadas'], many: ['fontes', 'conectadas'] }
+      ].filter(m => m.n === null || m.n > 0).map(m => {
+        const on = m.n !== null;
+        const pair = m.n === 1 ? m.one : m.many;
+        return {
+          value: on ? String(m.n) : m.value,
+          label: pair[0],
+          consequence: pair[1],
+          rule: on ? '#2E3849' : 'transparent',
+          cursor: on ? 'pointer' : 'default',
+          valueColor: on ? '#4FD98C' : '#9AA4BA'
+        };
+      }),
+
+      queueMeta: shown.length === all.length ? all.length + ' itens' : shown.length + ' de ' + all.length,
+      trailingNote: mode === 'filaVazia'
+        ? '11 eventos chegaram desde ontem — nenhum precisa de você.'
+        : '14 eventos a mais hoje, nenhum bloqueando outra pessoa.',
+
+      filters: [
+        { id: 'all', label: 'Tudo' },
+        { id: 'action', label: 'Ação' },
+        { id: 'waiting', label: 'Esperando' },
+        { id: 'blocked', label: 'Bloqueado' }
+      ].map(f => ({
+        label: f.label, count: count(f.id),
+        pick: () => this.setState({ lane: f.id, mode: mode === 'filtroVazio' ? 'full' : mode }),
+        bg: lane === f.id ? '#1A2130' : 'transparent',
+        bd: lane === f.id ? '#39435A' : '#212938',
+        fg: lane === f.id ? '#E9EDF7' : '#8C96AD',
+        countColor: lane === f.id ? '#9AA4BA' : '#79839B'
+      })),
+
+      rows: shown.map(i => {
+        const L = this.lanes[i.lane];
+        const hi = i.priority === 'high';
+        return {
+          laneLabel: L.label, laneFg: L.fg, laneBg: L.bg, laneBd: L.bd,
+          iconCss: brandIcon(i.service, i.lane === 'blocked' ? '8C96AD' : '9AA4BA'),
+          source: i.source, age: i.age, title: i.title, reason: i.reason,
+          actionLabel: i.action.label,
+          accent: hi ? '2px solid ' + (i.lane === 'blocked' ? '#FF6B8A' : '#1D9C4C') : '2px solid transparent',
+          padLeft: '16px',
+          btnBg: i.action.primary ? '#1D9C4C' : 'transparent',
+          btnFg: i.action.primary ? '#F4F7FF' : '#9AA4BA',
+          btnBd: i.action.primary ? '#1D9C4C' : '#2E3849'
+        };
+      }),
+
+      queueEmpty: shown.length === 0,
+      emptyHasReset: shown.length === 0 && all.length > 0,
+      emptyTitle: all.length === 0 ? 'Nada exige sua ação agora.' : 'Nenhum item bloqueado.',
+      emptyBody: all.length === 0
+        ? '11 eventos chegaram desde ontem — reviews concluídas, deploys que passaram e duas threads já respondidas. Nada disso precisa de você.'
+        : 'Os 4 itens em ação continuam na fila completa.',
+      resetFilter: () => this.setState({ lane: 'all', mode: 'full' }),
+
+      signals: mode === 'filaVazia' ? [] : [
+        { name: 'GitHub', count: '6 eventos', iconCss: brandIcon('github', '9AA4BA'), items: [
+          { title: 'Tainá aprovou #37', summary: 'bersi/dev-os-web · merge automático', age: '35m', cursor: 'pointer', titleColor: '#9AA4BA' },
+          { title: 'Deploy de produção concluído', summary: 'orchestrator · v0.14.2', age: '1h', cursor: 'default', titleColor: '#79839B' }
+        ] },
+        { name: 'Slack', count: '9 eventos', iconCss: brandIcon('slack', '9AA4BA'), items: [
+          { title: 'Rafa mencionou você em #releases', summary: 'sobre a janela de deploy de sexta', age: '2h', cursor: 'pointer', titleColor: '#9AA4BA' },
+          { title: 'Thread de incidente encerrada', summary: '#ops · rate limit resolvido', age: '5h', cursor: 'default', titleColor: '#79839B' }
+        ] }
+      ],
+      noSignal: mode === 'filaVazia',
+
+      weekly: [
+        { value: '7', label: 'PRs merged' },
+        { value: '12', label: 'issues fechadas' },
+        { value: '3', label: 'decisões' }
+      ],
+      activeWork: '5 itens',
+      risks: mode === 'filaVazia' ? [] : [
+        'Release mobile depende de uma PR parada há 2 dias',
+        'Ciclo DEV fecha sexta com 4 issues ainda abertas'
+      ],
+      noRisks: mode === 'filaVazia',
+
+      sourceMeta: '3 de 7',
+      sources: [
+        { name: 'GitHub', meta: '812 eventos', on: true },
+        { name: 'Linear', meta: '341 eventos', on: true },
+        { name: 'Slack', meta: '131 eventos', on: true },
+        { name: 'Calendar', meta: 'conectar', on: false },
+        { name: 'Jira', meta: 'conectar', on: false },
+        { name: 'Notion', meta: 'conectar', on: false },
+        { name: 'Trello', meta: 'conectar', on: false }
+      ].map(s => {
+        const key = s.name.toLowerCase();
+        return {
+          name: s.name, meta: s.meta,
+          iconCss: brandIcon(key, s.on ? '9AA4BA' : '4A5468'),
+          opacity: s.on ? '1' : '.55',
+          cursor: 'pointer',
+          nameColor: s.on ? '#E9EDF7' : '#79839B',
+          metaColor: s.on ? '#6A7489' : '#4FD98C'
+        };
+      }),
+
+      menuOpen: this.state.menu,
+      toggleMenu: () => this.setState(s => ({ menu: !s.menu })),
+      avatarBg: this.state.menu ? '#1A2130' : '#161C2B',
+      avatarBd: this.state.menu ? '#39435A' : '#212938',
+      menu: [
+        { name: 'Fontes conectadas', slug: 'plug', meta: '3/7', accent: true },
+        { name: 'Preferências', slug: 'settings', meta: '' },
+        { name: 'Membros', slug: 'users', meta: '4' },
+        { name: 'Faturamento', slug: 'credit-card', meta: '' },
+        { name: 'Sair', slug: 'log-out', meta: '' }
+      ].map(m => ({
+        name: m.name, meta: m.meta,
+        iconCss: lucide(m.slug, m.accent ? '4FD98C' : '8C96AD'),
+        color: m.accent ? '#E9EDF7' : '#9AA4BA',
+        metaColor: m.accent ? '#4FD98C' : '#79839B'
+      })),
+
+      isTabs: this.state.nav === 'tabs',
+      isCommand: this.state.nav === 'command',
+      isIcons: this.state.nav === 'icons',
+      contentPad: this.state.nav === 'command' ? '26px 20px 72px 20px' : (this.state.nav === 'icons' ? '30px 32px 72px 28px' : '28px 32px 72px 32px'),
+      searchIconCss: lucide('search', '79839B'),
+
+      navTabs: [
+        { name: 'Hoje', badge: '8', on: true },
+        { name: 'Fila', badge: '', on: false },
+        { name: 'Timeline', badge: '', on: false },
+        { name: 'Semana', badge: '', on: false },
+        { name: 'Chat', badge: '', on: false }
+      ].map(n => ({
+        ...n,
+        bg: n.on ? '#113022' : 'transparent',
+        color: n.on ? '#7FE3A8' : '#8C96AD',
+        weight: n.on ? '500' : '400',
+        badgeColor: n.on ? '#4FD98C' : '#79839B'
+      })),
+
+      navIcons: [
+        { name: 'Hoje', slug: 'layout-dashboard', on: true, dot: true },
+        { name: 'Fila', slug: 'list-checks', on: false, dot: false },
+        { name: 'Timeline', slug: 'activity', on: false, dot: false },
+        { name: 'Semana', slug: 'calendar-days', on: false, dot: false },
+        { name: 'Chat', slug: 'message-square', on: false, dot: false }
+      ].map(n => ({
+        name: n.name, dot: n.dot,
+        bg: n.on ? '#113022' : 'transparent',
+        iconCss: lucide(n.slug, n.on ? '7FE3A8' : '79839B')
+      })),
+
+      navRail: [
+        ['Command', 'command'], ['Tabs', 'tabs'], ['Icon rail', 'icons']
+      ].map(([name, id]) => ({
+        name,
+        go: () => this.setState({ nav: id }),
+        bg: this.state.nav === id ? '#1A2130' : 'transparent',
+        fg: this.state.nav === id ? '#E9EDF7' : '#79839B'
+      })),
+
+      stateRail: [
+        ['Cheio', 'full'], ['Fila vazia', 'filaVazia'], ['Filtro vazio', 'filtroVazio'], ['Sem viewer', 'semViewer']
+      ].map(([name, id]) => ({
+        name,
+        go: () => this.setState({ mode: id, lane: id === 'filtroVazio' ? 'blocked' : 'all' }),
+        bg: mode === id ? '#1D9C4C' : 'transparent',
+        fg: mode === id ? '#F4F7FF' : '#6A7489'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

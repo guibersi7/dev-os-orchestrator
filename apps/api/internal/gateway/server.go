@@ -20,6 +20,8 @@ type Config struct {
 	Store            store.Store
 	GatewaySecret    string
 	OAuthStateSecret string
+	AgentBaseURL     string
+	AgentSecret      string
 	HTTPClient       *http.Client
 	Logger           *slog.Logger
 }
@@ -29,6 +31,8 @@ type Server struct {
 	store            store.Store
 	gatewaySecret    string
 	oauthStateSecret string
+	agentBaseURL     string
+	agentSecret      string
 	httpClient       *http.Client
 	logger           *slog.Logger
 }
@@ -53,6 +57,8 @@ func NewServer(config Config) *Server {
 		store:            config.Store,
 		gatewaySecret:    config.GatewaySecret,
 		oauthStateSecret: oauthStateSecret,
+		agentBaseURL:     normalizeAgentBaseURL(config.AgentBaseURL),
+		agentSecret:      config.AgentSecret,
 		httpClient:       httpClient,
 		logger:           logger,
 	}
@@ -64,6 +70,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /v1/workspaces", s.withAuth(s.listWorkspaces))
 	mux.HandleFunc("POST /v1/workspaces", s.withAuth(s.createWorkspace))
 	mux.HandleFunc("GET /v1/dashboard", s.withAuth(s.dashboard))
+	mux.HandleFunc("POST /v1/agent/chat", s.withAuth(s.agentChat))
 	mux.HandleFunc("GET /v1/config", s.withAuth(s.getConfig))
 	mux.HandleFunc("PUT /v1/config", s.withAuth(s.putConfig))
 	mux.HandleFunc("GET /v1/connections", s.withAuth(s.listConnections))

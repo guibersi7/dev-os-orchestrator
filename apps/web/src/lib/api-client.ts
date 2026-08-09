@@ -175,6 +175,27 @@ export type UserConfig = {
   };
 };
 
+export type AgentCitation = {
+  type: "work_event" | "document_chunk" | string;
+  id: string;
+  service: Service;
+  title: string;
+  url?: string;
+};
+
+export type AgentSuggestedAction = {
+  label: string;
+  kind: string;
+};
+
+export type AgentChatResponse = {
+  answer: string;
+  citations: AgentCitation[];
+  suggestedActions: AgentSuggestedAction[];
+  confidence: "low" | "medium" | "high" | string;
+  model: string;
+};
+
 export type GatewayState<T> = {
   data: T | null;
   error: string | null;
@@ -350,6 +371,15 @@ export function syncIntegration(service: Service) {
     requestGateway<{ connector: ConnectorInfo; result: SyncResult }>("/v1/sync", {
       method: "POST",
       body: JSON.stringify({ service }),
+    }),
+  );
+}
+
+export function sendAgentChatMessage(message: string, conversationId?: string) {
+  return captureGatewayState(() =>
+    requestGateway<{ agent: AgentChatResponse }>("/v1/agent/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, conversationId }),
     }),
   );
 }

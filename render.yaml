@@ -1,7 +1,26 @@
-# Render Blueprint for the Standup API (apps/api — Go HTTP gateway).
-# Connect this repo as a Blueprint in the Render dashboard; Render builds the
-# Dockerfile at apps/api and exposes it over HTTPS with a /health check.
+# Render Blueprint for Standup services.
+# Connect this repo as a Blueprint in the Render dashboard.
 services:
+  - type: web
+    name: standup-agent
+    runtime: docker
+    rootDir: apps/agent
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: AGENT_SERVICE_SECRET
+        generateValue: true
+      - key: AGENT_MODEL_BASE_URL
+        sync: false
+      - key: AGENT_MODEL
+        value: local-agent
+      - key: AGENT_TIMEOUT_SECONDS
+        value: "20"
+
   - type: web
     name: standup-api
     runtime: docker
@@ -16,6 +35,17 @@ services:
       # Port the container listens on (matches the Dockerfile default).
       - key: API_ADDR
         value: ":8080"
+      # Internal Render network URL for the Python agent service.
+      - key: AGENT_BASE_URL
+        fromService:
+          type: web
+          name: standup-agent
+          property: hostport
+      - key: AGENT_SERVICE_SECRET
+        fromService:
+          type: web
+          name: standup-agent
+          envVarKey: AGENT_SERVICE_SECRET
       # Shared secret between the web app and the API. Render generates it;
       # copy the same value into Vercel's API_GATEWAY_SECRET so both sides match.
       - key: API_GATEWAY_SECRET

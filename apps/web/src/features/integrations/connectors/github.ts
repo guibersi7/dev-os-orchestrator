@@ -10,13 +10,13 @@ export const githubConnector = createConnector({
   connectUrl: "/api/auth/github/start",
   fetchRecentRecords: async () => [
     mockRecord("gh-pr-1482", "Add session refresh flow for GitHub OAuth", "Guilherme", {
-      repository: "devos-web",
+      repository: "standup-web",
       number: 1482,
       status: "blocked",
       blockedBy: "failing_checks",
     }),
     mockRecord("gh-check-991", "Auth session refresh checks failed", "GitHub Actions", {
-      repository: "devos-web",
+      repository: "standup-web",
       checkSuite: "e2e-login",
       conclusion: "failure",
     }),
