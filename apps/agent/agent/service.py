@@ -213,6 +213,10 @@ def _strip_json_fence(content: str) -> str:
 
 def _chat_completions_url(base_url: str) -> str:
     base_url = base_url.rstrip("/")
+    if base_url.endswith("/chat/completions"):
+        return base_url
+    if base_url.endswith("/v1/chat"):
+        return base_url + "/completions"
     if base_url.endswith("/v1"):
         return base_url + "/chat/completions"
     return base_url + "/v1/chat/completions"
