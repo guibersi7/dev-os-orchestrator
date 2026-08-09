@@ -11,8 +11,9 @@ export type CommandItem = {
 export const DESTINATIONS: CommandItem[] = [
   { id: "today", kind: "destination", label: "Hoje", href: "/today" },
   { id: "queue", kind: "destination", label: "Fila", href: "/today?lane=action" },
-  { id: "timeline", kind: "destination", label: "Timeline", href: "/today#atividade" },
-  { id: "weekly", kind: "destination", label: "Semana", href: "/today#semana" },
+  { id: "blocked", kind: "destination", label: "Bloqueado", href: "/today?lane=blocked" },
+  { id: "timeline", kind: "destination", label: "Timeline", href: "/timeline" },
+  { id: "weekly", kind: "destination", label: "Semana", href: "/weekly" },
   { id: "chat", kind: "destination", label: "Chat", href: "/chat" },
   { id: "sources", kind: "destination", label: "Fontes", href: "/settings" },
   { id: "settings", kind: "destination", label: "Preferências", href: "/settings" },

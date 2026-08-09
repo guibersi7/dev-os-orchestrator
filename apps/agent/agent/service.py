@@ -126,13 +126,14 @@ def _fallback_response(message: str, citations: list[dict[str, Any]]) -> dict[st
 
 def _rank_citations(message: str, events: list[dict[str, Any]], chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     terms = _terms(message)
+    service_intents = _service_intents(message)
     scored = []
     for event in events:
         text = " ".join(str(event.get(key, "")) for key in ("title", "summary", "type", "source"))
-        scored.append((_score(terms, text), event.get("occurredAt", ""), _event_citation(event)))
+        scored.append((_score(terms, text) + _service_score(service_intents, event.get("service")), event.get("occurredAt", ""), _event_citation(event)))
     for chunk in chunks:
         text = " ".join(str(chunk.get(key, "")) for key in ("title", "content", "source"))
-        scored.append((_score(terms, text), chunk.get("updatedAt", ""), _chunk_citation(chunk)))
+        scored.append((_score(terms, text) + _service_score(service_intents, chunk.get("service")), chunk.get("updatedAt", ""), _chunk_citation(chunk)))
 
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     citations = [item[2] for item in scored if item[2]["id"]]
@@ -195,6 +196,22 @@ def _terms(message: str) -> list[str]:
 def _score(terms: list[str], text: str) -> int:
     lowered = text.lower()
     return sum(1 for term in terms if term in lowered)
+
+
+def _service_intents(message: str) -> set[str]:
+    words = set(re.findall(r"[a-zA-Z0-9_#-]{2,}", message.lower().replace("-", " ")))
+    intents = {service for service in ("github", "slack", "linear", "jira", "trello", "notion", "calendar") if service in words}
+    if {"git", "pr", "prs", "pull"} & words:
+        intents.add("github")
+    if {"meet", "meeting", "agenda", "calendario", "calendário"} & words:
+        intents.add("calendar")
+    return intents
+
+
+def _service_score(service_intents: set[str], service: Any) -> int:
+    if not service_intents:
+        return 0
+    return 100 if str(service).lower() in service_intents else -25
 
 
 def _list(value: Any) -> list[dict[str, Any]]:

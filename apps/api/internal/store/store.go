@@ -1384,10 +1384,11 @@ func allServices() []domain.Service {
 
 func rankWorkEvents(events []domain.WorkEvent, query string, limit int) []domain.WorkEvent {
 	terms := searchTerms(query)
+	serviceIntent := detectServiceIntent(query)
 	ranked := append([]domain.WorkEvent(nil), events...)
 	sort.SliceStable(ranked, func(i, j int) bool {
-		left := scoreText(terms, ranked[i].Title+" "+ranked[i].Summary+" "+ranked[i].Type+" "+ranked[i].Source)
-		right := scoreText(terms, ranked[j].Title+" "+ranked[j].Summary+" "+ranked[j].Type+" "+ranked[j].Source)
+		left := scoreWorkEvent(terms, serviceIntent, ranked[i])
+		right := scoreWorkEvent(terms, serviceIntent, ranked[j])
 		if left != right {
 			return left > right
 		}
@@ -1401,10 +1402,11 @@ func rankWorkEvents(events []domain.WorkEvent, query string, limit int) []domain
 
 func rankDocumentChunks(chunks []domain.DocumentChunk, query string, limit int) []domain.DocumentChunk {
 	terms := searchTerms(query)
+	serviceIntent := detectServiceIntent(query)
 	ranked := append([]domain.DocumentChunk(nil), chunks...)
 	sort.SliceStable(ranked, func(i, j int) bool {
-		left := scoreText(terms, ranked[i].Title+" "+ranked[i].Content+" "+ranked[i].Source)
-		right := scoreText(terms, ranked[j].Title+" "+ranked[j].Content+" "+ranked[j].Source)
+		left := scoreDocumentChunk(terms, serviceIntent, ranked[i])
+		right := scoreDocumentChunk(terms, serviceIntent, ranked[j])
 		if left != right {
 			return left > right
 		}
@@ -1431,6 +1433,28 @@ func searchTerms(query string) []string {
 	return terms
 }
 
+func scoreWorkEvent(terms []string, serviceIntent map[domain.Service]bool, event domain.WorkEvent) int {
+	score := scoreText(terms, event.Title+" "+event.Summary+" "+event.Type+" "+event.Source)
+	if len(serviceIntent) == 0 {
+		return score
+	}
+	if serviceIntent[event.Service] {
+		return score + 100
+	}
+	return score - 25
+}
+
+func scoreDocumentChunk(terms []string, serviceIntent map[domain.Service]bool, chunk domain.DocumentChunk) int {
+	score := scoreText(terms, chunk.Title+" "+chunk.Content+" "+chunk.Source)
+	if len(serviceIntent) == 0 {
+		return score
+	}
+	if serviceIntent[chunk.Service] {
+		return score + 100
+	}
+	return score - 25
+}
+
 func scoreText(terms []string, text string) int {
 	if len(terms) == 0 {
 		return 0
@@ -1443,4 +1467,27 @@ func scoreText(terms []string, text string) int {
 		}
 	}
 	return score
+}
+
+func detectServiceIntent(query string) map[domain.Service]bool {
+	normalized := strings.ToLower(query)
+	normalized = strings.NewReplacer("-", " ", "_", " ", ".", " ", ",", " ", "?", " ", "!", " ", ":", " ").Replace(normalized)
+	words := map[string]bool{}
+	for _, word := range strings.Fields(normalized) {
+		words[word] = true
+	}
+
+	intents := map[domain.Service]bool{}
+	for _, service := range allServices() {
+		if words[string(service)] {
+			intents[service] = true
+		}
+	}
+	if words["github"] || words["git"] || words["pr"] || words["prs"] || words["pull"] {
+		intents[domain.ServiceGitHub] = true
+	}
+	if words["meet"] || words["meeting"] || words["calendar"] || words["agenda"] || words["calendario"] || words["calendário"] {
+		intents[domain.ServiceCalendar] = true
+	}
+	return intents
 }

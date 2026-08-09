@@ -5,7 +5,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from agent.server import AgentHandler
-from agent.service import _chat_completions_url, create_response
+from agent.service import _chat_completions_url, _rank_citations, create_response
 
 
 class AgentServiceTest(unittest.TestCase):
@@ -111,6 +111,32 @@ class AgentServiceTest(unittest.TestCase):
             _chat_completions_url("http://localhost:11434"),
             "http://localhost:11434/v1/chat/completions",
         )
+
+    def test_rank_citations_prioritizes_explicit_service_intent(self) -> None:
+        citations = _rank_citations(
+            "o que foi decidido no Slack?",
+            [
+                {
+                    "id": "jira-1",
+                    "service": "jira",
+                    "title": "Ticket mentions Slack rollout",
+                    "summary": "Slack appears in this Jira ticket.",
+                    "source": "Jira",
+                    "occurredAt": "2026-08-08T12:05:00Z",
+                },
+                {
+                    "id": "slack-1",
+                    "service": "slack",
+                    "title": "Release scope decision",
+                    "summary": "The team decided to hold release scope.",
+                    "source": "#release",
+                    "occurredAt": "2026-08-08T12:00:00Z",
+                },
+            ],
+            [],
+        )
+
+        self.assertEqual(citations[0]["service"], "slack")
 
 
 class AgentHandlerTest(unittest.TestCase):
