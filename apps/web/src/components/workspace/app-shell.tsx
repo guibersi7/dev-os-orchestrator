@@ -21,7 +21,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     getInitialAuthSession(),
   ]);
 
-  const workspace = workspacesState.data?.workspaces.find((item) => item.id === workspaceId);
+  const workspaces = workspacesState.data?.workspaces ?? [];
+  const workspace = workspaces.find((item) => item.id === workspaceId);
   const connections = connectionsState.data?.connections ?? [];
   const connected = connections.filter((connection) => connection.status === "connected").length;
 
@@ -44,7 +45,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         connectedLabel={`${connected}/7`}
         initials={initials}
         items={items}
+        workspaceId={workspaceId}
         workspaceName={workspace?.name ?? "Standup"}
+        workspaces={workspaces.map((item) => ({ id: item.id, name: item.name }))}
       />
       <main>{children}</main>
     </div>
