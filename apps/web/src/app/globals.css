@@ -1,4 +1,38 @@
 @import "tailwindcss";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
+
+@font-face {
+  font-family: "Switzer";
+  src: url("/fonts/switzer/switzer-400.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Switzer";
+  src: url("/fonts/switzer/switzer-500.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Switzer";
+  src: url("/fonts/switzer/switzer-600.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "Switzer";
+  src: url("/fonts/switzer/switzer-700.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 700;
+}
 
 :root {
   --standup-accent: #1d9c4c;
@@ -7,6 +41,8 @@
   --standup-accent-surface: #0e2418;
   --standup-accent-border: #1c4a31;
   --standup-accent-soft: rgba(29, 156, 76, 0.34);
+  --info-surface: #0e1420;
+  --info-border: #2b3b6e;
   --quantum-blue: var(--standup-accent);
   --quantum-blue-hover: var(--standup-accent-hover);
   --quantum-blue-text: var(--standup-accent-text);
@@ -22,16 +58,21 @@
   --line: #212938;
   --line-soft: #1c2432;
   --line-softer: #1b2230;
+  --line-hair: #161c2b;
+  --line-strong: #2e3849;
+  --line-strongest: #39435a;
   --ring-inner: #161c2b;
   --ring-middle: #141a28;
   --ring-outer: #121724;
   --ink-900: #e9edf7;
   --ink-600: #9aa4ba;
   --ink-500: #9aa4ba;
+  --ink-475: #8c96ad;
   --ink-450: #79839b;
-  --ink-400: #6a7489;
-  --ink-300: #6a7489;
-  --line-300: #2a3345;
+  --ink-400: #79839b;
+  --ink-300: #79839b;
+  --ink-disabled: #545f79;
+  --line-300: #2e3849;
   --line-200: var(--line);
   --line-150: var(--line);
   --line-100: var(--line);
@@ -43,11 +84,12 @@
   --card-surface: var(--surface);
   --app-bg: var(--bg-base);
   --danger-600: #ff6b8a;
-  --danger-text: #ff9caf;
+  --danger-text: #ff8fa6;
   --danger-50: #22141c;
-  --danger-border: #4a2230;
-  --warn-text: #f6c66a;
-  --warn-50: #241f14;
+  --danger-border: #3a2130;
+  --warn-text: #d9b871;
+  --warn-50: #231d12;
+  --warn-border: #3a3220;
   --brand-primary: var(--quantum-blue);
   --brand-primary-hover: var(--quantum-blue-hover);
   --brand-surface: var(--ice-glass);
@@ -82,6 +124,8 @@
   --color-standup-accent-text: var(--standup-accent-text);
   --color-standup-accent-surface: var(--standup-accent-surface);
   --color-standup-accent-border: var(--standup-accent-border);
+  --color-info-surface: var(--info-surface);
+  --color-info-border: var(--info-border);
   --color-bg-base: var(--bg-base);
   --color-bg-alt: var(--bg-alt);
   --color-surface: var(--surface);
@@ -91,6 +135,16 @@
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);
   --color-line-softer: var(--line-softer);
+  --color-line-hair: var(--line-hair);
+  --color-line-strong: var(--line-strong);
+  --color-line-strongest: var(--line-strongest);
+  --color-danger-600: var(--danger-600);
+  --color-danger-text: var(--danger-text);
+  --color-danger-surface: var(--danger-50);
+  --color-danger-border: var(--danger-border);
+  --color-warn-text: var(--warn-text);
+  --color-warn-surface: var(--warn-50);
+  --color-warn-border: var(--warn-border);
   --color-ring-inner: var(--ring-inner);
   --color-ring-middle: var(--ring-middle);
   --color-ring-outer: var(--ring-outer);
@@ -135,8 +189,9 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif;
+  font-family: "Switzer", Geist, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 button,
@@ -150,7 +205,7 @@ textarea {
 }
 
 .font-mono {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .text-balance {
@@ -159,6 +214,35 @@ textarea {
 
 .text-pretty {
   text-wrap: pretty;
+}
+
+.standup-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+  opacity: 0.035;
+  pointer-events: none;
+}
+
+.hero-line {
+  display: block;
+  overflow: hidden;
+}
+
+.hero-line > span {
+  display: block;
+}
+
+.ticker-mask {
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+
+.setup-progress {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.cut-rule {
+  width: 0%;
 }
 
 @keyframes dos-pulse {
