@@ -1,189 +1,151 @@
-import { AlertTriangle, ArrowLeft, GitPullRequest, MessagesSquare, Workflow } from "lucide-react";
-import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
-import { FocusPanel } from "@/components/workspace/focus-panel";
+import { CommandBar } from "@/components/nav/command-bar";
+import { ActionQueue } from "@/components/dashboard/action-queue";
+import type { LaneFilter } from "@/components/dashboard/action-queue";
+import { TodayBrief } from "@/components/dashboard/today-brief";
+import { AllActivity, SignalBoard, SourceSignalList, WeeklyProgress } from "@/components/dashboard/context-rail";
 import { IntegrationEmptyState } from "@/components/workspace/integration-empty-state";
-import { MetricStrip } from "@/components/workspace/metric-strip";
-import { Timeline } from "@/components/workspace/timeline";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { integrationCatalog } from "@/features/integrations/catalog";
-import { getDashboardState, getWorkspacesState } from "@/lib/api-client";
-import {
-  buildIssueQueue,
-  buildReviewQueue,
-  latestSyncLabel,
-  normalizeDashboardPayload,
-  sourceEventCounts,
-  sourceHealthByService,
-} from "@/lib/dashboard-view-model";
+import { getConnectionsState, getDashboardState, getWorkspacesState } from "@/lib/api-client";
+import { getInitialAuthSession } from "@/lib/auth-session";
+import { normalizeDashboardPayload } from "@/lib/dashboard-view-model";
+import { normalizeWorkEvents } from "@/lib/work-event";
+import { buildQueue, countTrailingEvents } from "@/lib/queue/build";
+import { buildViewerIdentity, isViewerActor } from "@/lib/viewer-identity";
+import { buildDashboardNarrative } from "@/lib/dashboard/narrative";
+import { buildRecentSignal, buildSourceRows, connectedCount, syncTone } from "@/lib/dashboard/rail";
+import { DESTINATIONS } from "@/features/command/search";
+import type { CommandItem } from "@/features/command/search";
 
 type DashboardWorkspacePageProps = {
   params: Promise<{ workspaceId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function DashboardWorkspacePage({ params }: DashboardWorkspacePageProps) {
+const LANES: LaneFilter[] = ["action", "waiting", "blocked"];
+
+function parseLane(value: string | string[] | undefined): LaneFilter {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return LANES.includes(candidate as LaneFilter) ? (candidate as LaneFilter) : "all";
+}
+
+export default async function DashboardWorkspacePage({ params, searchParams }: DashboardWorkspacePageProps) {
   const { workspaceId } = await params;
-  const [dashboardState, workspacesState] = await Promise.all([
+  const query = await searchParams;
+  const lane = parseLane(query.lane);
+
+  const [dashboardState, workspacesState, connectionsState, session] = await Promise.all([
     getDashboardState(workspaceId),
     getWorkspacesState(workspaceId),
+    getConnectionsState(),
+    getInitialAuthSession(),
   ]);
+
   const workspace = workspacesState.data?.workspaces.find((item) => item.id === workspaceId);
   const dashboard = normalizeDashboardPayload(dashboardState.data?.dashboard);
-  const reviewQueue = buildReviewQueue(dashboard.today.prsWaitingForReview.length ? dashboard.today.prsWaitingForReview : dashboard.events);
-  const issueQueue = buildIssueQueue(dashboard.today.assignedIssues.length ? dashboard.today.assignedIssues : dashboard.events);
-  const weeklySummary = dashboard.weeklySummary;
-  const eventCounts = sourceEventCounts(dashboard.events);
-  const healthByService = sourceHealthByService(dashboard.sourceHealth);
-  const hasConnectedSources = dashboard.metrics.connectedSources > 0 || dashboard.sourceHealth.some((source) => source.status === "connected");
-  const isEmptyWorkspace = !dashboardState.error && !hasConnectedSources && dashboard.events.length === 0;
-  const metrics = [
-    { label: "Connected sources", value: dashboard.metrics.connectedSources.toString(), icon: Workflow },
-    { label: "Waiting review", value: dashboard.metrics.waitingReview.toString(), icon: GitPullRequest },
-    { label: "Cross-tool blockers", value: dashboard.metrics.crossToolBlockers.toString(), icon: AlertTriangle },
-    { label: "Decisions found", value: dashboard.metrics.decisionsFound.toString(), icon: MessagesSquare },
+  const events = normalizeWorkEvents(dashboard.events, workspaceId);
+
+  // A failed connections call costs personalization, never the screen.
+  const identity = buildViewerIdentity(session.user, connectionsState.data?.connections ?? [], events);
+  const queue = buildQueue(events, { isViewer: (event) => isViewerActor(event, identity) });
+  const shown = lane === "all" ? queue : queue.filter((item) => item.lane === lane);
+
+  const narrative = buildDashboardNarrative(dashboard, queue, { viewerResolved: identity.resolved });
+  const signal = buildRecentSignal(events, queue);
+  const sourceRows = buildSourceRows(dashboard, events);
+  const connected = connectedCount(dashboard);
+  const trailing = countTrailingEvents(events, queue);
+
+  const lastSync = dashboard.sourceHealth
+    .map((source) => source.lastSyncedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+
+  const hasConnectedSources = connected > 0 || dashboard.metrics.connectedSources > 0;
+  const isEmptyWorkspace = !dashboardState.error && !hasConnectedSources && events.length === 0;
+
+  const commandItems: CommandItem[] = [
+    ...DESTINATIONS,
+    ...queue.map((item) => ({
+      id: `queue-${item.id}`,
+      kind: "queue" as const,
+      label: item.title,
+      hint: item.source,
+      href: item.action.href,
+    })),
+    ...sourceRows.map((row) => ({
+      id: `source-${row.service}`,
+      kind: "source" as const,
+      label: row.name,
+      hint: row.meta,
+      href: row.href,
+    })),
   ];
 
+  const initials = (session.user?.name ?? "S").slice(0, 1).toUpperCase();
+
   return (
-    <SpringReveal className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground">
-            {/* Intentionally use document navigation to avoid protected-route RSC requests. */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/dashboard">
-              <ArrowLeft className="h-4 w-4" />
-              Dashboards
-            </a>
-          </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">{workspace?.name ?? "Dashboard"}</h1>
-          <p className="text-sm text-muted-foreground">What matters now across code, planning, conversations, docs, and meetings.</p>
-        </div>
-        <Badge tone={dashboardState.error ? "red" : "green"}>
-          {dashboardState.error ? "Gateway offline" : latestSyncLabel(dashboard)}
-        </Badge>
-      </div>
-      {dashboardState.error ? (
-        <Card className="border-[#4A2230] bg-[#22141C] p-4 text-sm text-[#FF9CAF]">{dashboardState.error}</Card>
-      ) : null}
-      {isEmptyWorkspace ? (
-        <IntegrationEmptyState
-          title="Connect an app to populate this dashboard"
-          description="No connected integrations or synced events were found for this workspace. Start with GitHub, then add planning, docs, and messaging sources as needed."
-          service="github"
-          actionLabel="Connect GitHub"
-        />
-      ) : (
-        <>
-          <MetricStrip metrics={metrics} />
-          <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-            <div className="space-y-6">
-              <Card className="p-5">
-                <h2 className="text-base font-semibold">Pull requests</h2>
-                <AnimeStagger className="mt-4 divide-y divide-border">
-                  {reviewQueue.length === 0 ? (
-                    <p className="py-4 text-sm text-muted-foreground">
-                      No pull request or review events in the latest sync.
-                    </p>
-                  ) : null}
-                  {reviewQueue.map((pr) => (
-                    <a key={pr.id} href={`/integrations/${pr.service}`} className="block py-4 first:pt-0 last:pb-0">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium">{pr.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {pr.source} · {pr.actor} · {pr.age}
-                          </p>
-                        </div>
-                        <Badge tone={pr.status === "blocked" || pr.status === "checks_failed" ? "red" : "amber"}>
-                          {pr.status.replace("_", " ")}
-                        </Badge>
-                      </div>
-                    </a>
-                  ))}
-                </AnimeStagger>
-              </Card>
-              <Timeline events={dashboard.events} />
+    <>
+      <CommandBar
+        connectedLabel={`${connected}/7`}
+        initials={initials}
+        items={commandItems}
+        workspaceName={workspace?.name ?? "Standup"}
+      />
+
+      <SpringReveal className="mx-auto min-w-0 max-w-[1240px] px-5 pb-[72px] pt-[26px]">
+        {dashboardState.error ? (
+          <Card className="mb-6 border-[#3A2130] bg-[#22141C] p-4 text-sm text-[#FF8FA6]">{dashboardState.error}</Card>
+        ) : null}
+
+        {isEmptyWorkspace ? (
+          <IntegrationEmptyState
+            actionLabel="Connect GitHub"
+            description="No connected integrations or synced events were found for this workspace. Start with GitHub, then add planning, docs, and messaging sources as needed."
+            service="github"
+            title="Connect an app to populate this dashboard"
+          />
+        ) : (
+          <>
+            <TodayBrief
+              narrative={narrative}
+              syncLabel={lastSync ? `Sync ${new Date(lastSync).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Sem sync"}
+              syncTone={syncTone(lastSync ?? undefined, Boolean(dashboardState.error))}
+              viewerResolved={identity.resolved}
+              workspaceName={workspace?.name ?? "Dashboard"}
+            />
+
+            <div className="mt-7 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="min-w-0 space-y-6">
+                <ActionQueue
+                  active={lane}
+                  all={queue}
+                  items={shown}
+                  trailingNote={
+                    trailing > 0
+                      ? `${trailing} ${trailing === 1 ? "outro evento hoje" : "outros eventos hoje"}, nenhum bloqueando outra pessoa.`
+                      : ""
+                  }
+                />
+              </div>
+
+              <div className="min-w-0 space-y-6">
+                <SignalBoard groups={signal} />
+                <WeeklyProgress
+                  activeWork={dashboard.weeklySummary.activeWork.length}
+                  closedIssues={dashboard.weeklySummary.closedIssues.length}
+                  decisions={dashboard.metrics.decisionsFound}
+                  mergedPrs={dashboard.weeklySummary.mergedPrs.length}
+                  risks={dashboard.weeklySummary.risks}
+                />
+                <SourceSignalList connected={connected} rows={sourceRows} />
+                <AllActivity events={dashboard.events} />
+              </div>
             </div>
-            <div className="space-y-6">
-              <FocusPanel events={dashboard.events} focus={dashboard.focus} />
-              <Card className="p-5">
-                <h2 className="text-base font-semibold">Connected sources</h2>
-                <AnimeStagger className="mt-4 space-y-3">
-                  {integrationCatalog.map((integration) => {
-                    const health = healthByService[integration.id];
-                    const connected = health?.status === "connected";
-                    return (
-                      <a
-                        key={integration.id}
-                        href={`/integrations/${integration.id}`}
-                        className="flex items-center justify-between gap-3 rounded-md p-2 transition-colors hover:bg-accent"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{integration.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {(eventCounts[integration.id] ?? 0).toLocaleString()} events ·{" "}
-                            {health?.status?.replaceAll("_", " ") ?? "not synced"}
-                          </p>
-                        </div>
-                        <Badge tone={connected ? "green" : "neutral"}>{connected ? "On" : "Ready"}</Badge>
-                      </a>
-                    );
-                  })}
-                </AnimeStagger>
-              </Card>
-              <Card className="p-5">
-                <h2 className="text-base font-semibold">Weekly summary</h2>
-                <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-md bg-muted p-3">
-                    <dt className="text-muted-foreground">Merged PRs</dt>
-                    <dd className="mt-1 text-2xl font-semibold">{weeklySummary.mergedPrs.length}</dd>
-                  </div>
-                  <div className="rounded-md bg-muted p-3">
-                    <dt className="text-muted-foreground">Closed issues</dt>
-                    <dd className="mt-1 text-2xl font-semibold">{weeklySummary.closedIssues.length}</dd>
-                  </div>
-                  <div className="rounded-md bg-muted p-3">
-                    <dt className="text-muted-foreground">Decisions</dt>
-                    <dd className="mt-1 text-2xl font-semibold">{dashboard.metrics.decisionsFound}</dd>
-                  </div>
-                </dl>
-                <div className="mt-4 space-y-2">
-                  {weeklySummary.risks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No high-priority risks found in the latest sync.</p>
-                  ) : null}
-                  {weeklySummary.risks.map((risk) => (
-                    <p key={risk} className="text-sm text-muted-foreground">
-                      Risk: {risk}
-                    </p>
-                  ))}
-                </div>
-              </Card>
-              <Card className="p-5">
-                <h2 className="text-base font-semibold">Assigned issues</h2>
-                <AnimeStagger className="mt-4 space-y-3">
-                  {issueQueue.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No issue, ticket, or card events in the latest sync.</p>
-                  ) : null}
-                  {issueQueue.map((issue) => (
-                    <a
-                      key={issue.id}
-                      href={`/integrations/${issue.service}`}
-                      className="block rounded-md border border-border p-3 transition-colors hover:bg-accent"
-                    >
-                      <p className="text-sm font-medium">{issue.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {issue.source} · {issue.actor} · {issue.priority}
-                      </p>
-                    </a>
-                  ))}
-                </AnimeStagger>
-              </Card>
-            </div>
-          </div>
-        </>
-      )}
-    </SpringReveal>
+          </>
+        )}
+      </SpringReveal>
+    </>
   );
 }

@@ -1,25 +1,5 @@
 import type { DashboardPayload, Service, SourceHealth, WorkEvent } from "@/lib/api-client";
 
-export type ReviewQueueItem = {
-  id: string;
-  service: Service;
-  title: string;
-  source: string;
-  actor: string;
-  age: string;
-  status: "waiting_review" | "blocked" | "checks_failed" | "ready";
-};
-
-export type IssueQueueItem = {
-  id: string;
-  service: Service;
-  title: string;
-  source: string;
-  actor: string;
-  priority: string;
-  status: string;
-};
-
 export type WeeklySummaryView = {
   mergedPrs: number;
   closedIssues: number;
@@ -160,42 +140,6 @@ export function sourceHealthByService(sourceHealth: SourceHealth[]) {
   return Object.fromEntries(sourceHealth.map((source) => [source.service, source])) as Partial<Record<Service, SourceHealth>>;
 }
 
-export function buildReviewQueue(events: WorkEvent[]) {
-  return events
-    .filter((event) => {
-      const type = event.type.toLowerCase();
-      return type.includes("pull_request") || type.includes("review") || type.includes("check");
-    })
-    .slice(0, 6)
-    .map<ReviewQueueItem>((event) => ({
-      id: event.id,
-      service: event.service,
-      title: event.title,
-      source: event.source,
-      actor: event.actor,
-      age: formatRelativeTime(event.occurredAt),
-      status: statusFromEvent(event),
-    }));
-}
-
-export function buildIssueQueue(events: WorkEvent[]) {
-  return events
-    .filter((event) => {
-      const type = event.type.toLowerCase();
-      return type.includes("issue") || type.includes("ticket") || type.includes("card");
-    })
-    .slice(0, 6)
-    .map<IssueQueueItem>((event) => ({
-      id: event.id,
-      service: event.service,
-      title: event.title,
-      source: event.source,
-      actor: event.actor,
-      priority: event.priority.toUpperCase(),
-      status: event.type.split(".").at(-1)?.replaceAll("_", " ") ?? "open",
-    }));
-}
-
 export function buildWeeklySummary(events: WorkEvent[]) {
   const lowerTypes = events.map((event) => event.type.toLowerCase());
   const risks = events
@@ -211,13 +155,3 @@ export function buildWeeklySummary(events: WorkEvent[]) {
   } satisfies WeeklySummaryView;
 }
 
-function statusFromEvent(event: WorkEvent): ReviewQueueItem["status"] {
-  const type = event.type.toLowerCase();
-  const text = `${event.title} ${event.summary}`.toLowerCase();
-
-  if (type.includes("check.failed") || text.includes("failed")) return "checks_failed";
-  if (type.includes("blocked") || text.includes("blocked")) return "blocked";
-  if (type.includes("review.requested") || text.includes("review")) return "waiting_review";
-
-  return "ready";
-}
