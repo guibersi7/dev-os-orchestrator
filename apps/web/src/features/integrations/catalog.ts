@@ -1,12 +1,3 @@
-import {
-  BookOpenText,
-  CalendarDays,
-  Columns3,
-  GitPullRequest,
-  ListTodo,
-  MessageSquareText,
-  type LucideIcon,
-} from "lucide-react";
 import type { Service } from "@/lib/api-client";
 
 export type IntegrationCatalogItem = {
@@ -16,7 +7,6 @@ export type IntegrationCatalogItem = {
   authStrategy: string;
   syncMode: string;
   objects: string[];
-  icon: LucideIcon;
   connect?: {
     preConnectTitle: string;
     preConnectDescription: string;
@@ -50,7 +40,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_webhook",
     objects: ["pull_requests", "issues", "commits", "reviews", "review_comments", "releases", "checks"],
-    icon: GitPullRequest,
   },
   {
     id: "slack",
@@ -59,7 +48,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_polling",
     objects: ["channels", "direct_messages", "messages", "threads", "decisions", "blockers"],
-    icon: MessageSquareText,
     connect: {
       preConnectTitle: "Vamos conectar seu workspace Slack.",
       preConnectDescription:
@@ -103,7 +91,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_polling",
     objects: ["teams", "projects", "cycles", "issues", "labels", "comments"],
-    icon: ListTodo,
     connect: {
       preConnectTitle: "Connect Linear",
       preConnectDescription:
@@ -148,7 +135,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_polling",
     objects: ["projects", "epics", "issues", "sprints", "comments", "statuses"],
-    icon: ListTodo,
     connect: {
       preConnectTitle: "Connect Jira",
       preConnectDescription:
@@ -193,7 +179,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_polling",
     objects: ["boards", "lists", "cards", "labels", "comments", "members"],
-    icon: Columns3,
   },
   {
     id: "notion",
@@ -202,7 +187,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "incremental_polling",
     objects: ["databases", "pages", "blocks", "documents", "decisions", "chunks"],
-    icon: BookOpenText,
   },
   {
     id: "calendar",
@@ -211,7 +195,6 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     authStrategy: "oauth",
     syncMode: "scheduled_polling",
     objects: ["calendars", "events", "attendees", "follow_ups", "decisions"],
-    icon: CalendarDays,
   },
 ];
 

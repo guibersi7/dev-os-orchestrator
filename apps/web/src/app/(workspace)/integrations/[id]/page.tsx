@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { BrandIcon } from "@/features/integrations/icons";
 import { Card } from "@/components/ui/card";
 import { IntegrationEmptyState } from "@/components/workspace/integration-empty-state";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
@@ -14,7 +15,6 @@ export default async function IntegrationDetailPage({ params }: { params: Promis
     notFound();
   }
 
-  const Icon = source.icon;
   const connectionsState = await getConnectionsState();
   const connection = connectionsState.data?.connections.find((item) => item.service === source.id);
   const connected = connection?.status === "connected" && connection.hasToken;
@@ -29,7 +29,7 @@ export default async function IntegrationDetailPage({ params }: { params: Promis
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-start gap-4">
           <span className="flex h-12 w-12 items-center justify-center rounded-md bg-[#1A2130] text-[#E9EDF7]">
-            <Icon className="h-6 w-6" />
+            <BrandIcon service={source.id} size={22} />
           </span>
           <div>
             <Badge tone={status === "connected" ? "green" : syncState.error ? "red" : "neutral"}>
@@ -53,7 +53,6 @@ export default async function IntegrationDetailPage({ params }: { params: Promis
           title={`Connect ${source.name} to see workspace data`}
           description="This integration has not been connected for the current workspace yet. Connect it to authorize access, choose the right scope, and start syncing real work events."
           service={source.id}
-          icon={Icon}
           actionLabel={`Connect ${source.name}`}
         />
       ) : null}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BrandIcon } from "@/features/integrations/icons";
 import { Card } from "@/components/ui/card";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 
@@ -19,14 +20,13 @@ export default async function ConnectIntegrationPage({ params }: { params: Promi
     redirect(`/api/integrations/${integration.id}/connect`);
   }
 
-  const Icon = integration.icon;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Card className="p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
-            <Icon className="h-6 w-6" />
+            <BrandIcon service={integration.id} size={22} />
           </span>
           <div className="min-w-0">
             <Badge tone="blue">{integration.name} OAuth</Badge>

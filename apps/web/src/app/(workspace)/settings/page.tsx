@@ -3,6 +3,7 @@ import { AnimeStagger } from "@/components/motion/anime-stagger";
 import { SpringReveal } from "@/components/motion/react-spring-reveal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BrandIcon } from "@/features/integrations/icons";
 import { Card } from "@/components/ui/card";
 import { getIntegrationCatalogItem, integrationCatalog } from "@/features/integrations/catalog";
 import { type ConnectionStatus, getConfigState, getConnectionsState } from "@/lib/api-client";
@@ -113,14 +114,13 @@ export default async function SettingsPage({
             const connection = connections.get(integration.id);
             const status = connection?.status ?? "available";
             const connected = status === "connected" || status === "syncing";
-            const Icon = integration.icon;
 
             return (
               <Card key={integration.id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-surface text-brand-primary">
-                      <Icon className="h-5 w-5" />
+                      <BrandIcon service={integration.id} size={18} />
                     </span>
                     <div>
                       <p className="text-sm font-semibold">{integration.name}</p>

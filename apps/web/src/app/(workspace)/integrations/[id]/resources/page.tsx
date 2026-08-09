@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BrandIcon } from "@/features/integrations/icons";
 import { Card } from "@/components/ui/card";
 import { getIntegrationCatalogItem } from "@/features/integrations/catalog";
 import { getSelectableResourcesState } from "@/lib/api-client";
@@ -24,7 +25,6 @@ export default async function IntegrationResourcesPage({
 
   const resourcesState = await getSelectableResourcesState(integration.id);
   const payload = resourcesState.data;
-  const Icon = integration.icon;
   const resourceConfig = integration.resources;
 
   return (
@@ -38,7 +38,7 @@ export default async function IntegrationResourcesPage({
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary text-[#E9EDF7]">
-              <Icon className="h-6 w-6" />
+              <BrandIcon service={integration.id} size={22} />
             </span>
             <div>
               <Badge tone={paramsValue?.connected ? "green" : payload?.status === "needs_auth" ? "amber" : "blue"}>
