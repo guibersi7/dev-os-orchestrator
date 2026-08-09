@@ -100,6 +100,14 @@ class AgentServiceTest(unittest.TestCase):
             "https://api.groq.com/openai/v1/chat/completions",
         )
         self.assertEqual(
+            _chat_completions_url("https://api.groq.com/openai/v1/chat"),
+            "https://api.groq.com/openai/v1/chat/completions",
+        )
+        self.assertEqual(
+            _chat_completions_url("https://api.groq.com/openai/v1/chat/completions"),
+            "https://api.groq.com/openai/v1/chat/completions",
+        )
+        self.assertEqual(
             _chat_completions_url("http://localhost:11434"),
             "http://localhost:11434/v1/chat/completions",
         )
